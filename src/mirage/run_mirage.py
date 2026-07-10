@@ -70,7 +70,7 @@ Environment Variables:
     parser.add_argument(
         "--input", "-i",
         type=str,
-        help="Input directory containing documents (PDF, HTML, etc.)"
+        help="Input directory containing documents (PDF, HTML, TXT, Markdown, etc.)"
     )
     parser.add_argument(
         "--output", "-o",
@@ -170,6 +170,21 @@ Environment Variables:
         default=2,
         help="Maximum depth for multi-hop context retrieval (default: 2)"
     )
+    parser.add_argument(
+        "--no-strict-multihop",
+        action="store_true",
+        help="Disable single-chunk shortcut checks for generated QA pairs"
+    )
+    parser.add_argument(
+        "--min-supporting-chunks",
+        type=int,
+        help="Minimum distinct chunks required by strict multi-hop verification"
+    )
+    parser.add_argument(
+        "--no-jsonl",
+        action="store_true",
+        help="Do not write JSONL copies of generated QA outputs"
+    )
     
     # Output options
     parser.add_argument(
@@ -188,6 +203,9 @@ Environment Variables:
 
 def setup_environment(args):
     """Set up environment variables based on arguments."""
+    if args.config:
+        os.environ["MIRAGE_CONFIG"] = args.config
+
     # Set API key if provided
     if args.api_key:
         if args.backend == "gemini":
@@ -227,6 +245,12 @@ def setup_environment(args):
         os.environ["MIRAGE_RERANKER_MODEL"] = args.reranker_model
     if args.max_depth:
         os.environ["MIRAGE_MAX_DEPTH"] = str(args.max_depth)
+    if args.no_strict_multihop:
+        os.environ["MIRAGE_STRICT_MULTIHOP"] = "0"
+    if args.min_supporting_chunks:
+        os.environ["MIRAGE_MIN_SUPPORTING_CHUNKS"] = str(args.min_supporting_chunks)
+    if args.no_jsonl:
+        os.environ["MIRAGE_OUTPUT_JSONL"] = "0"
     
     # Set optional pipeline flags (off by default, enable with flags)
     if args.deduplication:

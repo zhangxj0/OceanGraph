@@ -14,6 +14,7 @@ This module also includes simple retrieval functions for single-query use cases.
 
 import json
 import re
+import hashlib
 import torch
 import faiss
 import numpy as np
@@ -432,6 +433,10 @@ def parse_verification_response(response: str) -> Tuple[str, Optional[List[str]]
         search_strings: List of search strings if incomplete, None if complete
         explanation: Explanation text
     """
+    # Some OpenAI-compatible models occasionally drop the leading pipe in the
+    # project delimiter (<|#|> -> <#|>). Normalize before parsing.
+    response = response.replace("<#|>", "<|#|>")
+
     # Try new delimiter-based format first
     tuple_delimiter = "<|#|>"
     
@@ -716,7 +721,8 @@ def build_complete_context(
     expert_persona: str = None,
     domain: str = None,
     log_details: bool = True,
-    chunk_addition_mode: str = CHUNK_ADDITION_MODE
+    chunk_addition_mode: str = CHUNK_ADDITION_MODE,
+    min_context_chunks: int = 1,
 ) -> Dict:
     """Build complete context through iterative verification and retrieval
     
@@ -729,6 +735,7 @@ def build_complete_context(
         domain: Domain context for evaluation
         log_details: Whether to include detailed iteration logs in output
         chunk_addition_mode: "EXPLANATORY" (only direct answers) or "RELATED" (both)
+        min_context_chunks: Minimum distinct chunks required before early COMPLETE stop
     
     Returns:
         Dict with:
@@ -791,11 +798,38 @@ def build_complete_context(
     # Helper to get combined text for return value
     def get_combined_text(chunks):
         return "\n\n".join([c['content'] for c in chunks])
+
+    def fallback_search_strings(chunks):
+        combined = re.sub(r"\s+", " ", get_combined_text(chunks)).strip()
+        if not combined:
+            return []
+        seed = combined[:700]
+        return [
+            seed,
+            f"related evidence needed to connect this ocean-science statement: {seed[:350]}",
+        ]
     
     # Helper to check if chunk already added (by file_name + chunk_id)
     def is_chunk_added(file_name, chunk_id):
         return any(c.get('file_name') == file_name and c.get('chunk_id') == chunk_id 
                   for c in chunks_added)
+
+    def chunk_fingerprint(content):
+        normalized = re.sub(r"\s+", " ", str(content or "")).strip().lower()
+        return hashlib.sha1(normalized.encode("utf-8")).hexdigest()
+
+    content_fingerprints = {
+        chunk_fingerprint(c.get('content', ''))
+        for c in current_chunks
+        if c.get('content')
+    }
+
+    def is_duplicate_content(chunk):
+        return chunk_fingerprint(chunk.get('content', '')) in content_fingerprints
+
+    def remember_chunk_content(chunk):
+        if chunk.get('content'):
+            content_fingerprints.add(chunk_fingerprint(chunk.get('content', '')))
     
     # Helper to add chunk to tracking
     def add_chunk_to_tracking(file_name, chunk_id):
@@ -845,6 +879,22 @@ def build_complete_context(
         iter_log['explanation'] = explanation
         iter_log['search_strings'] = search_strings
         
+        if status == "COMPLETE" and len(current_chunks) < min_context_chunks and depth < max_depth:
+            print(
+                f"\n[INFO] Context verified as COMPLETE but has only "
+                f"{len(current_chunks)}/{min_context_chunks} chunks; forcing retrieval for strict multi-hop."
+            )
+            status = "INCOMPLETE"
+            if not search_strings:
+                search_strings = fallback_search_strings(current_chunks)
+                iter_log['search_strings'] = search_strings
+            explanation = (
+                f"{explanation}\nForced retrieval because the run requires at least "
+                f"{min_context_chunks} distinct supporting chunks."
+            )
+            iter_log['status'] = status
+            iter_log['explanation'] = explanation
+
         if status == "COMPLETE":
             hop_count = len(chunks_added) - 1  # Each hop adds one link
             print(f"\n[OK] Context is COMPLETE at depth {depth}, hop_count={hop_count}")
@@ -911,7 +961,8 @@ def build_complete_context(
                     initial_chunk_id = current_chunks[0].get('chunk_id', 'initial')
                     initial_file_name = current_chunks[0].get('file_name', 'unknown')
                     
-                    if (not is_chunk_added(file_name, chunk_id) and 
+                    if (not is_chunk_added(file_name, chunk_id) and
+                        not is_duplicate_content(chunk) and
                         not (file_name == initial_file_name and chunk_id == initial_chunk_id)):
                         candidates_to_verify.append((search_string, chunk))
                         candidate_info.append((file_name, chunk_id, chunk['score']))
@@ -957,7 +1008,11 @@ def build_complete_context(
                 iter_log['retrieved_chunks'].append(chunk_log)
                 
                 if status in accepted_statuses:
+                    if is_duplicate_content(chunk):
+                        print(f"    [SKIP] Duplicate content after verification: {file_name}:{chunk_id}")
+                        continue
                     add_chunk_to_tracking(file_name, chunk_id)
+                    remember_chunk_content(chunk)
                     # Add classification tag to chunk for context building
                     chunk['classification'] = status
                     new_chunks.append(chunk)

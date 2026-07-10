@@ -15,11 +15,16 @@ import json
 import re
 import logging
 import os
-from typing import Dict, List
+from typing import Any, Dict, List, Tuple
 from tqdm import tqdm
 from mirage.core.llm import call_vlm_interweaved, setup_logging, batch_call_vlm_interweaved
 from mirage.pipeline.context import build_complete_context
 from mirage.pipeline.domain import fetch_domain_and_role, load_domain_expert_from_env, save_domain_expert_to_env
+from mirage.pipeline.evidence_graph import (
+    build_evidence_graph,
+    build_search_trajectory,
+    ensure_short_answers,
+)
 from mirage.core.prompts import PROMPTS, PROMPTS_CHUNK
 
 # Configuration (override via config.yaml or command line)
@@ -33,6 +38,101 @@ CHUNK_ADDITION_MODE = "RELATED"  # EXPLANATORY (only direct answers) or RELATED 
 def call_ai_service(prompt: str, chunks: List[Dict]) -> str:
     """Unified call to VLM using interleaved chunks"""
     return call_vlm_interweaved(prompt, chunks)
+
+
+def _as_list(value: Any) -> List:
+    """Return value as a list while preserving empty values as []."""
+    return value if isinstance(value, list) else []
+
+
+def _coerce_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def get_structured_qa_fields(qa_pair: Dict) -> Dict:
+    """Return dataset-facing structured fields from a generated QA pair."""
+    return {
+        "question_type": qa_pair.get("question_type", "multihop"),
+        "answer_type": qa_pair.get("answer_type", ""),
+        "short_answers": _as_list(qa_pair.get("short_answers")),
+        "subdomain": qa_pair.get("subdomain", ""),
+        "declared_hop_count": qa_pair.get("hop_count", None),
+        "sub_questions": _as_list(qa_pair.get("sub_questions")),
+        "reasoning_path": qa_pair.get("reasoning_path", ""),
+        "supporting_facts": _as_list(qa_pair.get("supporting_facts")),
+        "evidence_spans": _as_list(qa_pair.get("evidence_spans")),
+    }
+
+
+def _extract_json_object(response: str) -> Dict:
+    """Extract the first JSON object from an LLM response."""
+    if not response:
+        return {}
+
+    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", response, re.DOTALL | re.IGNORECASE)
+    json_text = fenced.group(1) if fenced else None
+
+    if json_text is None:
+        start = response.find("{")
+        end = response.rfind("}")
+        if start == -1 or end <= start:
+            return {}
+        json_text = response[start:end + 1]
+
+    try:
+        parsed = json.loads(json_text)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        logging.warning("Could not parse structured QA JSON response")
+        return {}
+
+
+def _parse_json_qa_response(response: str) -> Tuple[List[Dict], Dict]:
+    """Parse the preferred structured QA JSON response."""
+    data = _extract_json_object(response)
+    if not data:
+        return [], {}
+
+    qa_pairs_raw = data.get("qa_pairs", [])
+    if not isinstance(qa_pairs_raw, list):
+        return [], {}
+
+    qa_metadata = {
+        "keywords_per_chunk": data.get("keywords_per_chunk", {}),
+        "related_keywords": data.get("related_keywords", ""),
+        "chunk_count": _coerce_int(data.get("chunk_count"), 0),
+    }
+
+    qa_pairs = []
+    for item in qa_pairs_raw:
+        if not isinstance(item, dict):
+            continue
+
+        question = str(item.get("question", "")).strip()
+        answer = str(item.get("answer", "")).strip()
+        if not question or not answer:
+            continue
+
+        qa_pairs.append({
+            "question": question,
+            "answer": answer,
+            "short_answers": _as_list(item.get("short_answers")),
+            "relevance_score": str(_coerce_int(item.get("relevance_score"), 0)),
+            "difficulty_score": str(_coerce_int(item.get("difficulty_score"), 0)),
+            "question_type": item.get("question_type", "multihop"),
+            "answer_type": item.get("answer_type", ""),
+            "subdomain": item.get("subdomain", ""),
+            "hop_count": _coerce_int(item.get("hop_count"), qa_metadata["chunk_count"]),
+            "sub_questions": _as_list(item.get("sub_questions")),
+            "reasoning_path": item.get("reasoning_path", ""),
+            "supporting_facts": _as_list(item.get("supporting_facts")),
+            "evidence_spans": _as_list(item.get("evidence_spans")),
+        })
+
+    return qa_pairs, qa_metadata
 
 def check_chunk_relevance(chunk_content: str, expert_persona: str, domain: str) -> bool:
     """Check if a chunk is relevant to the expert role and domain. Returns True if relevant, False otherwise."""
@@ -113,6 +213,12 @@ def generate_qa(chunks: List[Dict], expert_persona: str, domain: str) -> tuple:
     completion_delimiter = PROMPTS.get("DEFAULT_COMPLETION_DELIMITER", "<|#|>END<|#|>")
     
     try:
+        structured_pairs, structured_metadata = _parse_json_qa_response(response)
+        if structured_pairs:
+            qa_metadata.update(structured_metadata)
+            print(f"[OK] Generated {len(structured_pairs)} structured Q&A pair(s)")
+            return structured_pairs, qa_metadata
+
         # Remove completion delimiter if present
         full_response = response
         if completion_delimiter in response:
@@ -444,6 +550,134 @@ def batch_verify_qa(chunks: List[Dict], qa_pairs: List[Dict], expert_persona: st
     
     return responses
 
+
+def _parse_single_chunk_shortcut_response(response: str) -> Tuple[str, str]:
+    """Parse the anti-shortcut verifier response."""
+    tuple_delimiter = PROMPTS.get("DEFAULT_TUPLE_DELIMITER", "<|#|>")
+    status = "UNKNOWN"
+    explanation = ""
+
+    if response and tuple_delimiter in response:
+        parts = response.split(tuple_delimiter)
+        for i, part in enumerate(parts):
+            key = part.strip().lower()
+            if key == "status" and i + 1 < len(parts):
+                candidate = parts[i + 1].strip().upper()
+                if candidate in {"CAN_ANSWER", "PARTIAL_ONLY", "CANNOT_ANSWER"}:
+                    status = candidate
+            elif key == "explanation" and i + 1 < len(parts):
+                explanation = parts[i + 1].strip()
+
+    if status == "UNKNOWN" and response:
+        upper = response.upper()
+        if "CANNOT_ANSWER" in upper:
+            status = "CANNOT_ANSWER"
+        elif "PARTIAL_ONLY" in upper:
+            status = "PARTIAL_ONLY"
+        elif "CAN_ANSWER" in upper:
+            status = "CAN_ANSWER"
+
+    return status, explanation
+
+
+def _chunk_source_id(chunk: Dict, idx: int) -> str:
+    file_name = chunk.get("file_name", "unknown")
+    chunk_id = chunk.get("global_chunk_id") or chunk.get("chunk_id", str(idx))
+    return f"{file_name}:{chunk_id}"
+
+
+def verify_multihop_necessity(
+    chunks: List[Dict],
+    question: str,
+    answer: str,
+    expert_persona: str,
+    domain: str,
+    min_supporting_chunks: int = 2
+) -> Dict:
+    """Reject shortcut questions that can be answered by any single chunk."""
+    usable_chunks = [
+        chunk for chunk in chunks
+        if isinstance(chunk, dict) and str(chunk.get("content", "")).strip()
+    ]
+
+    distinct_sources = {
+        _chunk_source_id(chunk, idx)
+        for idx, chunk in enumerate(usable_chunks, 1)
+    }
+    if len(distinct_sources) < min_supporting_chunks:
+        return {
+            "status": "INSUFFICIENT_CHUNKS",
+            "passes": False,
+            "min_supporting_chunks": min_supporting_chunks,
+            "distinct_chunk_count": len(distinct_sources),
+            "single_chunk_checks": [],
+        }
+
+    if domain:
+        domain_context = f" in the field of {domain}"
+    else:
+        domain_context = ""
+
+    requests = []
+    chunk_labels = []
+    for idx, chunk in enumerate(usable_chunks, 1):
+        prompt = PROMPTS["single_chunk_shortcut_check"].format(
+            question=question,
+            answer=answer,
+            expert_persona=expert_persona,
+            domain_context=domain_context
+        )
+        requests.append((prompt, [chunk]))
+        chunk_labels.append(_chunk_source_id(chunk, idx))
+
+    if len(requests) > 1:
+        responses = batch_call_vlm_interweaved(requests, show_progress=False)
+    else:
+        responses = [call_ai_service(requests[0][0], requests[0][1])]
+
+    checks = []
+    shortcut_chunks = []
+    unknown_chunks = []
+    partial_chunks = []
+    for label, response in zip(chunk_labels, responses):
+        status, explanation = _parse_single_chunk_shortcut_response(response)
+        check = {
+            "chunk": label,
+            "status": status,
+            "explanation": explanation,
+        }
+        checks.append(check)
+        if status == "CAN_ANSWER":
+            shortcut_chunks.append(label)
+        elif status == "UNKNOWN":
+            unknown_chunks.append(label)
+        elif status == "PARTIAL_ONLY":
+            partial_chunks.append(label)
+
+    if shortcut_chunks:
+        status = "SHORTCUT_FOUND"
+        passes = False
+    elif unknown_chunks:
+        status = "UNKNOWN_SINGLE_CHUNK_CHECK"
+        passes = False
+    else:
+        status = "MULTIHOP_REQUIRED"
+        passes = len(partial_chunks) >= min_supporting_chunks
+
+    return {
+        "status": status,
+        "passes": passes,
+        "min_supporting_chunks": min_supporting_chunks,
+        "distinct_chunk_count": len(distinct_sources),
+        "shortcut_chunks": shortcut_chunks,
+        "single_chunk_checks": checks,
+    }
+
+
+def is_multihop_necessity_successful(result: Dict) -> bool:
+    return bool(result and result.get("passes") is True)
+
+
 def process_chunk_for_qa(chunk_data: Dict, expert_persona: str, domain: str) -> Dict:
     """Complete pipeline: build context, generate Q&A using pre-extracted role, verify"""
     chunk_id = chunk_data.get('chunk_id', 'unknown')
@@ -498,17 +732,22 @@ def process_chunk_for_qa(chunk_data: Dict, expert_persona: str, domain: str) -> 
         for i, (qa_pair, verification_result) in enumerate(zip(selected_pairs, verification_results), 1):
             question = qa_pair["question"]
             answer = qa_pair["answer"]
+            qa_pair["short_answers"] = ensure_short_answers(qa_pair)
+            evidence_graph = build_evidence_graph(context_chunks, qa_pair, qa_metadata)
             print(f"\n  Q&A {i}: {question[:80]}...")
             print(f"  Verification: {verification_result[:100] if verification_result else 'ERROR'}...")
             
             verified_qa_pairs.append({
                 "question": question,
                 "answer": answer,
+                **get_structured_qa_fields(qa_pair),
                 "relevance_score": qa_pair.get("relevance_score", "0"),
                 "difficulty_score": qa_pair.get("difficulty_score", "0"),
                 "selection_status": qa_pair.get("selection_status", "SELECTED"),
                 "selection_reason": qa_pair.get("selection_reason", ""),
-                "verification_result": verification_result or "ERROR"
+                "verification_result": verification_result or "ERROR",
+                "evidence_graph": evidence_graph,
+                "search_trajectory": build_search_trajectory(context_result),
             })
     
     return {
@@ -520,6 +759,7 @@ def process_chunk_for_qa(chunk_data: Dict, expert_persona: str, domain: str) -> 
         "depth_reached": context_result['depth'],
         "chunks_added": context_result['chunks_added'],
         "search_history": context_result.get('search_history', []),
+        "search_trajectory": build_search_trajectory(context_result),
         "expert_persona": expert_persona,
         "domain": domain,
         "keywords_per_chunk": qa_metadata.get('keywords_per_chunk', {}),
@@ -843,6 +1083,7 @@ if __name__ == "__main__":
                         "domain": result.get("domain", ""),
                         "question": qa_pair["question"],
                         "answer": qa_pair["answer"],
+                        **get_structured_qa_fields(qa_pair),
                         "relevance_score": qa_pair.get("relevance_score", "0"),
                         "difficulty_score": qa_pair.get("difficulty_score", "0"),
                         "selection_status": qa_pair.get("selection_status", "SELECTED"),
@@ -866,6 +1107,7 @@ if __name__ == "__main__":
                         "domain": result.get("domain", ""),
                         "question": qa_pair["question"],
                         "answer": qa_pair["answer"],
+                        **get_structured_qa_fields(qa_pair),
                         "relevance_score": qa_pair.get("relevance_score", "0"),
                         "difficulty_score": qa_pair.get("difficulty_score", "0"),
                         "selection_status": qa_pair.get("selection_status", "SELECTED"),
@@ -891,6 +1133,7 @@ if __name__ == "__main__":
                     "domain": result.get("domain", ""),
                     "question": qa_pair["question"],
                     "answer": qa_pair["answer"],
+                    **get_structured_qa_fields(qa_pair),
                     "relevance_score": qa_pair.get("relevance_score", "0"),
                     "difficulty_score": qa_pair.get("difficulty_score", "0"),
                     "selection_status": qa_pair.get("selection_status", "REJECTED"),

@@ -20,6 +20,10 @@ _LAZY_IMPORTS = {
     "generate_qa_for_chunk": ("qa_generator", "generate_qa_for_chunk"),
     "verify_qa_pair": ("qa_generator", "verify_qa_pair"),
     "select_best_qa_pairs": ("qa_generator", "select_best_qa_pairs"),
+    # Evidence graph and Search-R1 supervision
+    "build_evidence_graph": ("evidence_graph", "build_evidence_graph"),
+    "build_search_trajectory": ("evidence_graph", "build_search_trajectory"),
+    "ensure_short_answers": ("evidence_graph", "ensure_short_answers"),
     # Domain
     "fetch_domain_and_role": ("domain", "fetch_domain_and_role"),
     "load_domain_expert_from_env": ("domain", "load_domain_expert_from_env"),

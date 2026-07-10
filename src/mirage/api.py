@@ -151,6 +151,15 @@ class MiRAGEConfig:
     
     chunk_addition_mode: str = "RELATED"
     """How to add chunks during context building: "RELATED" or "EXPLANATORY" """
+
+    strict_multihop_verification: bool = True
+    """Reject QA pairs that can be answered from any single context chunk."""
+
+    min_supporting_chunks: int = 2
+    """Minimum number of distinct chunks required for strict multi-hop QA."""
+
+    output_jsonl: bool = True
+    """Also write JSONL copies of generated QA outputs."""
     
     # =========================================================================
     # Document Processing (PDF/HTML -> Markdown)
@@ -349,6 +358,9 @@ class MiRAGEConfig:
             max_breadth=retrieval.get('max_breadth', 5),
             chunks_per_search=retrieval.get('chunks_per_search', 2),
             chunk_addition_mode=retrieval.get('chunk_addition_mode', 'RELATED'),
+            strict_multihop_verification=qa_gen.get('strict_multihop_verification', True),
+            min_supporting_chunks=qa_gen.get('min_supporting_chunks', 2),
+            output_jsonl=qa_gen.get('output_jsonl', True),
             # Processing
             max_workers=parallel.get('qa_max_workers', 4),
             num_cpu_workers=parallel.get('num_workers', 3),
@@ -405,6 +417,9 @@ class MiRAGEConfig:
             'qa_generation': {
                 'num_qa_pairs': self.num_qa_pairs,
                 'type': self.qa_type,
+                'strict_multihop_verification': self.strict_multihop_verification,
+                'min_supporting_chunks': self.min_supporting_chunks,
+                'output_jsonl': self.output_jsonl,
             },
             'retrieval': {
                 'multihop': {
@@ -551,8 +566,10 @@ class MiRAGEResults:
                 'question': qa.get('question', ''),
                 'answer': qa.get('answer', ''),
                 'question_type': qa.get('question_type', ''),
-                'difficulty': qa.get('difficulty', ''),
-                'num_hops': qa.get('num_hops', 0),
+                'subdomain': qa.get('subdomain', ''),
+                'difficulty': qa.get('difficulty_score', qa.get('difficulty', '')),
+                'num_hops': qa.get('hop_count', qa.get('declared_hop_count', 0)),
+                'strict_multihop_status': qa.get('multihop_necessity_result', {}).get('status', ''),
             }
             for k, v in qa.items():
                 if k not in row and isinstance(v, (str, int, float, bool)):
@@ -826,6 +843,9 @@ class MiRAGE:
         os.environ["MIRAGE_NUM_QA_PAIRS"] = str(cfg.num_qa_pairs)
         os.environ["MIRAGE_MAX_WORKERS"] = str(cfg.max_workers)
         os.environ["MIRAGE_MAX_DEPTH"] = str(cfg.max_depth)
+        os.environ["MIRAGE_STRICT_MULTIHOP"] = "1" if cfg.strict_multihop_verification else "0"
+        os.environ["MIRAGE_MIN_SUPPORTING_CHUNKS"] = str(cfg.min_supporting_chunks)
+        os.environ["MIRAGE_OUTPUT_JSONL"] = "1" if cfg.output_jsonl else "0"
         
         # Pipeline flags
         if cfg.skip_pdf_processing:

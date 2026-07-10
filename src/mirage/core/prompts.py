@@ -332,8 +332,8 @@ You are a(n) {expert_persona} in the domain of {domain_context}. Your task is to
 **EXECUTION PROTOCOL:**
 1.  **Analyze:** Identify distinct chunks and extract critical technical keywords for each.
 2.  **Map:** Identify "Bridge Keywords"--concepts that intersect or relate across different chunks.
-3.  **Synthesize:** Construct one or more questions that **requires** combining information from multiple chunks to answer. If a question can be answered by a single chunk, it is invalid.
-4.  **Decompose:** Verify the logic by mapping specific parts of the Questions and Answers back to their source chunks.
+3.  **Synthesize:** Construct one or more questions that **require** combining information from multiple chunks to answer. If a question can be answered by a single chunk, it is invalid.
+4.  **Decompose:** Verify the logic by mapping specific parts of the question and answer back to their source chunks.
 
 **CRITICAL CONSTRAINTS:**
 *   **Multi-Hop Requirement:** The questions must be unsolvable without synthesizing facts from at least two distinct locations in the text.
@@ -341,60 +341,52 @@ You are a(n) {expert_persona} in the domain of {domain_context}. Your task is to
     *   **NEVER** use vague phrases like "the provided text," "the second figure," or "Section 1."
     *   **ALWAYS** explicitly name the specific entity, standard, or concept (e.g., "In the Q3 Financial Report..." or "According to the ISO 9001 guidelines...").
 *   **Strict Grounding:** Answer ONLY using the provided content. Do not hallucinate external details.
+*   **Reward-Friendly Short Answers:** Always include `short_answers` for each QA pair. These must be minimal exact-match targets: entity names, list items, numeric values, or yes/no labels. Do not include explanations, evidence, or full sentences. If a question needs an explanatory `answer`, make `short_answers` contain only the core answer span that should receive EM/F1 credit.
+
+**Ocean-domain guidance when applicable:**
+Prefer questions that cross at least two of these evidence types: physical oceanography, marine chemistry, marine ecology, marine geology, ocean engineering, air-sea interaction, climate-ocean coupling, remote sensing, observing systems, and regional ocean processes.
+Useful question types include bridge, comparison, causal, temporal, spatial, and numeric_aggregation.
 
 **OUTPUT FORMAT:**
-Respond using strictly this format (repeat for each distinct question(s)/answer(s) pair):
+Return exactly one valid JSON object and no prose outside it. Use this schema:
 
-<|#|>START<|#|>
-Chunk Count: <Integer>
-Keywords per Chunk: <Chunk 1: [A, B], Chunk 2: [C, D]>
-Related Keywords: <[A] relates to [C] via...>
-<|#|>QA_GENERATION<|#|>
-Question: <Specific, self-contained, multi-hop question>
-Answer: <Concise synthesized answer>
-Relevance: <0-10>
-Difficulty: <0-10>
-<|#|>DECOMPOSITION<|#|>
-Question Source: <Specific phrase in Q -> Derived from Chunk X>
-Answer Source: <Specific fact in A -> Derived from Chunk Y>
-<|#|>NEXT<|#|>
-Question: ...
-Answer: ...
-Relevance: ...
-Difficulty: ...
-Question Source: ...
-Answer Source: ...
-<|#|>NEXT<|#|>
-...
-
-<|#|>END<|#|>
-
-------------------------------------------------
-Example 1:
-------------------------------------------------
-Expert Persona: Food Safety Officer
-Domain Context: Dietary Compliance & Menu Auditing
-Content: 
-
-    [Chunk 1: Bistro Menu Description] The "Autumn Harvest Risotto" is a creamy dish featuring Arborio rice, butternut squash, aged parmesan cheese, and is slow-cooked in a house-made chicken broth. 
-
-    [Chunk 2: The Green-Leaf Certification Guide] To qualify for the "Green-Leaf Vegetarian Label," a dish must be entirely free of meat, poultry, and seafood flesh, including any stocks, broths, or gravies derived from animal tissue. Dairy and eggs are permitted. 
-     
-System Response: 
-
-<|#|>START<|#|>
-Chunk Count: 2
-Keywords per Chunk: <Chunk 1: [Autumn Harvest Risotto, chicken broth, parmesan cheese], Chunk 2: [Green-Leaf Vegetarian Label, free of meat/poultry, stocks/broths derived from animal tissue]>
-Related Keywords: <[chicken broth] relates to [stocks/broths derived from animal tissue] via poultry origin>
-<|#|>QA_GENERATION<|#|>
-Question: According to the Green-Leaf Certification Guide, why does the "Autumn Harvest Risotto" fail to qualify for the "Green-Leaf Vegetarian Label"?
-Answer: The "Autumn Harvest Risotto" fails to qualify because it is cooked in chicken broth, and the Green-Leaf Certification Guide explicitly excludes dishes containing stocks or broths derived from animal tissue (poultry).
-Relevance: 10
-Difficulty: 3
-<|#|>DECOMPOSITION<|#|>
-Question Source: <"Autumn Harvest Risotto" -> Derived from Chunk 1; "Green-Leaf Vegetarian Label" -> Derived from Chunk 2>
-Answer Source: <Contains "chicken broth" -> Derived from Chunk 1; "Excludes stocks/broths derived from animal tissue" -> Derived from Chunk 2>
-<|#|>END<|#|> 
+{{
+  "chunk_count": <integer>,
+  "keywords_per_chunk": {{
+    "chunk_1": ["keyword", "keyword"],
+    "chunk_2": ["keyword", "keyword"]
+  }},
+  "related_keywords": "short explanation of the bridge concepts across chunks",
+  "qa_pairs": [
+    {{
+      "question": "specific, standalone multi-hop question",
+      "answer": "concise answer grounded only in the chunks",
+      "short_answers": [
+        "canonical minimal answer for exact-match scoring",
+        "optional alias or reordered list form"
+      ],
+      "question_type": "bridge | comparison | causal | temporal | spatial | numeric_aggregation",
+      "answer_type": "entity | description | numeric | list | yes_no",
+      "subdomain": "physical_oceanography | marine_chemistry | marine_ecology | marine_geology | ocean_engineering | climate_ocean | remote_sensing | observing_systems | mixed",
+      "hop_count": <integer>,
+      "sub_questions": [
+        "single-hop sub-question answered by one chunk",
+        "single-hop sub-question answered by another chunk"
+      ],
+      "reasoning_path": "one or two sentences explaining how the sub-answers combine",
+      "supporting_facts": [
+        {{"chunk": "Chunk 1", "fact": "minimal fact copied or paraphrased from the chunk"}},
+        {{"chunk": "Chunk 2", "fact": "minimal fact copied or paraphrased from the chunk"}}
+      ],
+      "evidence_spans": [
+        {{"chunk": "Chunk 1", "span": "short exact evidence phrase"}},
+        {{"chunk": "Chunk 2", "span": "short exact evidence phrase"}}
+      ],
+      "relevance_score": <integer 0-10>,
+      "difficulty_score": <integer 0-10>
+    }}
+  ]
+}}
 
 """
 
@@ -531,6 +523,29 @@ Status<|#|>QUESTION_INCORRECT, ANSWER_CORRECT, REQUIRES_CONTENT<|#|>Explanation<
 <|#|>END<|#|>
 """
 
+PROMPTS["single_chunk_shortcut_check"] = """
+You are a(n) {expert_persona} from the domain of {domain_context} working as an adversarial multi-hop QA verifier.
+
+The QA pair below is supposed to require evidence from multiple chunks. You will see exactly ONE candidate chunk. Decide whether this single chunk alone is enough to answer the question with the proposed answer.
+
+Question:
+{question}
+
+Proposed Answer:
+{answer}
+
+Rules:
+- CAN_ANSWER: choose this only if the single chunk contains all facts needed to answer the question.
+- PARTIAL_ONLY: choose this if the chunk provides useful evidence but cannot answer the complete question alone.
+- CANNOT_ANSWER: choose this if the chunk is irrelevant or does not support the answer.
+- Be strict: if a reader could answer from this one chunk without any other chunk, mark CAN_ANSWER.
+
+Expected Output Format:
+<|#|>START<|#|>
+Status<|#|><CAN_ANSWER | PARTIAL_ONLY | CANNOT_ANSWER><|#|>Explanation<|#|><Brief single-sentence justification>
+<|#|>END<|#|>
+"""
+
 #%% QA Correction Prompt
 
 PROMPTS["question_answer_generation_corrected"] = """
@@ -546,6 +561,7 @@ Correction Requirements:
     1. Eliminate Vague References to fix QUESTION_INCORRECT: The question must be fully self-contained. Replace terms like "the provided text," "the described X," or "this table" with explicit names (e.g., "According to IEC 60034-7," "In Table 2") if available in the content.
     2. Ensure Specificity to fix ANSWER_INCORRECT: The answer shall correctly answer the question based on the content.
     3. Strict Accuracy to fix CAN_ANSWER_WITHOUT_CONTENT: The answer must rely exclusively on facts and values present in the content. Do not contradict the content or hallucinate external info.
+    4. Strict Multi-Hop Repair: If feedback says "Strict multihop verifier failed" or "SHORTCUT_FOUND", rewrite the question so that no single chunk can answer it. The corrected question must require at least two distinct chunks.
 
 Output Format:
 <|#|>START<|#|>Question<|#|><Corrected, specific, self-contained question><|#|>Answer<|#|><Accurate answer citing specific content sources><|#|>Relevance<|#|><0-10><|#|>Difficulty<|#|><0-10><|#|>END<|#|> 

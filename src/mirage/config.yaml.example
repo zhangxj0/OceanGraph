@@ -61,7 +61,7 @@ rate_limiting:
 # Input/Output Paths
 # -----------------------------------------------------------------------------
 paths:
-  # Input: Either a directory of PDFs/HTMLs or a pre-processed chunks file
+  # Input: Either a directory of PDFs/HTML/TXT/Markdown or a pre-processed chunks file
   input_pdf_dir: data/documents          # Directory with source documents
   input_chunks_file: null                 # Or: path/to/chunks.json
   
@@ -82,6 +82,9 @@ processing:
 qa_generation:
   num_qa_pairs: 1000       # Target number of QA pairs (null = unlimited)
   type: multihop           # Options: 'multihop', 'multimodal', 'text', 'mix'
+  strict_multihop_verification: true  # Reject questions answerable from any single chunk
+  min_supporting_chunks: 2             # Minimum distinct chunks required for accepted QA
+  output_jsonl: true                   # Also save qa_multihop_pass.jsonl for dataset release
 
 # -----------------------------------------------------------------------------
 # Shuffling (for reproducibility)
@@ -214,9 +217,9 @@ chunking:
 # Domain & Expert Role (auto-detect if null)
 # -----------------------------------------------------------------------------
 domain_expert:
-  expert_persona: null     # e.g., "Motor Test Engineer"
-  domain: null             # e.g., "Electrical Engineering - Electric Motors"
-  use_multimodal_embeddings: true
+  expert_persona: "Ocean Science Multi-Hop QA Curator"
+  domain: "Ocean Science and Marine Engineering"
+  use_multimodal_embeddings: false
   output_dir: output/domain_analysis
 
 # -----------------------------------------------------------------------------

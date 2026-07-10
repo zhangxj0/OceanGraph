@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1120" viewBox="0 0 1800 1120">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .panel { fill: #ffffff; stroke: #cfd6e4; stroke-width: 2; rx: 18; }
+      .panel-core { fill: #eef6ff; stroke: #6aa6d9; stroke-width: 2.5; rx: 20; }
+      .panel-ext { fill: #f4fbf5; stroke: #66aa74; stroke-width: 2.5; rx: 20; }
+      .panel-train { fill: #fff7ed; stroke: #d88b3d; stroke-width: 2.5; rx: 20; }
+      .box { fill: #ffffff; stroke: #6e7f95; stroke-width: 1.8; rx: 12; }
+      .box-blue { fill: #ffffff; stroke: #2e77bb; stroke-width: 2; rx: 12; }
+      .box-green { fill: #ffffff; stroke: #348a45; stroke-width: 2; rx: 12; }
+      .box-orange { fill: #ffffff; stroke: #bd6d1f; stroke-width: 2; rx: 12; }
+      .small { font-family: Arial, Helvetica, sans-serif; font-size: 23px; fill: #243142; }
+      .tiny { font-family: Arial, Helvetica, sans-serif; font-size: 19px; fill: #465568; }
+      .title { font-family: Arial, Helvetica, sans-serif; font-size: 34px; font-weight: 700; fill: #172132; }
+      .section { font-family: Arial, Helvetica, sans-serif; font-size: 27px; font-weight: 700; fill: #1c2a3b; }
+      .label { font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: 700; fill: #ffffff; }
+      .tag-core { fill: #2e77bb; rx: 12; }
+      .tag-ext { fill: #348a45; rx: 12; }
+      .tag-train { fill: #bd6d1f; rx: 12; }
+      .arrow { stroke: #45566d; stroke-width: 2.8; fill: none; marker-end: url(#arrowhead); }
+      .arrow-blue { stroke: #2e77bb; stroke-width: 2.8; fill: none; marker-end: url(#arrowhead-blue); }
+      .arrow-green { stroke: #348a45; stroke-width: 2.8; fill: none; marker-end: url(#arrowhead-green); }
+      .arrow-orange { stroke: #bd6d1f; stroke-width: 2.8; fill: none; marker-end: url(#arrowhead-orange); }
+      .dash { stroke-dasharray: 8 7; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#45566d"/>
+    </marker>
+    <marker id="arrowhead-blue" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#2e77bb"/>
+    </marker>
+    <marker id="arrowhead-green" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#348a45"/>
+    </marker>
+    <marker id="arrowhead-orange" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#bd6d1f"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1120"/>
+
+  <text class="title" x="70" y="70">MiRAGE-Ocean to Search-R1: Multi-hop QA Generation with Short-answer Rewards</text>
+
+  <rect class="panel-core" x="55" y="110" width="1110" height="750"/>
+  <rect class="tag-core" x="80" y="130" width="215" height="38"/>
+  <text class="label" x="100" y="156">MiRAGE core</text>
+
+  <rect class="panel-ext" x="1195" y="110" width="550" height="750"/>
+  <rect class="tag-ext" x="1220" y="130" width="235" height="38"/>
+  <text class="label" x="1240" y="156">Our adaptation</text>
+
+  <rect class="panel-train" x="260" y="900" width="1285" height="170"/>
+  <rect class="tag-train" x="285" y="920" width="270" height="38"/>
+  <text class="label" x="305" y="946">Search-R1 training</text>
+
+  <!-- Core pipeline: row 1 -->
+  <rect class="box-blue" x="90" y="210" width="230" height="115"/>
+  <text class="section" x="125" y="250">Source Corpus</text>
+  <text class="tiny" x="120" y="283">PDF / text / markdown</text>
+  <text class="tiny" x="120" y="308">domain documents</text>
+
+  <rect class="box-blue" x="385" y="210" width="250" height="115"/>
+  <text class="section" x="420" y="250">Parsing</text>
+  <text class="tiny" x="415" y="283">Docling, OCR, tables,</text>
+  <text class="tiny" x="415" y="308">figures, markdown</text>
+
+  <rect class="box-blue" x="700" y="210" width="250" height="115"/>
+  <text class="section" x="735" y="250">Semantic Chunks</text>
+  <text class="tiny" x="730" y="283">self-contained units</text>
+  <text class="tiny" x="730" y="308">with metadata</text>
+
+  <rect class="box-blue" x="90" y="400" width="250" height="125"/>
+  <text class="section" x="120" y="440">Embedding Index</text>
+  <text class="tiny" x="120" y="473">BAAI/bge-m3</text>
+  <text class="tiny" x="120" y="498">+ FAISS retrieval</text>
+
+  <rect class="box-blue" x="405" y="400" width="330" height="125"/>
+  <text class="section" x="435" y="440">Context Completion</text>
+  <text class="tiny" x="435" y="473">completeness verifier</text>
+  <text class="tiny" x="435" y="498">query generation + rerank</text>
+
+  <rect class="box-blue" x="800" y="400" width="300" height="125"/>
+  <text class="section" x="830" y="440">Multi-hop Context</text>
+  <text class="tiny" x="830" y="473">seed chunk + supporting</text>
+  <text class="tiny" x="830" y="498">chunks across evidence</text>
+
+  <rect class="box-blue" x="225" y="610" width="310" height="130"/>
+  <text class="section" x="255" y="650">QA Generation Agent</text>
+  <text class="tiny" x="255" y="684">question, long answer,</text>
+  <text class="tiny" x="255" y="710">reasoning path</text>
+
+  <rect class="box-blue" x="630" y="610" width="330" height="130"/>
+  <text class="section" x="660" y="650">Quality Verification</text>
+  <text class="tiny" x="660" y="684">selection, grounding,</text>
+  <text class="tiny" x="660" y="710">single-chunk shortcut test</text>
+
+  <!-- Adaptation panel -->
+  <rect class="box-green" x="1240" y="215" width="445" height="125"/>
+  <text class="section" x="1270" y="255">Ocean-domain Control</text>
+  <text class="tiny" x="1270" y="288">taxonomy, expert persona,</text>
+  <text class="tiny" x="1270" y="314">multihop question types</text>
+
+  <rect class="box-green" x="1240" y="395" width="445" height="135"/>
+  <text class="section" x="1270" y="435">Short-answer Ground Truth</text>
+  <text class="tiny" x="1270" y="468">canonical EM target</text>
+  <text class="tiny" x="1270" y="494">+ aliases / reordered lists</text>
+
+  <rect class="box-green" x="1240" y="595" width="445" height="145"/>
+  <text class="section" x="1270" y="635">Dataset Exporter</text>
+  <text class="tiny" x="1270" y="668">MiRAGE JSON/JSONL</text>
+  <text class="tiny" x="1270" y="694">2Wiki-like JSONL</text>
+  <text class="tiny" x="1270" y="720">Search-R1 JSONL / parquet</text>
+
+  <!-- Outputs in middle bottom of panels -->
+  <rect class="box" x="1005" y="620" width="135" height="100"/>
+  <text class="tiny" x="1027" y="658">supporting</text>
+  <text class="tiny" x="1038" y="684">facts</text>
+
+  <rect class="box" x="1005" y="740" width="135" height="75"/>
+  <text class="tiny" x="1025" y="773">evidence</text>
+  <text class="tiny" x="1040" y="799">spans</text>
+
+  <!-- Training panel -->
+  <rect class="box-orange" x="320" y="975" width="270" height="65"/>
+  <text class="small" x="352" y="1015">Retriever / search env</text>
+
+  <rect class="box-orange" x="665" y="975" width="250" height="65"/>
+  <text class="small" x="704" y="1015">Policy model</text>
+
+  <rect class="box-orange" x="985" y="975" width="250" height="65"/>
+  <text class="small" x="1020" y="1015">EM / F1 reward</text>
+
+  <rect class="box-orange" x="1300" y="975" width="185" height="65"/>
+  <text class="small" x="1330" y="1015">RL update</text>
+
+  <!-- Arrows -->
+  <path class="arrow-blue" d="M320 268 C345 268 360 268 385 268"/>
+  <path class="arrow-blue" d="M635 268 C660 268 675 268 700 268"/>
+  <path class="arrow-blue" d="M825 325 C825 365 760 370 650 400"/>
+  <path class="arrow-blue" d="M700 285 C540 330 345 365 250 400"/>
+  <path class="arrow-blue" d="M340 463 C365 463 380 463 405 463"/>
+  <path class="arrow-blue" d="M735 463 C760 463 775 463 800 463"/>
+  <path class="arrow-blue" d="M950 525 C925 585 780 590 535 645"/>
+  <path class="arrow-blue" d="M535 675 C570 675 595 675 630 675"/>
+  <path class="arrow-blue" d="M960 675 C975 675 990 675 1005 675"/>
+  <path class="arrow-blue" d="M960 700 C980 720 995 742 1005 775"/>
+
+  <path class="arrow-green dash" d="M1240 278 C1120 278 1030 300 945 325"/>
+  <path class="arrow-green" d="M960 675 C1075 640 1165 548 1240 468"/>
+  <path class="arrow-green" d="M1463 530 C1463 555 1463 570 1463 595"/>
+  <path class="arrow-green" d="M1140 670 C1180 670 1205 670 1240 670"/>
+  <path class="arrow-green" d="M1463 740 C1463 825 1160 875 900 975"/>
+
+  <path class="arrow-orange" d="M590 1008 C620 1008 635 1008 665 1008"/>
+  <path class="arrow-orange" d="M915 1008 C945 1008 955 1008 985 1008"/>
+  <path class="arrow-orange" d="M1235 1008 C1265 1008 1270 1008 1300 1008"/>
+  <path class="arrow-orange dash" d="M1392 975 C1330 925 760 925 455 975"/>
+
+  <!-- Small annotations -->
+  <text class="tiny" x="450" y="370">iterative retrieval loop</text>
+  <text class="tiny" x="1230" y="865">reward_model.ground_truth.target = short_answers</text>
+  <text class="tiny" x="72" y="890">Blue blocks preserve the original MiRAGE generation pipeline; green blocks are the added training-data adaptation.</text>
+</svg>

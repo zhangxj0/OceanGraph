@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""OceanGraph-R1 command line entry point.
+
+This module provides a paper-facing wrapper around the internal generation
+engine. It keeps the stable pipeline implementation intact while presenting the
+system as an ocean-domain multi-agent dataset construction framework.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import multiprocessing as mp
+import os
+import sys
+from pathlib import Path
+
+from oceangraph import FRAMEWORK_NAME, FRAMEWORK_VERSION
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "OceanGraph-R1: a domain-aware multi-agent framework for generating "
+            "evidence-grounded ocean science multi-hop QA datasets"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python run_oceangraph.py -i data/ocean_docs -o output/oceangraph_demo
+  python run_oceangraph.py -i data/ocean_docs -o output/oceangraph_demo --backend openai --api-key YOUR_KEY
+  python run_oceangraph.py -i data/ocean_docs -o output/oceangraph_demo --deduplication --evaluation
+
+Pipeline agents:
+  1. Domain Corpus Agent
+  2. Evidence Reasoning Agent
+  3. QA Verification Agent
+""",
+    )
+
+    parser.add_argument("--input", "-i", type=str, help="Input directory containing PDF, HTML, TXT, or Markdown documents")
+    parser.add_argument("--output", "-o", type=str, help="Output directory for generated dataset files")
+    parser.add_argument("--backend", "-b", choices=["gemini", "openai", "ollama"], default="gemini")
+    parser.add_argument("--api-key", "-k", type=str, help="API key for the selected backend")
+    parser.add_argument("--model", type=str, help="Model name to use")
+    parser.add_argument("--config", "-c", type=str, default="config.yaml", help="Path to configuration file")
+    parser.add_argument("--preflight", action="store_true", help="Run environment checks only")
+    parser.add_argument("--skip-pdf-processing", action="store_true", help="Use existing markdown outputs")
+    parser.add_argument("--skip-chunking", action="store_true", help="Use existing chunks.json")
+    parser.add_argument("--deduplication", action="store_true", help="Enable QA deduplication")
+    parser.add_argument("--evaluation", action="store_true", help="Enable evaluation metrics")
+    parser.add_argument("--num-qa-pairs", type=int, default=100, help="Target number of accepted QA pairs")
+    parser.add_argument("--max-workers", type=int, default=4, help="Number of parallel workers")
+    parser.add_argument("--embedding-model", default="auto", help="Embedding model: auto, qwen3_vl, nomic, or bge_m3")
+    parser.add_argument("--reranker-model", default="gemini_vlm", help="Reranker model: gemini_vlm, qwen3_vl, or text_embedding")
+    parser.add_argument("--max-depth", type=int, default=2, help="Maximum depth for multi-hop context retrieval")
+    parser.add_argument("--no-strict-multihop", action="store_true", help="Disable single-chunk shortcut checks")
+    parser.add_argument("--min-supporting-chunks", type=int, help="Minimum distinct chunks required by strict verification")
+    parser.add_argument("--no-jsonl", action="store_true", help="Do not write JSONL copies of QA outputs")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {FRAMEWORK_VERSION}")
+    return parser.parse_args()
+
+
+def setup_environment(args: argparse.Namespace) -> None:
+    """Set both public OceanGraph variables and internal engine variables."""
+    if args.config:
+        os.environ["OCEANGRAPH_CONFIG"] = args.config
+        os.environ["MIRAGE_CONFIG"] = args.config
+
+    if args.api_key:
+        if args.backend == "gemini":
+            os.environ["GEMINI_API_KEY"] = args.api_key
+        elif args.backend == "openai":
+            os.environ["OPENAI_API_KEY"] = args.api_key
+
+    backend = args.backend.upper()
+    os.environ["OCEANGRAPH_BACKEND"] = backend
+    os.environ["MIRAGE_BACKEND"] = backend
+
+    if args.model:
+        os.environ["OCEANGRAPH_MODEL"] = args.model
+        os.environ["MIRAGE_MODEL"] = args.model
+
+    if args.input:
+        os.environ["OCEANGRAPH_INPUT_DIR"] = args.input
+        os.environ["MIRAGE_INPUT_DIR"] = args.input
+    if args.output:
+        os.environ["OCEANGRAPH_OUTPUT_DIR"] = args.output
+        os.environ["MIRAGE_OUTPUT_DIR"] = args.output
+
+    if args.num_qa_pairs:
+        os.environ["OCEANGRAPH_NUM_QA_PAIRS"] = str(args.num_qa_pairs)
+        os.environ["MIRAGE_NUM_QA_PAIRS"] = str(args.num_qa_pairs)
+    if args.max_workers:
+        os.environ["OCEANGRAPH_MAX_WORKERS"] = str(args.max_workers)
+        os.environ["MIRAGE_MAX_WORKERS"] = str(args.max_workers)
+    if args.embedding_model:
+        os.environ["OCEANGRAPH_EMBEDDING_MODEL"] = args.embedding_model
+        os.environ["MIRAGE_EMBEDDING_MODEL"] = args.embedding_model
+    if args.reranker_model:
+        os.environ["OCEANGRAPH_RERANKER_MODEL"] = args.reranker_model
+        os.environ["MIRAGE_RERANKER_MODEL"] = args.reranker_model
+    if args.max_depth:
+        os.environ["OCEANGRAPH_MAX_DEPTH"] = str(args.max_depth)
+        os.environ["MIRAGE_MAX_DEPTH"] = str(args.max_depth)
+    if args.no_strict_multihop:
+        os.environ["OCEANGRAPH_STRICT_MULTIHOP"] = "0"
+        os.environ["MIRAGE_STRICT_MULTIHOP"] = "0"
+    if args.min_supporting_chunks:
+        os.environ["OCEANGRAPH_MIN_SUPPORTING_CHUNKS"] = str(args.min_supporting_chunks)
+        os.environ["MIRAGE_MIN_SUPPORTING_CHUNKS"] = str(args.min_supporting_chunks)
+    if args.no_jsonl:
+        os.environ["OCEANGRAPH_OUTPUT_JSONL"] = "0"
+        os.environ["MIRAGE_OUTPUT_JSONL"] = "0"
+
+    if args.deduplication:
+        os.environ["OCEANGRAPH_RUN_DEDUPLICATION"] = "1"
+        os.environ["MIRAGE_RUN_DEDUPLICATION"] = "1"
+    if args.evaluation:
+        os.environ["OCEANGRAPH_RUN_EVALUATION"] = "1"
+        os.environ["MIRAGE_RUN_EVALUATION"] = "1"
+
+
+def validate_args(args: argparse.Namespace) -> list[str]:
+    errors: list[str] = []
+    if args.input and not Path(args.input).exists():
+        errors.append(f"Input directory does not exist: {args.input}")
+
+    if not args.preflight and args.backend != "ollama":
+        api_key = args.api_key
+        if args.backend == "gemini":
+            api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        elif args.backend == "openai":
+            api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            env_var = "GEMINI_API_KEY" if args.backend == "gemini" else "OPENAI_API_KEY"
+            errors.append(f"API key required for {args.backend}. Use --api-key or set {env_var}.")
+    return errors
+
+
+def write_run_metadata(args: argparse.Namespace) -> None:
+    if not args.output:
+        return
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    metadata = {
+        "framework": FRAMEWORK_NAME,
+        "framework_version": FRAMEWORK_VERSION,
+        "input_dir": args.input,
+        "output_dir": args.output,
+        "backend": args.backend,
+        "model": args.model,
+        "num_qa_pairs": args.num_qa_pairs,
+        "max_workers": args.max_workers,
+        "embedding_model": args.embedding_model,
+        "reranker_model": args.reranker_model,
+        "max_depth": args.max_depth,
+        "agents": [
+            "domain_corpus",
+            "evidence_reasoning",
+            "qa_verification",
+        ],
+    }
+    (output_dir / "oceangraph_run_config.json").write_text(
+        json.dumps(metadata, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def main() -> None:
+    args = parse_args()
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
+    logger = logging.getLogger(__name__)
+
+    logger.info("=" * 76)
+    logger.info("  %s: Ocean Science Multi-Agent Dataset Generator", FRAMEWORK_NAME)
+    logger.info("=" * 76)
+
+    setup_environment(args)
+
+    try:
+        from mirage.main import run_pipeline
+        from mirage.utils.preflight import run_preflight_checks
+    except ImportError as exc:
+        logger.error("Failed to import the internal generation engine: %s", exc)
+        logger.info("Install the project with: pip install -e .")
+        sys.exit(1)
+
+    if args.preflight:
+        logger.info("Running preflight checks...")
+        success = run_preflight_checks()
+        sys.exit(0 if success else 1)
+
+    if not args.input or not args.output:
+        logger.error("Both --input and --output are required.")
+        logger.info("Usage: python run_oceangraph.py --input <input_dir> --output <output_dir>")
+        sys.exit(1)
+
+    errors = validate_args(args)
+    if errors:
+        for error in errors:
+            logger.error(error)
+        sys.exit(1)
+
+    logger.info("Backend: %s", args.backend.upper())
+    logger.info("Input directory: %s", args.input)
+    logger.info("Output directory: %s", args.output)
+    logger.info("Target QA pairs: %s", args.num_qa_pairs)
+    logger.info("Strict multi-hop verification: %s", "OFF" if args.no_strict_multihop else "ON")
+    write_run_metadata(args)
+
+    logger.info("Starting OceanGraph-R1 agent pipeline...")
+    run_pipeline()
+    logger.info("OceanGraph-R1 pipeline completed.")
+
+
+if __name__ == "__main__":
+    mp.set_start_method("spawn", force=True)
+    main()

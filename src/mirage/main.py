@@ -28,6 +28,11 @@ from mirage.utils.llm_cache import init_llm_cache, get_llm_cache
 # Global checkpoint manager (initialized in run_pipeline)
 _CHECKPOINT_MANAGER = None
 
+# Plain text documents can enter the same downstream Markdown -> chunk -> QA path
+# without using the PDF/HTML converter.
+TEXT_DOCUMENT_EXTENSIONS = {'.txt', '.md', '.markdown'}
+IGNORED_SOURCE_FILENAMES = {'README.md', '.gitkeep'}
+
 # ============================================================================
 # CONFIGURATION - Load from config.yaml if available
 # ============================================================================
@@ -99,6 +104,9 @@ try:
     # QA Generation Control
     QA_NUM_PAIRS = _qa_gen.get('num_qa_pairs', 1000)  # Target number of QA pairs
     QA_TYPE = _qa_gen.get('type', 'multihop')  # Type: 'multihop', 'multimodal', 'text', 'mix'
+    QA_STRICT_MULTIHOP = _qa_gen.get('strict_multihop_verification', True)
+    QA_MIN_SUPPORTING_CHUNKS = _qa_gen.get('min_supporting_chunks', 2)
+    QA_OUTPUT_JSONL = _qa_gen.get('output_jsonl', True)
     
     # FAISS config
     _faiss = get_faiss_config()
@@ -157,6 +165,9 @@ except (ImportError, Exception):
     # QA Generation Control defaults
     QA_NUM_PAIRS = 1000  # Default: 1000 QA pairs
     QA_TYPE = "multihop"  # Default: multihop QA pairs
+    QA_STRICT_MULTIHOP = True
+    QA_MIN_SUPPORTING_CHUNKS = 2
+    QA_OUTPUT_JSONL = True
     
     # FAISS defaults
     FAISS_USE_GPU = False
@@ -191,6 +202,12 @@ if os.environ.get("MIRAGE_RUN_DEDUPLICATION") == "1":
     RUN_DEDUPLICATION = True
 if os.environ.get("MIRAGE_RUN_EVALUATION") == "1":
     RUN_EVALUATION = True
+if os.environ.get("MIRAGE_STRICT_MULTIHOP") is not None:
+    QA_STRICT_MULTIHOP = os.environ.get("MIRAGE_STRICT_MULTIHOP") == "1"
+if os.environ.get("MIRAGE_MIN_SUPPORTING_CHUNKS"):
+    QA_MIN_SUPPORTING_CHUNKS = int(os.environ.get("MIRAGE_MIN_SUPPORTING_CHUNKS"))
+if os.environ.get("MIRAGE_OUTPUT_JSONL") is not None:
+    QA_OUTPUT_JSONL = os.environ.get("MIRAGE_OUTPUT_JSONL") == "1"
 
 # Helper function to recompute all derived output paths
 def _update_output_paths():
@@ -542,6 +559,37 @@ def _convert_single_pdf(args: Tuple[str, str, dict, int]) -> Tuple[str, str, str
     return _convert_single_document(args)
 
 
+def _prepare_plain_text_document(doc_file: Path, markdown_dir: Path) -> Tuple[str, str, str]:
+    """Prepare a TXT/Markdown file for semantic chunking.
+
+    The rest of the pipeline expects one ``*_ref.md`` file under
+    ``output/markdown/<document_stem>/``. This helper mirrors that layout while
+    keeping the source text unchanged apart from adding a title to plain TXT.
+    """
+    try:
+        md_output_dir = markdown_dir / doc_file.stem
+        md_output_dir.mkdir(parents=True, exist_ok=True)
+        md_file = md_output_dir / f"{doc_file.stem}_ref.md"
+
+        text = doc_file.read_text(encoding='utf-8', errors='replace')
+        if doc_file.suffix.lower() == '.txt':
+            text = f"# {doc_file.stem}\n\n{text.strip()}\n"
+
+        md_file.write_text(text, encoding='utf-8')
+        return (doc_file.name, str(md_file), None)
+    except Exception as e:
+        return (doc_file.name, None, str(e))
+
+
+def _is_source_document(path: Path, supported_extensions: set[str]) -> bool:
+    """Return True for user-provided source documents, excluding templates."""
+    return (
+        path.is_file()
+        and path.name not in IGNORED_SOURCE_FILENAMES
+        and path.suffix.lower() in supported_extensions
+    )
+
+
 def _chunk_single_markdown(args: Tuple[str, str]) -> Tuple[str, List[dict], str]:
     """Worker function to chunk a single markdown file (for parallel processing)
     
@@ -616,13 +664,17 @@ def convert_documents_to_chunks_parallel(doc_dir: str, output_chunks_file: str,
                         completed_md_stems.add(file_stem)
     
     # Collect all document files
+    supported_extensions = set(SUPPORTED_EXTENSIONS) | TEXT_DOCUMENT_EXTENSIONS
     doc_files = []
-    for ext in SUPPORTED_EXTENSIONS:
-        doc_files.extend(doc_dir.glob(f"*{ext}"))
+    for ext in supported_extensions:
+        doc_files.extend(
+            f for f in doc_dir.glob(f"*{ext}")
+            if _is_source_document(f, supported_extensions)
+        )
     
     if not doc_files and not existing_md_files:
         print(f"No document files found in {doc_dir}")
-        print(f"   Supported formats: {SUPPORTED_EXTENSIONS}")
+        print(f"   Supported formats: {supported_extensions}")
         return []
     
     # Filter out already-converted documents
@@ -636,7 +688,7 @@ def convert_documents_to_chunks_parallel(doc_dir: str, output_chunks_file: str,
     md_files = existing_md_files.copy()
     
     # =========================================================================
-    # PHASE 1: Convert remaining documents to Markdown
+    # PHASE 1: Convert or prepare remaining documents to Markdown
     # =========================================================================
     if pending_docs:
         # Sort by file size if enabled
@@ -653,38 +705,63 @@ def convert_documents_to_chunks_parallel(doc_dir: str, output_chunks_file: str,
                 pending_docs = []
         
         if pending_docs:
-            pdf_count = sum(1 for f in pending_docs if f.suffix.lower() == '.pdf')
-            html_count = sum(1 for f in pending_docs if f.suffix.lower() in {'.html', '.htm', '.xhtml'})
-            print(f"\nPhase 1: Converting {len(pending_docs)} documents to Markdown (PDF: {pdf_count}, HTML: {html_count})")
-            print(f"Using {NUM_WORKERS} parallel workers on GPUs {AVAILABLE_GPUS}")
-            
-            output_dir_str = str(output_dir.resolve())
-            doc_args = [(str(doc_file.resolve()), output_dir_str, {}, AVAILABLE_GPUS[i % len(AVAILABLE_GPUS)]) 
-                       for i, doc_file in enumerate(pending_docs)]
-            
-            ctx = mp.get_context('spawn')
-            with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=ctx) as executor:
-                futures = {executor.submit(_convert_single_document, args): Path(args[0]).name for args in doc_args}
-                
-                for future in tqdm(as_completed(futures), total=len(futures), desc="Converting documents"):
-                    doc_name = futures[future]
-                    try:
-                        name, md_file_path, error = future.result()
-                        file_stem = Path(name).stem
-                        if error:
-                            print(f"  [ERROR] {name}: {error}")
-                            if checkpoint_mgr:
-                                checkpoint_mgr.mark_markdown_failed(file_stem, error)
-                        else:
-                            md_files.append((md_file_path, file_stem))
-                            print(f"  [OK] {name} -> markdown")
-                            # Checkpoint after each successful conversion
-                            if checkpoint_mgr:
-                                checkpoint_mgr.mark_markdown_complete(file_stem, md_file_path)
-                    except Exception as e:
-                        print(f"  [ERROR] {doc_name}: {e}")
+            plain_text_docs = [
+                f for f in pending_docs
+                if f.suffix.lower() in TEXT_DOCUMENT_EXTENSIONS
+            ]
+            convertible_docs = [
+                f for f in pending_docs
+                if f.suffix.lower() not in TEXT_DOCUMENT_EXTENSIONS
+            ]
+
+            if plain_text_docs:
+                print(f"\nPhase 1a: Preparing {len(plain_text_docs)} plain text/Markdown documents")
+                for doc_file in plain_text_docs:
+                    name, md_file_path, error = _prepare_plain_text_document(doc_file, markdown_dir)
+                    file_stem = Path(name).stem
+                    if error:
+                        print(f"  [ERROR] {name}: {error}")
                         if checkpoint_mgr:
-                            checkpoint_mgr.mark_markdown_failed(Path(doc_name).stem, str(e))
+                            checkpoint_mgr.mark_markdown_failed(file_stem, error)
+                    else:
+                        md_files.append((md_file_path, file_stem))
+                        print(f"  [OK] {name} -> markdown")
+                        if checkpoint_mgr:
+                            checkpoint_mgr.mark_markdown_complete(file_stem, md_file_path)
+
+            if convertible_docs:
+                pdf_count = sum(1 for f in convertible_docs if f.suffix.lower() == '.pdf')
+                html_count = sum(1 for f in convertible_docs if f.suffix.lower() in {'.html', '.htm', '.xhtml'})
+                print(f"\nPhase 1b: Converting {len(convertible_docs)} documents to Markdown (PDF: {pdf_count}, HTML: {html_count})")
+                print(f"Using {NUM_WORKERS} parallel workers on GPUs {AVAILABLE_GPUS}")
+
+                output_dir_str = str(output_dir.resolve())
+                doc_args = [(str(doc_file.resolve()), output_dir_str, {}, AVAILABLE_GPUS[i % len(AVAILABLE_GPUS)])
+                           for i, doc_file in enumerate(convertible_docs)]
+
+                ctx = mp.get_context('spawn')
+                with ProcessPoolExecutor(max_workers=NUM_WORKERS, mp_context=ctx) as executor:
+                    futures = {executor.submit(_convert_single_document, args): Path(args[0]).name for args in doc_args}
+
+                    for future in tqdm(as_completed(futures), total=len(futures), desc="Converting documents"):
+                        doc_name = futures[future]
+                        try:
+                            name, md_file_path, error = future.result()
+                            file_stem = Path(name).stem
+                            if error:
+                                print(f"  [ERROR] {name}: {error}")
+                                if checkpoint_mgr:
+                                    checkpoint_mgr.mark_markdown_failed(file_stem, error)
+                            else:
+                                md_files.append((md_file_path, file_stem))
+                                print(f"  [OK] {name} -> markdown")
+                                # Checkpoint after each successful conversion
+                                if checkpoint_mgr:
+                                    checkpoint_mgr.mark_markdown_complete(file_stem, md_file_path)
+                        except Exception as e:
+                            print(f"  [ERROR] {doc_name}: {e}")
+                            if checkpoint_mgr:
+                                checkpoint_mgr.mark_markdown_failed(Path(doc_name).stem, str(e))
     
     if not md_files:
         print("No documents converted successfully")
@@ -936,7 +1013,13 @@ def embed_all_chunks(chunks: list, chunks_file: str, embeddings_dir: str) -> tup
         batch_chunk_ids = []
         for i, chunk in enumerate(batch_chunks):
             content = chunk.get('content', str(chunk)) if isinstance(chunk, dict) else str(chunk)
-            chunk_id = chunk.get('chunk_id', str(batch_start + i + 1)) if isinstance(chunk, dict) else str(batch_start + i + 1)
+            if isinstance(chunk, dict):
+                chunk_id = (
+                    chunk.get('global_chunk_id') or
+                    f"{chunk.get('file_name', 'unknown')}:{chunk.get('chunk_id', str(batch_start + i + 1))}"
+                )
+            else:
+                chunk_id = str(batch_start + i + 1)
             batch_texts.append(content)
             batch_chunk_ids.append(chunk_id)
         
@@ -1083,7 +1166,13 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
     from mirage.pipeline.context import build_complete_context
     from mirage.pipeline.qa_generator import (
         generate_qa, select_qa_pairs, verify_qa, is_verification_successful,
-        correct_failed_qa
+        correct_failed_qa, get_structured_qa_fields,
+        verify_multihop_necessity, is_multihop_necessity_successful
+    )
+    from mirage.pipeline.evidence_graph import (
+        build_evidence_graph,
+        build_search_trajectory,
+        ensure_short_answers,
     )
     
     successful_qa = []
@@ -1109,7 +1198,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             expert_persona=expert_persona,
             domain=domain,
             log_details=True,  # Enable detailed iteration logging
-            chunk_addition_mode=CHUNK_ADDITION_MODE
+            chunk_addition_mode=CHUNK_ADDITION_MODE,
+            min_context_chunks=QA_MIN_SUPPORTING_CHUNKS if (QA_STRICT_MULTIHOP or QA_TYPE == "multihop") else 1,
         )
         context_chunks = context_result.get('chunks', [])
         
@@ -1131,6 +1221,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         
         # 4.2 Generate QA pairs
         qa_pairs, qa_metadata = generate_qa(context_chunks, expert_persona, domain)
+        search_trajectory = build_search_trajectory(context_result)
         
         # 4.3 Select relevant pairs
         selected, rejected = select_qa_pairs(qa_pairs, context_chunks, expert_persona, domain)
@@ -1140,9 +1231,22 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         pairs_for_correction = []  # Collect failed pairs for correction
         
         for qa in pairs_to_verify:
+            qa['short_answers'] = ensure_short_answers(qa)
+            evidence_graph = build_evidence_graph(context_chunks, qa, qa_metadata)
             verification = verify_qa(
                 context_chunks, qa['question'], qa['answer'], expert_persona, domain
             )
+
+            multihop_necessity = {}
+            if QA_STRICT_MULTIHOP:
+                multihop_necessity = verify_multihop_necessity(
+                    context_chunks,
+                    qa['question'],
+                    qa['answer'],
+                    expert_persona,
+                    domain,
+                    min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS
+                )
             
             qa_entry = {
                 'chunk_id': i,
@@ -1155,35 +1259,59 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'max_breadth_used': context_result.get('max_breadth_used', 0),
                 'chunks_added': context_result['chunks_added'],
                 'search_history': context_result.get('search_history', []),
+                'search_trajectory': search_trajectory,
                 'iteration_logs': context_result.get('iteration_logs', []),
                 'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                 'related_keywords': qa_metadata.get('related_keywords', ''),
+                'evidence_graph': evidence_graph,
                 'expert_persona': expert_persona,
                 'domain': domain,
                 'question': qa['question'],
                 'answer': qa['answer'],
+                **get_structured_qa_fields(qa),
                 'relevance_score': qa.get('relevance_score', '0'),
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'SELECTED'),
                 'selection_reason': qa.get('selection_reason', ''),
-                'verification_result': verification
+                'verification_result': verification,
+                'strict_multihop_verification': QA_STRICT_MULTIHOP,
+                'multihop_necessity_result': multihop_necessity
             }
             
-            if is_verification_successful(verification, question=qa['question'], 
-                                          answer=qa['answer'], chunks=context_chunks):
+            verification_passed = is_verification_successful(
+                verification,
+                question=qa['question'],
+                answer=qa['answer'],
+                chunks=context_chunks
+            )
+            multihop_passed = (
+                not QA_STRICT_MULTIHOP or
+                is_multihop_necessity_successful(multihop_necessity)
+            )
+
+            if verification_passed and multihop_passed:
                 successful_qa.append(qa_entry)
             else:
                 # Collect for correction attempt if enabled
                 if QA_CORRECTION_ENABLED:
+                    correction_feedback = verification
+                    if QA_STRICT_MULTIHOP and not multihop_passed:
+                        correction_feedback += (
+                            f"\nStrict multihop verifier failed: "
+                            f"{multihop_necessity.get('status', 'UNKNOWN')}"
+                        )
                     pairs_for_correction.append({
                         'question': qa['question'],
                         'answer': qa['answer'],
-                        'verification_result': verification,
+                        'verification_result': correction_feedback,
                         'original_qa_entry': qa_entry
                     })
                 else:
                     # Final failure (correction disabled) - store with reason
-                    qa_entry['failure_reason'] = 'Failed verification (correction disabled)'
+                    if not verification_passed:
+                        qa_entry['failure_reason'] = 'Failed verification (correction disabled)'
+                    else:
+                        qa_entry['failure_reason'] = 'Failed strict multihop verification (correction disabled)'
                     failed_qa.append(qa_entry)
         
         # 4.5 Attempt correction for failed pairs
@@ -1213,10 +1341,25 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 # Verify corrected pairs
                 new_failures = []
                 for corrected in corrected_pairs:
+                    corrected['short_answers'] = ensure_short_answers(corrected)
+                    corrected_evidence_graph = build_evidence_graph(
+                        context_chunks, corrected, qa_metadata
+                    )
                     corrected_verification = verify_qa(
                         context_chunks, corrected['question'], corrected['answer'], 
                         expert_persona, domain
                     )
+
+                    corrected_multihop_necessity = {}
+                    if QA_STRICT_MULTIHOP:
+                        corrected_multihop_necessity = verify_multihop_necessity(
+                            context_chunks,
+                            corrected['question'],
+                            corrected['answer'],
+                            expert_persona,
+                            domain,
+                            min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS
+                        )
                     
                     corrected_entry = {
                         'chunk_id': i,
@@ -1229,33 +1372,52 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         'max_breadth_used': context_result.get('max_breadth_used', 0),
                         'chunks_added': context_result['chunks_added'],
                         'search_history': context_result.get('search_history', []),
+                        'search_trajectory': search_trajectory,
                         'iteration_logs': context_result.get('iteration_logs', []),
                         'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                         'related_keywords': qa_metadata.get('related_keywords', ''),
+                        'evidence_graph': corrected_evidence_graph,
                         'expert_persona': expert_persona,
                         'domain': domain,
                         'question': corrected['question'],
                         'answer': corrected['answer'],
+                        **get_structured_qa_fields(corrected),
                         'relevance_score': corrected.get('relevance_score', '0'),
                         'difficulty_score': corrected.get('difficulty_score', '0'),
                         'selection_status': 'CORRECTED',
                         'selection_reason': f'Corrected on attempt {correction_attempt}',
                         'verification_result': corrected_verification,
+                        'strict_multihop_verification': QA_STRICT_MULTIHOP,
+                        'multihop_necessity_result': corrected_multihop_necessity,
                         'correction_attempt': correction_attempt
                     }
                     
-                    if is_verification_successful(corrected_verification,
-                                                  question=corrected['question'],
-                                                  answer=corrected['answer'],
-                                                  chunks=context_chunks):
+                    corrected_verification_passed = is_verification_successful(
+                        corrected_verification,
+                        question=corrected['question'],
+                        answer=corrected['answer'],
+                        chunks=context_chunks
+                    )
+                    corrected_multihop_passed = (
+                        not QA_STRICT_MULTIHOP or
+                        is_multihop_necessity_successful(corrected_multihop_necessity)
+                    )
+
+                    if corrected_verification_passed and corrected_multihop_passed:
                         print(f"    Corrected pair passed verification")
                         successful_qa.append(corrected_entry)
                     else:
                         # Accumulate feedback for next attempt
+                        corrected_feedback = corrected_verification
+                        if QA_STRICT_MULTIHOP and not corrected_multihop_passed:
+                            corrected_feedback += (
+                                f"\nStrict multihop verifier failed: "
+                                f"{corrected_multihop_necessity.get('status', 'UNKNOWN')}"
+                            )
                         new_failures.append({
                             'question': corrected['question'],
                             'answer': corrected['answer'],
-                            'verification_result': corrected_verification,
+                            'verification_result': corrected_feedback,
                             'original_qa_entry': corrected_entry
                         })
                 
@@ -1290,6 +1452,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'related_keywords': qa_metadata.get('related_keywords', ''),
                 'question': qa['question'],
                 'answer': qa['answer'],
+                **get_structured_qa_fields(qa),
                 'relevance_score': qa.get('relevance_score', '0'),
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'REJECTED'),
@@ -1630,6 +1793,11 @@ def generate_qa_dataset_parallel(chunks: list, domain: str, expert_persona: str,
 def save_qa_results(successful: list, failed: list, chunks_with_context: list):
     """Save QA results and chunks with context to JSON files"""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    def _write_jsonl(path: str, rows: list):
+        with open(path, 'w', encoding='utf-8') as f:
+            for row in rows:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
     
     if chunks_with_context:
         with open(OUTPUT_CHUNKS_WITH_CONTEXT, 'w', encoding='utf-8') as f:
@@ -1640,6 +1808,10 @@ def save_qa_results(successful: list, failed: list, chunks_with_context: list):
         with open(OUTPUT_QA_SUCCESSFUL, 'w', encoding='utf-8') as f:
             json.dump(successful, f, indent=2, ensure_ascii=False)
         print(f"Saved {len(successful)} successful QA pairs to {OUTPUT_QA_SUCCESSFUL}")
+        if QA_OUTPUT_JSONL:
+            jsonl_path = os.path.splitext(OUTPUT_QA_SUCCESSFUL)[0] + ".jsonl"
+            _write_jsonl(jsonl_path, successful)
+            print(f"Saved JSONL successful QA pairs to {jsonl_path}")
     
     if failed:
         # Separate malformed chunks (with 'error' key) from regular QA failures
@@ -1655,6 +1827,10 @@ def save_qa_results(successful: list, failed: list, chunks_with_context: list):
             with open(OUTPUT_QA_FAILED, 'w', encoding='utf-8') as f:
                 json.dump(qa_failed, f, indent=2, ensure_ascii=False)
             print(f"Saved {len(qa_failed)} failed QA pairs to {OUTPUT_QA_FAILED}")
+            if QA_OUTPUT_JSONL:
+                jsonl_path = os.path.splitext(OUTPUT_QA_FAILED)[0] + ".jsonl"
+                _write_jsonl(jsonl_path, qa_failed)
+                print(f"Saved JSONL failed QA pairs to {jsonl_path}")
     
     # Stats: Count single vs multiple chunks in successful QA pairs
     single_chunk_count = 0
@@ -1983,11 +2159,19 @@ def run_pipeline():
     print("=" * 70)
     print("QA DATASET GENERATION PIPELINE (WITH CHECKPOINTING)")
     print("=" * 70)
+    from mirage.core import llm as llm_module
+    llm_module._initialize_config()
+    backend_display = llm_module.BACKEND or BACKEND
+    llm_model_display = llm_module.LLM_MODEL_NAME or LLM_MODEL_NAME
+    vlm_model_display = llm_module.VLM_MODEL_NAME or VLM_MODEL_NAME
+    rpm_display = llm_module.GEMINI_RPM or GEMINI_RPM
+    burst_display = llm_module.GEMINI_BURST or GEMINI_BURST
+
     print(f"Configuration:")
-    print(f"   - Backend: {BACKEND}")
-    print(f"   - LLM Model: {LLM_MODEL_NAME}")
-    print(f"   - VLM Model: {VLM_MODEL_NAME}")
-    print(f"   - API Rate Limit: {GEMINI_RPM} RPM, burst={GEMINI_BURST}")
+    print(f"   - Backend: {backend_display}")
+    print(f"   - LLM Model: {llm_model_display}")
+    print(f"   - VLM Model: {vlm_model_display}")
+    print(f"   - API Rate Limit: {rpm_display} RPM, burst={burst_display}")
     print(f"   - CPU Workers: {NUM_WORKERS}")
     print(f"   - QA Workers: {QA_MAX_WORKERS}")
     print(f"   - Dedup Workers: {DEDUP_MAX_WORKERS}")
@@ -1995,6 +2179,8 @@ def run_pipeline():
     print(f"   - Target QA Pairs: {QA_NUM_PAIRS if QA_NUM_PAIRS else 'unlimited'}")
     print(f"   - QA Type: {QA_TYPE}")
     print(f"   - Max Depth: {MAX_DEPTH}")
+    print(f"   - Strict Multihop Verification: {QA_STRICT_MULTIHOP}")
+    print(f"   - Min Supporting Chunks: {QA_MIN_SUPPORTING_CHUNKS}")
     print(f"   - Run Evaluation: {RUN_EVALUATION}")
     print(f"   - Checkpointing: ENABLED")
     print("=" * 70)

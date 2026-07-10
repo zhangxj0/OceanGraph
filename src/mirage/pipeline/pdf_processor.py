@@ -35,7 +35,11 @@ from docling.datamodel.pipeline_options import (
     EasyOcrOptions
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption, HTMLFormatOption
-from docling.utils.export import generate_multimodal_pages
+
+try:
+    from docling.utils.export import generate_multimodal_pages
+except ImportError:
+    generate_multimodal_pages = None
 
 
 def load_config(config_path="config.yaml"):

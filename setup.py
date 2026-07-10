@@ -1,26 +1,24 @@
 """
-MiRAGE - Setup Configuration
+OceanGraph-R1 - Setup Configuration
 
 Install with: pip install -e .
-Or from PyPI: pip install mirage-benchmark
 """
 
 from setuptools import setup, find_packages
 from pathlib import Path
 
 # Read README for long description
-readme_path = Path(__file__).parent / "README.md"
+readme_path = Path(__file__).parent / "OCEANGRAPH_FRAMEWORK.md"
 long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
 
 setup(
-    name="mirage-benchmark",
+    name="oceangraph-r1",
     version="2.0.0",
-    author="MiRAGE Authors",
+    author="OceanGraph-R1 Authors",
     author_email="contact@example.com",
-    description="A Multiagent Framework for Generating Multimodal Multihop QA Datasets for RAG Evaluation",
+    description="A domain-aware multi-agent framework for ocean science multi-hop search reasoning datasets",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ChandanKSahu/MiRAGE",
     
     # Package configuration
     package_dir={"": "src"},
@@ -29,7 +27,7 @@ setup(
     # Python version requirement
     python_requires=">=3.9",
     
-    # Core dependencies - everything needed for `runmirage` to work out of the box
+    # Core dependencies - everything needed for OceanGraph-R1 to work out of the box
     install_requires=[
         # === Core ML/DL ===
         "torch>=2.0.0",
@@ -123,9 +121,8 @@ setup(
     # Entry points for CLI
     entry_points={
         "console_scripts": [
-            "mirage=mirage.cli:main",
-            "mirage-preflight=mirage.utils.preflight:main",
-            "run_mirage=mirage.run_mirage:main",
+            "oceangraph=oceangraph.cli:main",
+            "run_oceangraph=oceangraph.cli:main",
         ],
     },
     
@@ -145,7 +142,7 @@ setup(
     ],
     
     # Keywords
-    keywords="rag multimodal qa dataset generation llm vlm evaluation benchmark",
+    keywords="ocean science search reasoning multi-agent multihop qa dataset generation llm rag",
     
     # Include package data
     include_package_data=True,

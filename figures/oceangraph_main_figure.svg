@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">OceanGraph three-agent framework overview</title>
+  <desc id="desc">A three-agent framework that turns heterogeneous ocean science sources into evidence-grounded multi-hop QA datasets.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fbff"/>
+      <stop offset="1" stop-color="#eef8f7"/>
+    </linearGradient>
+    <linearGradient id="ocean" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#0f5c8c"/>
+      <stop offset="1" stop-color="#1aa68a"/>
+    </linearGradient>
+    <linearGradient id="reasoning" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#eaf8f5"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#103042" flood-opacity="0.16"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#23627f"/>
+    </marker>
+    <marker id="arrowTeal" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#118f80"/>
+    </marker>
+    <style>
+      .font { font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .title { font-size: 34px; font-weight: 800; fill: #103042; }
+      .subtitle { font-size: 19px; font-weight: 500; fill: #496778; }
+      .section { font-size: 20px; font-weight: 800; fill: #16384b; }
+      .small { font-size: 15px; font-weight: 600; fill: #496778; }
+      .tiny { font-size: 13px; font-weight: 600; fill: #557183; }
+      .cardTitle { font-size: 18px; font-weight: 800; fill: #0f3346; }
+      .cardBody { font-size: 13.5px; font-weight: 600; fill: #466576; }
+      .pillText { font-size: 13px; font-weight: 800; fill: #ffffff; }
+      .outputText { font-size: 15px; font-weight: 700; fill: #24485a; }
+      .outline { fill: #ffffff; stroke: #d8e7ee; stroke-width: 2; }
+      .agent { fill: #ffffff; stroke: #b8d7df; stroke-width: 2; }
+      .agentCore { fill: url(#reasoning); stroke: #55b8aa; stroke-width: 2.5; }
+      .arrow { fill: none; stroke: #23627f; stroke-width: 3; marker-end: url(#arrow); }
+      .arrowTeal { fill: none; stroke: #118f80; stroke-width: 3; marker-end: url(#arrowTeal); }
+      .loop { fill: none; stroke: #ee8f5a; stroke-width: 3; stroke-dasharray: 7 7; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="1380" cy="115" r="190" fill="#dff2ef" opacity="0.62"/>
+  <circle cx="170" cy="790" r="220" fill="#e2eef9" opacity="0.65"/>
+
+  <text x="800" y="70" text-anchor="middle" class="font title">OceanGraph: Three-Agent Dataset Generation Framework</text>
+  <text x="800" y="105" text-anchor="middle" class="font subtitle">Evidence-grounded multi-hop QA construction for ocean science</text>
+
+  <rect x="55" y="170" width="295" height="555" rx="18" class="outline" filter="url(#shadow)"/>
+  <text x="202" y="214" text-anchor="middle" class="font section">Ocean Science Sources</text>
+  <text x="202" y="244" text-anchor="middle" class="font small">heterogeneous, multi-domain corpus</text>
+
+  <g transform="translate(86 284)">
+    <rect x="0" y="0" width="88" height="94" rx="10" fill="#eef5fb" stroke="#bcd4e4"/>
+    <path d="M 18 18 H 57 L 71 32 V 76 H 18 Z" fill="#ffffff" stroke="#75a8c5" stroke-width="2"/>
+    <path d="M 57 18 V 32 H 71" fill="none" stroke="#75a8c5" stroke-width="2"/>
+    <text x="44" y="58" text-anchor="middle" class="font small" fill="#0f5c8c">PDF</text>
+  </g>
+  <g transform="translate(222 284)">
+    <rect x="0" y="0" width="88" height="94" rx="10" fill="#eefbf8" stroke="#b9ded7"/>
+    <path d="M 18 22 H 70 V 72 H 18 Z" fill="#ffffff" stroke="#62b5a8" stroke-width="2"/>
+    <path d="M 28 35 H 60 M 28 48 H 60 M 28 61 H 50" stroke="#62b5a8" stroke-width="4" stroke-linecap="round"/>
+    <text x="44" y="88" text-anchor="middle" class="font tiny">HTML</text>
+  </g>
+  <g transform="translate(86 410)">
+    <rect x="0" y="0" width="88" height="94" rx="10" fill="#fff5ed" stroke="#ecc8a9"/>
+    <path d="M 21 24 H 67 M 21 39 H 67 M 21 54 H 53" stroke="#d88645" stroke-width="5" stroke-linecap="round"/>
+    <text x="44" y="82" text-anchor="middle" class="font tiny">TXT / MD</text>
+  </g>
+  <g transform="translate(222 410)">
+    <rect x="0" y="0" width="88" height="94" rx="10" fill="#f3f0fb" stroke="#cfc3e8"/>
+    <rect x="20" y="22" width="48" height="36" rx="4" fill="#ffffff" stroke="#8c79c6" stroke-width="2"/>
+    <path d="M 20 34 H 68 M 32 22 V 58 M 49 22 V 58" stroke="#8c79c6" stroke-width="2"/>
+    <circle cx="61" cy="72" r="7" fill="#ee8f5a"/>
+    <text x="44" y="88" text-anchor="middle" class="font tiny">tables</text>
+  </g>
+
+  <rect x="92" y="574" width="220" height="92" rx="14" fill="#f7fbfd" stroke="#d6e5ed"/>
+  <text x="202" y="608" text-anchor="middle" class="font small">Five Ocean Domains</text>
+  <text x="202" y="634" text-anchor="middle" class="font tiny">physical, carbon, remote sensing</text>
+  <text x="202" y="656" text-anchor="middle" class="font tiny">ecology, coastal hazards</text>
+
+  <path d="M 350 448 C 380 448, 390 448, 420 448" class="arrow"/>
+
+  <rect x="420" y="150" width="790" height="610" rx="26" fill="#ffffff" stroke="#b8d7df" stroke-width="2.5" filter="url(#shadow)"/>
+  <rect x="420" y="150" width="790" height="68" rx="26" fill="url(#ocean)"/>
+  <path d="M 420 190 H 1210 V 218 H 420 Z" fill="url(#ocean)"/>
+  <text x="815" y="193" text-anchor="middle" class="font" font-size="24" font-weight="800" fill="#ffffff">Three-Agent Collaborative Generation Core</text>
+
+  <g transform="translate(465 292)">
+    <rect width="210" height="245" rx="16" class="agent"/>
+    <rect x="0" y="0" width="210" height="12" rx="6" fill="#0f5c8c"/>
+    <circle cx="40" cy="55" r="22" fill="#e7f2f8" stroke="#7eafc9" stroke-width="2"/>
+    <path d="M 27 52 H 53 M 31 65 H 49 M 34 40 H 47" stroke="#0f5c8c" stroke-width="4" stroke-linecap="round"/>
+    <text x="105" y="103" text-anchor="middle" class="font cardTitle">1. Domain</text>
+    <text x="105" y="126" text-anchor="middle" class="font cardTitle">Corpus Agent</text>
+    <text x="26" y="166" class="font cardBody">Parse sources, chunk text,</text>
+    <text x="26" y="190" class="font cardBody">normalize metadata, and</text>
+    <text x="26" y="214" class="font cardBody">apply ocean-domain labels.</text>
+  </g>
+
+  <g transform="translate(700 255)">
+    <rect width="250" height="320" rx="18" class="agentCore"/>
+    <rect x="0" y="0" width="250" height="14" rx="7" fill="#1aa68a"/>
+    <circle cx="50" cy="62" r="24" fill="#dff7f1" stroke="#55b8aa" stroke-width="2"/>
+    <path d="M 38 63 C 43 46, 63 47, 60 65 C 57 82, 38 79, 38 63 Z" fill="none" stroke="#118f80" stroke-width="4"/>
+    <text x="125" y="111" text-anchor="middle" class="font cardTitle">2. Evidence</text>
+    <text x="125" y="135" text-anchor="middle" class="font cardTitle">Reasoning Agent</text>
+    <text x="30" y="176" class="font cardBody">Iteratively retrieve evidence,</text>
+    <text x="30" y="200" class="font cardBody">select complementary chunks,</text>
+    <text x="30" y="224" class="font cardBody">and build cross-chunk links.</text>
+    <rect x="28" y="254" width="194" height="38" rx="19" fill="#ffffff" stroke="#b9ded7"/>
+    <text x="125" y="278" text-anchor="middle" class="font tiny">context completion loop</text>
+  </g>
+
+  <g transform="translate(975 292)">
+    <rect width="210" height="245" rx="16" class="agent"/>
+    <rect x="0" y="0" width="210" height="12" rx="6" fill="#7c6bc0"/>
+    <circle cx="40" cy="55" r="22" fill="#f1effb" stroke="#b6ace1" stroke-width="2"/>
+    <path d="M 29 55 L 38 65 L 54 42" fill="none" stroke="#6a57b3" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="105" y="103" text-anchor="middle" class="font cardTitle">3. QA</text>
+    <text x="105" y="126" text-anchor="middle" class="font cardTitle">Verification Agent</text>
+    <text x="25" y="166" class="font cardBody">Generate structured QA,</text>
+    <text x="25" y="190" class="font cardBody">reject shortcut questions,</text>
+    <text x="25" y="214" class="font cardBody">and supervise evidence graphs.</text>
+  </g>
+
+  <path d="M 675 414 H 692" class="arrowTeal"/>
+  <path d="M 950 414 H 967" class="arrowTeal"/>
+  <path d="M 915 250 C 930 214, 777 214, 790 250" class="loop"/>
+  <text x="815" y="236" text-anchor="middle" class="font tiny" fill="#a75c30">iterative evidence expansion</text>
+
+  <g transform="translate(475 640)">
+    <rect width="680" height="58" rx="18" fill="#f7fbfd" stroke="#d8e7ee" stroke-width="2"/>
+    <rect x="22" y="15" width="120" height="28" rx="14" fill="#0f5c8c"/>
+    <text x="82" y="35" text-anchor="middle" class="font pillText">Shared State</text>
+    <text x="166" y="36" class="font small">domain taxonomy  +  retrieval trace  +  evidence ledger  +  graph schema</text>
+  </g>
+
+  <path d="M 1210 448 C 1235 448, 1240 448, 1265 448" class="arrow"/>
+
+  <rect x="1265" y="170" width="280" height="555" rx="18" class="outline" filter="url(#shadow)"/>
+  <text x="1405" y="214" text-anchor="middle" class="font section">Ocean Multi-Hop</text>
+  <text x="1405" y="240" text-anchor="middle" class="font section">QA Dataset</text>
+  <text x="1405" y="270" text-anchor="middle" class="font small">grounded, auditable records</text>
+
+  <g transform="translate(1302 312)">
+    <rect width="206" height="46" rx="10" fill="#eef5fb" stroke="#c7dce8"/>
+    <text x="18" y="29" class="font outputText">Question + Answer</text>
+  </g>
+  <g transform="translate(1302 373)">
+    <rect width="206" height="46" rx="10" fill="#eefbf8" stroke="#bee2dc"/>
+    <text x="18" y="29" class="font outputText">Short Answer Aliases</text>
+  </g>
+  <g transform="translate(1302 434)">
+    <rect width="206" height="46" rx="10" fill="#fff5ed" stroke="#efcfb4"/>
+    <text x="18" y="29" class="font outputText">Reasoning Path</text>
+  </g>
+  <g transform="translate(1302 495)">
+    <rect width="206" height="46" rx="10" fill="#f1effb" stroke="#d5cdec"/>
+    <text x="18" y="29" class="font outputText">Supporting Facts</text>
+  </g>
+  <g transform="translate(1302 556)">
+    <rect width="206" height="46" rx="10" fill="#f7fbfd" stroke="#d9e8ee"/>
+    <text x="18" y="29" class="font outputText">Evidence Spans</text>
+  </g>
+  <g transform="translate(1302 617)">
+    <rect width="206" height="46" rx="10" fill="#eaf7f5" stroke="#bee2dc"/>
+    <text x="18" y="29" class="font outputText">Evidence Graph</text>
+  </g>
+
+  <g transform="translate(420 802)">
+    <rect width="790" height="58" rx="18" fill="#ffffff" stroke="#d8e7ee" stroke-width="2"/>
+    <rect x="22" y="16" width="130" height="28" rx="14" fill="#0f5c8c"/>
+    <text x="87" y="35" text-anchor="middle" class="font pillText">Quality Gates</text>
+    <text x="176" y="36" class="font small">domain relevance  +  multi-hop necessity  +  grounding verification  +  evidence traceability</text>
+  </g>
+</svg>

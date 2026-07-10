@@ -94,9 +94,9 @@ def check_config() -> CheckResult:
 def check_api_key() -> CheckResult:
     """Check if API key is available and non-empty."""
     try:
-        from mirage.core.llm import _initialize_config, BACKEND
+        from mirage.core.llm import _initialize_config
         _initialize_config()  # Ensure config is loaded first
-        from mirage.core.llm import API_KEY
+        from mirage.core.llm import API_KEY, BACKEND
         
         if API_KEY and len(API_KEY) > 10:
             # Mask the key for display
@@ -345,6 +345,27 @@ def check_reranker() -> CheckResult:
                 message="MonoVLM reranker loaded and working",
                 details={"type": "monovlm", "model": "lightonai/MonoQwen2-VL-v0.1"}
             )
+        elif default_reranker in ["text_embedding", "text-embedding"]:
+            from mirage.embeddings.rerankers_multimodal import TextEmbeddingReranker
+            reranker = TextEmbeddingReranker()
+
+            test_query = "ocean heat content"
+            test_chunks = [{"text": "Ocean heat content records changes in stored ocean energy.", "chunk_id": "1"}]
+            rankings = reranker.rerank(test_query, test_chunks, top_k=1)
+
+            if rankings:
+                return CheckResult(
+                    name="Reranker",
+                    status=CheckStatus.PASS,
+                    message="Text embedding reranker loaded and working",
+                    details={"type": "text_embedding", "model": "BAAI/bge-large-en-v1.5"}
+                )
+            return CheckResult(
+                name="Reranker",
+                status=CheckStatus.FAIL,
+                message="Text embedding reranker returned no rankings",
+                details={"type": "text_embedding"}
+            )
         else:
             return CheckResult(
                 name="Reranker",
@@ -523,11 +544,19 @@ def check_input_data() -> CheckResult:
             )
         
         if input_pdf_dir and os.path.exists(input_pdf_dir):
-            # Check for PDF files
-            pdf_files = list(Path(input_pdf_dir).glob("*.pdf"))
-            # Also check for HTML files (News domain uses HTML)
-            html_files = list(Path(input_pdf_dir).glob("*.html")) + list(Path(input_pdf_dir).glob("*.htm"))
-            total_files = len(pdf_files) + len(html_files)
+            # Check for supported source files
+            ignored_names = {"README.md", ".gitkeep"}
+
+            def source_files(pattern: str):
+                return [
+                    path for path in Path(input_pdf_dir).glob(pattern)
+                    if path.is_file() and path.name not in ignored_names
+                ]
+
+            pdf_files = source_files("*.pdf")
+            html_files = source_files("*.html") + source_files("*.htm")
+            text_files = source_files("*.txt") + source_files("*.md") + source_files("*.markdown")
+            total_files = len(pdf_files) + len(html_files) + len(text_files)
             
             if total_files > 0:
                 file_types = []
@@ -535,6 +564,8 @@ def check_input_data() -> CheckResult:
                     file_types.append(f"{len(pdf_files)} PDF")
                 if html_files:
                     file_types.append(f"{len(html_files)} HTML")
+                if text_files:
+                    file_types.append(f"{len(text_files)} text/Markdown")
                 return CheckResult(
                     name="Input Data",
                     status=CheckStatus.PASS,
@@ -545,7 +576,7 @@ def check_input_data() -> CheckResult:
                 return CheckResult(
                     name="Input Data",
                     status=CheckStatus.FAIL,
-                    message="No PDF or HTML files in input directory",
+                    message="No PDF, HTML, text, or Markdown files in input directory",
                     details={"path": input_pdf_dir}
                 )
         

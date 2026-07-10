@@ -24,7 +24,8 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     if _config_cache is not None and config_path is None:
         return _config_cache
     
-    path = Path(config_path) if config_path else _CONFIG_PATH
+    env_config_path = os.environ.get("MIRAGE_CONFIG")
+    path = Path(config_path or env_config_path) if (config_path or env_config_path) else _CONFIG_PATH
     
     # If config file doesn't exist, return defaults
     if not path.exists():
@@ -83,7 +84,10 @@ def _get_default_config() -> Dict[str, Any]:
         },
         'qa_generation': {
             'num_qa_pairs': 100,
-            'type': 'multihop'
+            'type': 'multihop',
+            'strict_multihop_verification': True,
+            'min_supporting_chunks': 2,
+            'output_jsonl': True,
         }
     }
 
@@ -213,7 +217,10 @@ def get_qa_generation_config() -> Dict[str, Any]:
     config = load_config()
     return config.get('qa_generation', {
         'num_qa_pairs': 1000,
-        'type': 'multihop'
+        'type': 'multihop',
+        'strict_multihop_verification': True,
+        'min_supporting_chunks': 2,
+        'output_jsonl': True,
     })
 
 

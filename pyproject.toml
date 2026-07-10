@@ -3,18 +3,18 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mirage-benchmark"
+name = "oceangraph-r1"
 version = "2.0.0"
-description = "A Multiagent Framework for Generating Multimodal Multihop QA Datasets for RAG Evaluation"
-readme = "README.md"
+description = "A domain-aware multi-agent framework for ocean science multi-hop search reasoning datasets"
+readme = "OCEANGRAPH_FRAMEWORK.md"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "MiRAGE Authors", email = "contact@example.com"}
+    {name = "OceanGraph-R1 Authors", email = "contact@example.com"}
 ]
 maintainers = [
-    {name = "MiRAGE Authors", email = "contact@example.com"}
+    {name = "OceanGraph-R1 Authors", email = "contact@example.com"}
 ]
-keywords = ["rag", "multimodal", "qa", "dataset", "generation", "llm", "vlm", "evaluation", "benchmark"]
+keywords = ["ocean science", "search reasoning", "multi-agent", "multihop qa", "dataset", "generation", "llm", "rag"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -102,19 +102,12 @@ dev = [
     "build>=0.10.0",
 ]
 all = [
-    "mirage-benchmark[eval,dev]",
+    "oceangraph-r1[eval,dev]",
 ]
 
-[project.urls]
-Homepage = "https://github.com/ChandanKSahu/MiRAGE"
-Documentation = "https://github.com/ChandanKSahu/MiRAGE#readme"
-Repository = "https://github.com/ChandanKSahu/MiRAGE.git"
-Issues = "https://github.com/ChandanKSahu/MiRAGE/issues"
-
 [project.scripts]
-mirage = "mirage.cli:main"
-mirage-preflight = "mirage.utils.preflight:main"
-run_mirage = "mirage.run_mirage:main"
+oceangraph = "oceangraph.cli:main"
+run_oceangraph = "oceangraph.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

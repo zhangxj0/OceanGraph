@@ -13,8 +13,21 @@ from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
-import pypdfium2 as pdfium
 from tqdm import tqdm
+
+TEXT_DOCUMENT_EXTENSIONS = ('.txt', '.md', '.markdown')
+
+
+def _load_pdfium():
+    """Load pypdfium2 lazily so text-only runs do not require PDF tooling."""
+    try:
+        import pypdfium2 as pdfium
+    except ImportError as exc:
+        raise ImportError(
+            "PDF page counting requires pypdfium2. Install pypdfium2 or skip "
+            "PDF source statistics for text-only datasets."
+        ) from exc
+    return pdfium
 
 
 def get_tokenizer():
@@ -53,6 +66,7 @@ def count_pages_from_zip(zip_path: Path) -> Dict[str, int]:
                 
                 if lower_name.endswith('.pdf'):
                     try:
+                        pdfium = _load_pdfium()
                         pdf_bytes = zf.read(name)
                         pdf = pdfium.PdfDocument(pdf_bytes)
                         page_counts[stem] = len(pdf)
@@ -60,6 +74,9 @@ def count_pages_from_zip(zip_path: Path) -> Dict[str, int]:
                         page_counts[stem] = 0
                 elif lower_name.endswith(('.html', '.htm')):
                     # HTML files count as 1 "page"
+                    page_counts[stem] = 1
+                elif lower_name.endswith(TEXT_DOCUMENT_EXTENSIONS):
+                    # Plain text and Markdown inputs are treated as one source document.
                     page_counts[stem] = 1
     except Exception as e:
         print(f"Error reading zip {zip_path}: {e}")
@@ -73,7 +90,7 @@ def get_file_size_mb_from_zip(zip_path: Path) -> Dict[str, float]:
         with zipfile.ZipFile(zip_path, 'r') as zf:
             for info in zf.infolist():
                 lower = info.filename.lower()
-                if lower.endswith(('.pdf', '.html', '.htm')):
+                if lower.endswith(('.pdf', '.html', '.htm') + TEXT_DOCUMENT_EXTENSIONS):
                     stem = Path(info.filename).stem
                     sizes[stem] = info.file_size / (1024 * 1024)
     except Exception:
@@ -88,10 +105,13 @@ def get_file_type_from_zip(zip_path: Path) -> str:
             names = zf.namelist()
             pdfs = sum(1 for n in names if n.lower().endswith('.pdf'))
             htmls = sum(1 for n in names if n.lower().endswith(('.html', '.htm')))
+            texts = sum(1 for n in names if n.lower().endswith(TEXT_DOCUMENT_EXTENSIONS))
             if pdfs > htmls:
                 return "pdf"
             elif htmls > 0:
                 return "html"
+            elif texts > 0:
+                return "text"
     except Exception:
         pass
     return "unknown"
@@ -375,6 +395,7 @@ def compute_dataset_stats(
                 for chunk_name in pdf_names:
                     if chunk_name.lower() in pdf_stem.lower() or pdf_stem.lower() in chunk_name.lower():
                         try:
+                            pdfium = _load_pdfium()
                             pdf = pdfium.PdfDocument(pdf_file)
                             page_counts[chunk_name] = len(pdf)
                         except Exception:

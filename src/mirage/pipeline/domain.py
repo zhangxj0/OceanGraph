@@ -2,6 +2,8 @@
 Module to extract domain and expert role from semantic chunks using BERTopic and LLM.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -11,20 +13,28 @@ from typing import List, Dict, Tuple, Optional, Union
 import torch
 import pandas as pd
 import numpy as np
-from umap import UMAP
-from bertopic import BERTopic
-from bertopic.representation import MaximalMarginalRelevance
-from sklearn.feature_extraction.text import CountVectorizer
-from PIL import Image
-from sentence_transformers import SentenceTransformer
-import datamapplot
 
 # Import from mirage modules
 from mirage.core.llm import call_llm_simple, setup_logging
-from mirage.embeddings.models import NomicVLEmbed
 from mirage.core.prompts import PROMPTS
 
 #%% Setup
+
+def _load_topic_modeling_dependencies():
+    """Load optional BERTopic stack only when automatic domain detection runs."""
+    try:
+        from umap import UMAP
+        from bertopic import BERTopic
+        from bertopic.representation import MaximalMarginalRelevance
+        from sklearn.feature_extraction.text import CountVectorizer
+    except ImportError as exc:
+        raise ImportError(
+            "Automatic domain detection requires optional dependencies: "
+            "bertopic, umap-learn, and scikit-learn. For domain-specific runs, "
+            "set domain_expert.domain and domain_expert.expert_persona in config.yaml "
+            "to skip topic modeling."
+        ) from exc
+    return UMAP, BERTopic, MaximalMarginalRelevance, CountVectorizer
 
 def save_domain_expert_to_env(domain: str, expert_persona: str):
     """Save domain and expert persona as environment variables"""
@@ -104,11 +114,16 @@ def align_chunks_with_embeddings(chunks: List[Dict], chunk_ids: List[str]) -> Tu
     """
     print("Aligning chunks with pre-computed embeddings...")
     
-    # Create map of chunk_id -> chunk for O(1) lookup
+    # Create map of stable IDs -> chunk for O(1) lookup. Older runs may only
+    # have chunk_id, while newer runs prefer global_chunk_id or file_name:chunk_id.
     chunk_map = {}
     for c in chunks:
         c_id = str(c.get('chunk_id', ''))
-        chunk_map[c_id] = c
+        file_chunk_id = f"{c.get('file_name', 'unknown')}:{c_id}"
+        global_chunk_id = str(c.get('global_chunk_id', ''))
+        for key in {c_id, file_chunk_id, global_chunk_id}:
+            if key:
+                chunk_map[key] = c
         
     aligned_chunks = []
     valid_indices = []
@@ -130,7 +145,7 @@ def align_chunks_with_embeddings(chunks: List[Dict], chunk_ids: List[str]) -> Tu
     print(f"[OK] Aligned {len(aligned_chunks)} chunks.")
     return aligned_chunks, valid_indices
 
-def get_embeddings_multimodal(chunks: List[Dict], embed_model: NomicVLEmbed) -> np.ndarray:
+def get_embeddings_multimodal(chunks: List[Dict], embed_model) -> np.ndarray:
     """
     Generate multimodal embeddings for chunks using NomicVLEmbed.
     Handles text and optional images (from 'artifact' field).
@@ -183,6 +198,8 @@ def get_embeddings_text_only(chunks: List[Dict], model_name: str = "BAAI/bge-m3"
     """
     Generate text-only embeddings using SentenceTransformer (BGE-M3).
     """
+    from sentence_transformers import SentenceTransformer
+
     print(f"Generating Text-Only Embeddings using {model_name}...")
     
     docs = [c.get('content', '') for c in chunks]
@@ -199,6 +216,8 @@ def get_domain_model(chunks: List[Dict], embeddings: Optional[Union[torch.Tensor
     """
     Train BERTopic model using embeddings (pre-calculated or computed on-the-fly).
     """
+    UMAP, BERTopic, MaximalMarginalRelevance, CountVectorizer = _load_topic_modeling_dependencies()
+
     print(f"Starting Topic Modeling on {len(chunks)} chunks...")
     
     # Extract text content for BERTopic (it still needs docs for representation)
@@ -405,6 +424,13 @@ def visualize_results(topic_model: BERTopic, docs: List[str], output_dir: str, e
         if embeddings is not None:
             try:
                 print("  - Calculating 2D UMAP for Datamap...")
+                try:
+                    from umap import UMAP
+                except ImportError as exc:
+                    raise ImportError(
+                        "Document datamap visualization requires umap-learn."
+                    ) from exc
+
                 # Reduce dimensionality of embeddings to 2D for visualization
                 # User specified params: n_neighbors=10, n_components=2, min_dist=0.0, metric='cosine'
                 umap_2d = UMAP(n_neighbors=10, n_components=2, min_dist=0.0, metric='cosine', random_state=42)
