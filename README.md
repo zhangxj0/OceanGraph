@@ -38,7 +38,7 @@ and verifies that each accepted question requires evidence from multiple chunks.
 ## Installation
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
+git clone https://github.com/zhangxj0/OceanGraph.git
 cd OceanGraph
 python -m venv .venv
 ```
