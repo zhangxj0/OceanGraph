@@ -80,9 +80,9 @@ Pipeline agents:
     parser.add_argument("--evaluation", action="store_true", help="Enable evaluation metrics")
     parser.add_argument("--num-qa-pairs", type=int, default=100, help="Target number of accepted QA pairs")
     parser.add_argument("--max-workers", type=int, default=4, help="Number of parallel workers")
-    parser.add_argument("--embedding-model", default="auto", help="Embedding model: auto, qwen3_vl, nomic, or bge_m3")
+    parser.add_argument("--embedding-model", default="bge_m3", help="Text embedding model: bge_m3, bge_large, or auto")
     parser.add_argument("--offline-models", action="store_true", help="Use only locally cached Hugging Face models")
-    parser.add_argument("--reranker-model", default="gemini_vlm", help="Reranker model: gemini_vlm, qwen3_vl, or text_embedding")
+    parser.add_argument("--reranker-model", default="text_embedding", help="Text reranker model")
     parser.add_argument("--max-depth", type=int, default=2, help="Maximum depth for multi-hop context retrieval")
     parser.add_argument("--no-strict-multihop", action="store_true", help="Disable single-chunk shortcut checks")
     parser.add_argument(

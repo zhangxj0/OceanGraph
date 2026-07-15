@@ -3,6 +3,10 @@
 This guide reproduces the validated DeepSeek text-only baseline and the
 Search-R1 export path without storing credentials in the repository.
 
+OceanGraph does not send images to model APIs. PDF figures may be extracted by
+legacy ingestion code, but `pipeline.modality: text` removes their paths and
+keeps only textual chunk content before generation and export.
+
 ## 1. Validated environment
 
 - Ubuntu 24.04-compatible Linux

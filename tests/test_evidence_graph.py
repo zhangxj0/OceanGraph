@@ -37,7 +37,7 @@ def test_search_trajectory_preserves_rank_action_and_termination():
                 {
                     "depth": 1,
                     "search_strings": ["ocean carbon"],
-                    "model_route": {"profile": "generator", "model": "qwen3.7-plus"},
+                    "model_route": {"profile": "generator", "model": "Qwen3.7-Plus"},
                     "retrieved_chunks": [
                         {
                             "search_query": "ocean carbon",

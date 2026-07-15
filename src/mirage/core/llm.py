@@ -207,7 +207,23 @@ def _request_fingerprint(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
 
 
+def _text_only_mode() -> bool:
+    try:
+        from mirage.core.config import is_text_only_mode
+
+        return is_text_only_mode()
+    except Exception:
+        return True
+
+
+def _ensure_vision_enabled() -> None:
+    if _text_only_mode():
+        raise RuntimeError("Image API calls are disabled because pipeline.modality is text")
+
+
 def _chunk_image_path(chunk: Dict[str, Any]) -> Optional[str]:
+    if _text_only_mode():
+        return None
     artifact = chunk.get("artifact", [])
     if isinstance(artifact, list) and artifact:
         return str(artifact[0])
@@ -510,6 +526,7 @@ def call_llm_simple(
 
 def call_vlm_simple(prompt: str, image_path: str) -> str:
     """Simple VLM call with single image. Supports OLLAMA, GEMINI, OPENAI."""
+    _ensure_vision_enabled()
     _initialize_config()
     print(f"Calling VLM (simple) via {BACKEND}...")
     attempt = 0
@@ -634,6 +651,7 @@ def call_vlm_simple(prompt: str, image_path: str) -> str:
 
 def call_vlm_with_examples(prompt: str, query_image_path: str, example_image_paths: List[str]) -> str:
     """VLM call with multiple example images and query image"""
+    _ensure_vision_enabled()
     _initialize_config()
     print(f"Calling VLM with examples via {BACKEND}...")
     attempt = 0
@@ -716,6 +734,7 @@ def call_vlm_with_examples(prompt: str, query_image_path: str, example_image_pat
 
 def call_vlm_with_multiple_images(prompt: str, image_paths: List[str]) -> str:
     """VLM call with multiple images for reranking"""
+    _ensure_vision_enabled()
     _initialize_config()
     print(f"Calling VLM with {len(image_paths)} images via {BACKEND}...")
     attempt = 0
@@ -837,6 +856,7 @@ def call_vlm_multi_images_ollama(prompt: str, image_paths: List[str]) -> str:
     Calls local Ollama with multiple images and a prompt.
     Uses message chaining strategy for correct image ordering in context.
     """
+    _ensure_vision_enabled()
     print(f"Calling VLM with {len(image_paths)} images (Ollama)...")
     
     url = "http://127.0.0.1:11434/api/chat"
@@ -892,7 +912,7 @@ def call_vlm_interweaved(
     stage: str = "default",
     response_format: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """VLM call with interleaved text and images from chunks.
+    """Model call over chunk text, with legacy image support when explicitly enabled.
     Supports OLLAMA, GEMINI, OPENAI.
     
     Args:
@@ -949,26 +969,7 @@ def call_vlm_interweaved(
         2. Old format: {'image_path': str} - backward compatibility
         3. JSON format: {'chunk_type': str, 'artifact': str} - legacy format
         """
-        # Check for artifact list (new format)
-        artifact = chunk.get('artifact', [])
-        if isinstance(artifact, list) and len(artifact) > 0:
-            return artifact[0]  # Use first image
-        
-        # Fallback: check image_path field (backward compatibility)
-        image_path = chunk.get('image_path')
-        if image_path:
-            return image_path
-        
-        # Fallback: legacy format with chunk_type and artifact string
-        if 'chunk_type' in chunk:
-            chunk_type = chunk.get('chunk_type', '')
-            artifact_str = chunk.get('artifact', 'None')
-            if chunk_type in ['standalone image', 'image'] and artifact_str != 'None':
-                match = re.search(r'!\[Image\]\(([^)]+)\)', artifact_str)
-                if match:
-                    return match.group(1)
-        
-        return None
+        return _chunk_image_path(chunk)
     
     while True:
         attempt += 1
@@ -1662,15 +1663,7 @@ async def _async_call_vlm_interweaved(
     
     def _extract_image_path(chunk):
         """Helper to extract image path from chunk"""
-        if 'chunk_type' in chunk:
-            chunk_type = chunk.get('chunk_type', '')
-            artifact = chunk.get('artifact', 'None')
-            if chunk_type in ['standalone image', 'image'] and artifact != 'None':
-                match = re.search(r'!\[Image\]\(([^)]+)\)', artifact)
-                if match:
-                    return match.group(1)
-            return None
-        return chunk.get('image_path')
+        return _chunk_image_path(chunk)
     
     try:
         if profile.backend == "OLLAMA":

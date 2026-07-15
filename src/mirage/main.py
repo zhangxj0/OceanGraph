@@ -41,7 +41,7 @@ try:
         load_config, get_paths_config, get_processing_config, 
         get_parallel_config, get_retrieval_config, get_embedding_config,
         get_evaluation_config, get_qa_correction_config, get_qa_generation_config,
-        get_faiss_config, get_deduplication_config
+        get_faiss_config, get_deduplication_config, is_text_only_mode
     )
     
     _cfg = load_config()
@@ -55,6 +55,7 @@ try:
     _qa_correction = get_qa_correction_config()
     _qa_gen = get_qa_generation_config()
     _dedup = get_deduplication_config()
+    TEXT_ONLY_MODE = is_text_only_mode()
     
     # Input/Output paths
     INPUT_PDF_DIR = _paths.get('input_pdf_dir', "data/documents")
@@ -71,7 +72,7 @@ try:
     SHUFFLE_SEED = _shuffle.get('seed', 42)
     
     # Embedding
-    EMBEDDING_MODEL = _embed.get('model', "nomic")
+    EMBEDDING_MODEL = _embed.get('model', "bge_m3")
     CACHE_EMBEDDINGS = _embed.get('cache_embeddings', True)
     EMBED_BATCH_SIZE = _embed.get('batch_size', 16)
     EMBEDDING_GPUS = _embed.get('gpus', None)  # GPUs for embedding model
@@ -141,7 +142,7 @@ except (ImportError, Exception):
     SHUFFLE = True
     SHUFFLE_SEED = 42
     
-    EMBEDDING_MODEL = "nomic"
+    EMBEDDING_MODEL = "bge_m3"
     CACHE_EMBEDDINGS = True
     EMBED_BATCH_SIZE = 16
     EMBEDDING_GPUS = None
@@ -170,6 +171,7 @@ except (ImportError, Exception):
     QA_MIN_SUPPORTING_CHUNKS = 2
     QA_OUTPUT_JSONL = True
     QA_COUNTERFACTUAL_VERIFICATION = True
+    TEXT_ONLY_MODE = True
     
     # FAISS defaults
     FAISS_USE_GPU = False
@@ -195,9 +197,9 @@ else:
     try:
         from mirage.core.config import load_config
         _cfg = load_config()
-        RERANKER_MODEL = _cfg.get('reranker', {}).get('default', 'gemini_vlm')
+        RERANKER_MODEL = _cfg.get('reranker', {}).get('default', 'text_embedding')
     except:
-        RERANKER_MODEL = 'gemini_vlm'
+        RERANKER_MODEL = 'text_embedding'
 if os.environ.get("MIRAGE_MAX_DEPTH"):
     MAX_DEPTH = int(os.environ.get("MIRAGE_MAX_DEPTH"))
 if os.environ.get("MIRAGE_RUN_DEDUPLICATION") == "1":
@@ -372,7 +374,7 @@ def _load_sentence_transformer(model_name: str):
         print(f"CPU-first loading failed ({e}), trying direct load...")
         return SentenceTransformer(model_name, device=device)
 
-def get_embedder(model_name: Optional[str] = None, use_multimodal: bool = True):
+def get_embedder(model_name: Optional[str] = None, use_multimodal: bool = False):
     """Get or create embedding model (cached if CACHE_EMBEDDINGS=True)
     
     Args:
@@ -1497,6 +1499,11 @@ def filter_chunks_by_qa_type(chunks: list, qa_type: str) -> list:
     Returns:
         Filtered list of chunks appropriate for the QA type
     """
+    if TEXT_ONLY_MODE:
+        from oceangraph.text import sanitize_text_chunks
+
+        chunks = sanitize_text_chunks(chunks)
+
     if qa_type == 'mix':
         # Mix mode: use all chunks
         return chunks
@@ -2063,7 +2070,7 @@ def run_evaluation(qa_file: str, chunks_file: str, output_dir: str) -> dict:
                 qa_file=qa_file,
                 output_dir=output_dir,
                 corpus_path=chunks_file,  # Pass corpus for domain coverage
-                enable_multimodal=True,
+                enable_multimodal=not TEXT_ONLY_MODE,
                 max_workers=QA_MAX_WORKERS,
                 sample_size=EVAL_SAMPLE_SIZE,
                 run_context_necessity=True

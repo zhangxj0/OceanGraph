@@ -154,6 +154,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
                 "qa_verification",
             ],
         },
+        "pipeline": {"modality": "text"},
         "backend": {
             "active": backend,
             "openai": {
@@ -186,8 +187,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
                     "url": args.api_url if backend_lower == "openai" else "",
                     "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
                     "model": args.llm_model,
-                    "vision_model": args.vlm_model,
-                    "supports_vision": True,
+                    "supports_vision": False,
                     "temperature": 0.0,
                     "structured_output": backend_lower == "openai",
                     "timeout": 300,
@@ -197,8 +197,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
                     "url": args.api_url if backend_lower == "openai" else "",
                     "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
                     "model": args.llm_model,
-                    "vision_model": args.vlm_model,
-                    "supports_vision": True,
+                    "supports_vision": False,
                     "temperature": 0.0,
                     "structured_output": backend_lower == "openai",
                     "timeout": 300,
@@ -333,15 +332,14 @@ def parse_args(default_domain: str | None = None) -> argparse.Namespace:
     parser.add_argument("--api-url", default=os.environ.get("OCEAN_API_URL", "https://api.deepseek.com/chat/completions"))
     parser.add_argument("--ollama-url", default=os.environ.get("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat"))
     parser.add_argument("--llm-model", default=os.environ.get("OCEAN_LLM_MODEL", "deepseek-chat"))
-    parser.add_argument("--vlm-model", default=os.environ.get("OCEAN_VLM_MODEL", os.environ.get("OCEAN_LLM_MODEL", "deepseek-chat")))
     parser.add_argument("--embedding-model", default=os.environ.get("OCEAN_EMBEDDING_MODEL", "bge_m3"))
     parser.add_argument("--offline-models", action="store_true", help="Use only locally cached Hugging Face models")
     parser.add_argument("--reranker-model", default=os.environ.get("OCEAN_RERANKER_MODEL", "text_embedding"))
     parser.add_argument(
         "--qa-type",
-        choices=["multihop", "multimodal", "text", "mix"],
+        choices=["multihop", "text"],
         default=os.environ.get("OCEAN_QA_TYPE", "multihop"),
-        help="QA category to generate; keep multihop for paper runs, use mix for smoke tests",
+        help="Generate text-only multi-hop or text QA records",
     )
     parser.add_argument("--max-workers", type=int, default=env_int("OCEAN_MAX_WORKERS", 1))
     parser.add_argument("--embed-batch-size", type=int, default=env_int("OCEAN_EMBED_BATCH_SIZE", 8))

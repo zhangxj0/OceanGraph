@@ -2,7 +2,7 @@ from oceangraph.providers import StageModelRouter
 
 
 def test_stage_router_selects_generator_and_verifier(monkeypatch):
-    monkeypatch.setenv("DASHSCOPE_API_KEY", "qwen-secret")
+    monkeypatch.setenv("PARATERA_API_KEY", "qwen-secret")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-secret")
     config = {
         "models": {
@@ -10,10 +10,9 @@ def test_stage_router_selects_generator_and_verifier(monkeypatch):
                 "generator": {
                     "backend": "OPENAI",
                     "url": "https://example.test/qwen/chat/completions",
-                    "api_key_env": "DASHSCOPE_API_KEY",
-                    "model": "qwen3.7-plus",
-                    "vision_model": "qwen3.7-plus",
-                    "supports_vision": True,
+                    "api_key_env": "PARATERA_API_KEY",
+                    "model": "Qwen3.7-Plus",
+                    "supports_vision": False,
                     "thinking": False,
                     "structured_output": True,
                 },
@@ -37,9 +36,9 @@ def test_stage_router_selects_generator_and_verifier(monkeypatch):
 
     generator = router.resolve("generation")
     verifier = router.resolve("verification")
-    assert generator.model == "qwen3.7-plus"
+    assert generator.model == "Qwen3.7-Plus"
     assert verifier.model == "deepseek-v4-pro"
-    assert router.resolve("verification", vision=True).model == "qwen3.7-plus"
+    assert generator.supports_vision is False
     assert generator.headers["Authorization"] == "Bearer qwen-secret"
     assert verifier.headers["Authorization"] == "Bearer deepseek-secret"
     assert router.has_api_key() is True

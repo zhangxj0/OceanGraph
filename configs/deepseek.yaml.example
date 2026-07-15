@@ -1,3 +1,6 @@
+pipeline:
+  modality: text
+
 backend:
   active: OPENAI
   openai:

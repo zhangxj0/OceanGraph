@@ -28,8 +28,8 @@ and verifies that each accepted question requires evidence from multiple chunks.
 - **Evidence-grounded multi-hop QA** — Builds reasoning paths, supporting
   facts, and evidence spans, then rejects questions that can be answered from a
   single chunk.
-- **Multimodal-ready ingestion** — Processes PDF, HTML, TXT, and Markdown
-  sources into a common retrieval and chunking workflow.
+- **Text-only corpus generation** — Converts PDF, HTML, TXT, and Markdown
+  sources into text chunks and never sends extracted images to model APIs.
 - **Structured outputs** — Exports accepted and rejected QA pairs as JSON and
   JSONL together with chunks and completed context.
 - **Configurable model backends** — Supports Gemini, OpenAI, and local Ollama
@@ -74,15 +74,14 @@ For the recommended stage-routed setup, keep credentials in environment
 variables and copy the `models` section from `src/mirage/config.yaml.example`:
 
 ```powershell
-$env:DASHSCOPE_API_KEY = "YOUR_DASHSCOPE_KEY"
+$env:PARATERA_API_KEY = "YOUR_PARATERA_KEY"
 $env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 ```
 
 This routes corpus analysis, retrieval, generation, and correction to
-`qwen3.7-plus`, while text-only selection and verification use
-`deepseek-v4-pro`. If a verification request contains a real image, the router
-automatically falls back to the configured vision-capable generator rather than
-sending image content to a text-only verifier.
+`Qwen3.7-Plus` through Paratera, while text-only selection and verification use
+`deepseek-v4-pro`. The default `pipeline.modality: text` setting strips image
+artifacts before retrieval, generation, verification, and dataset export.
 
 Run an OceanGraph pipeline over an input directory:
 
@@ -174,9 +173,9 @@ organization, and `OCEANGRAPH_FRAMEWORK.md` for a detailed framework overview.
 --input, -i                 Directory containing PDF, HTML, TXT, or Markdown inputs
 --output, -o                Destination for generated dataset artifacts
 --backend, -b               gemini, openai, or ollama
---embedding-model           auto, qwen3_vl, nomic, or bge_m3
+--embedding-model           bge_m3, bge_large, or auto
 --offline-models            Use only locally cached Hugging Face models
---reranker-model            gemini_vlm, qwen3_vl, or text_embedding
+--reranker-model            text_embedding
 --num-qa-pairs              Target number of accepted QA pairs
 --max-depth                 Maximum multi-hop retrieval depth
 --min-supporting-chunks     Minimum distinct chunks for strict verification

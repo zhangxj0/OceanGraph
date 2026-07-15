@@ -764,6 +764,11 @@ def process_chunk_for_qa(chunk_data: Dict, expert_persona: str, domain: str) -> 
     
     final_context = context_result['context']
     context_chunks = context_result.get('chunks', [])
+    from mirage.core.config import is_text_only_mode
+    if is_text_only_mode():
+        from oceangraph.text import sanitize_text_chunks
+
+        context_chunks = sanitize_text_chunks(context_chunks)
     completion_status = context_result['status']
     
     print(f"Context status: {completion_status}")
@@ -817,7 +822,7 @@ def process_chunk_for_qa(chunk_data: Dict, expert_persona: str, domain: str) -> 
         "chunk_id": chunk_id,
         "original_chunk": chunk_content,
         "final_context": final_context,
-        "context_chunks": context_chunks,  # Full chunks with image_path for multimodal eval
+        "context_chunks": context_chunks,
         "context_status": completion_status,
         "depth_reached": context_result['depth'],
         "chunks_added": context_result['chunks_added'],

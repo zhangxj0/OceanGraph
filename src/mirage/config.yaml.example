@@ -51,17 +51,19 @@ backend:
     timeout: 300
 
 # -----------------------------------------------------------------------------
-# Stage-specific model routing (API keys must come from environment variables)
+# Text-only pipeline and stage-specific model routing
 # -----------------------------------------------------------------------------
+pipeline:
+  modality: text
+
 models:
   profiles:
     generator:
       backend: OPENAI
-      url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-      api_key_env: DASHSCOPE_API_KEY
-      model: qwen3.7-plus
-      vision_model: qwen3.7-plus
-      supports_vision: true
+      url: https://llmapi.paratera.com/v1/chat/completions
+      api_key_env: PARATERA_API_KEY
+      model: Qwen3.7-Plus
+      supports_vision: false
       temperature: 0.0
       thinking: false
       structured_output: true
@@ -131,25 +133,13 @@ shuffling:
 # Embedding Configuration
 # -----------------------------------------------------------------------------
 embedding:
-  model: nomic             # Options: "nomic", "bge_m3", "gemini"
+  model: bge_m3            # Text embedding model
   cache_embeddings: true
   local_files_only: false  # Set true on isolated servers with pre-cached models
   batch_size: 8            # Reduce if OOM errors
   gpus: [0]                # GPU IDs for embedding
   
   models:
-    gemini:
-      name: gemini-embedding-001
-      output_dimensionality: 768
-      api_based: true
-    nomic:
-      name: nomic-ai/nomic-embed-multimodal-7b
-      quantization:
-        load_in_4bit: true
-        bnb_4bit_compute_dtype: bfloat16
-        bnb_4bit_use_double_quant: true
-      torch_dtype: bfloat16
-      attn_implementation: sdpa
     bge_m3:
       name: BAAI/bge-m3
     bge_large:
@@ -161,18 +151,9 @@ embedding:
 # Reranker Configuration
 # -----------------------------------------------------------------------------
 reranker:
-  default: gemini_vlm      # Options: "gemini_vlm", "monovlm", "text_embedding"
+  default: text_embedding
   
   models:
-    gemini_vlm:
-      model_name: gemini-2.0-flash
-      api_based: true
-      max_tokens: 500
-      timeout: 180
-    monovlm:
-      model_name: lightonai/MonoQwen2-VL-v0.1
-      processor_name: Qwen/Qwen2-VL-2B-Instruct
-      torch_dtype: bfloat16
     text_embedding:
       model_name: BAAI/bge-large-en-v1.5
 

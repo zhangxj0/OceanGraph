@@ -27,6 +27,21 @@ def _apply_runtime_environment(config: Dict[str, Any]) -> Dict[str, Any]:
     return config
 
 
+def is_text_only_mode(config_path: str = None) -> bool:
+    """Return whether OceanGraph must exclude all visual inputs and metadata."""
+    truthy_values = {'1', 'true', 'yes', 'on'}
+    falsy_values = {'0', 'false', 'no', 'off'}
+    for name in ('OCEANGRAPH_TEXT_ONLY', 'MIRAGE_TEXT_ONLY'):
+        value = os.environ.get(name, '').strip().lower()
+        if value in truthy_values:
+            return True
+        if value in falsy_values:
+            return False
+    config = load_config(config_path)
+    pipeline_config = config.get('pipeline') or {}
+    return str(pipeline_config.get('modality', 'text')).strip().lower() == 'text'
+
+
 def load_config(config_path: str = None) -> Dict[str, Any]:
     """Load configuration from YAML file with caching.
     
@@ -95,6 +110,9 @@ def _get_default_config() -> Dict[str, Any]:
             'num_workers': 3,
             'qa_max_workers': 6,
             'dedup_max_workers': 4
+        },
+        'pipeline': {
+            'modality': 'text',
         },
         'embedding': {
             'local_files_only': False,
@@ -211,7 +229,7 @@ def get_domain_expert_config() -> Dict[str, Any]:
     return config.get('domain_expert', {
         'expert_persona': None,
         'domain': None,
-        'use_multimodal_embeddings': True,
+        'use_multimodal_embeddings': False,
         'output_dir': 'trials/domain_analysis'
     })
 
