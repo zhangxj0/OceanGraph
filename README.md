@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg" alt="Python 3.9+">
+  <img src="https://img.shields.io/badge/python-3.12-blue.svg" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache-2.0 license">
   <img src="https://img.shields.io/badge/domain-ocean%20science-0077B6.svg" alt="Ocean science">
 </p>
@@ -49,14 +49,26 @@ Activate the virtual environment, then install the package:
 pip install -e .
 ```
 
-For evaluation dependencies:
+For migration to the validated Paratera NVIDIA image, reuse its preinstalled
+Torch build and install the exact versions from `requirements.txt`:
 
 ```bash
-pip install -e ".[eval]"
+python -m pip install --user --break-system-packages --no-deps \
+  -r requirements.txt
+python -m pip install --user --break-system-packages -e . --no-deps
 ```
 
-For the exact DeepSeek baseline, isolated-server setup, validation criteria, and
-Search-R1 conversion steps, see [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
+`faiss-cpu` is required by multi-hop vector retrieval. Docling is no longer
+required for TXT/Markdown inputs; PDF/HTML ingestion remains an optional
+document-processing path.
+
+Evaluation uses the configured DeepSeek verification route and the same local
+BGE-M3 installation as retrieval; no Gemini, LangChain, or RAGAS packages are
+required.
+
+For the validated Qwen generation plus DeepSeek verification setup,
+isolated-server deployment, validation criteria, and Search-R1 conversion
+steps, see [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
 
 ## Quick start
 
@@ -71,9 +83,10 @@ export OPENAI_API_KEY="YOUR_OPENAI_KEY"
 ```
 
 For the recommended stage-routed setup, keep credentials in environment
-variables and copy the `models` section from `src/mirage/config.yaml.example`:
+variables and copy the `models` section from `configs/oceangraph.yaml.example`:
 
 ```powershell
+Copy-Item configs/oceangraph.yaml.example config.yaml
 $env:PARATERA_API_KEY = "YOUR_PARATERA_KEY"
 $env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 ```
@@ -87,6 +100,7 @@ Run an OceanGraph pipeline over an input directory:
 
 ```bash
 python run_oceangraph.py \
+  --config config.yaml \
   --input data/ocean_texts \
   --output output/oceangraph_demo \
   --backend openai \
@@ -190,8 +204,7 @@ organization, and `OCEANGRAPH_FRAMEWORK.md` for a detailed framework overview.
 
 ```text
 OceanGraph/
-├── src/oceangraph/         # OceanGraph public CLI and taxonomy
-├── src/mirage/             # Core multi-agent generation engine
+├── src/oceangraph/         # Unified public API and generation engine
 ├── scripts/                # Dataset and conversion helpers
 ├── figures/                # Framework illustrations
 ├── run_oceangraph.py       # Standalone entry point

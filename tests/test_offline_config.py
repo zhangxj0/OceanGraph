@@ -2,7 +2,7 @@ import os
 
 import yaml
 
-from mirage.core.config import load_config
+from oceangraph.core.config import load_config
 
 
 def test_local_files_only_enables_transformer_offline_mode(tmp_path, monkeypatch):

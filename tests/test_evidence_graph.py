@@ -1,4 +1,4 @@
-from mirage.pipeline.evidence_graph import build_evidence_graph, build_search_trajectory
+from oceangraph.pipeline.evidence_graph import build_evidence_graph, build_search_trajectory
 
 
 def test_evidence_graph_uses_counterfactually_necessary_chunks():

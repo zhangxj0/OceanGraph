@@ -10,7 +10,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from mirage_to_search_r1 import main
+from oceangraph_search_r1 import main
 
 
 def _ensure_default(flag: str, value: str) -> None:
@@ -24,4 +24,3 @@ if __name__ == "__main__":
         _ensure_default("--wiki-output-name", "oceangraph_2wiki_like.jsonl")
         _ensure_default("--id-prefix", "oceangraph")
     raise SystemExit(main())
-

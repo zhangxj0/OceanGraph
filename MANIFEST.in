@@ -2,12 +2,13 @@
 include README.md
 include LICENSE
 include requirements.txt
-include config.yaml.example
+recursive-include configs *.yaml.example
 include pyproject.toml
-include run_mirage.py
+include run_oceangraph.py
 
 # Include all Python files
-recursive-include *.py
+recursive-include src *.py *.yaml
+recursive-include scripts *.py
 
 # Include assets (images for documentation)
 recursive-include assets *.png *.jpg *.jpeg *.gif *.svg

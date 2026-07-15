@@ -15,7 +15,7 @@ _DEFAULT_STAGE_ROUTES = {
     "selection": "verifier",
     "verification": "verifier",
     "correction": "generator",
-    "default": "default",
+    "default": "generator",
 }
 
 

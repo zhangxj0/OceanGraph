@@ -1,6 +1,6 @@
 import pytest
 
-from mirage.core import llm
+from oceangraph.core import llm
 from oceangraph.text import sanitize_text_chunks
 
 

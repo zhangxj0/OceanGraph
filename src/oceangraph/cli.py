@@ -98,10 +98,9 @@ Pipeline agents:
 
 
 def setup_environment(args: argparse.Namespace) -> None:
-    """Set both public OceanGraph variables and internal engine variables."""
+    """Expose command-line options through OceanGraph environment variables."""
     if args.config:
         os.environ["OCEANGRAPH_CONFIG"] = args.config
-        os.environ["MIRAGE_CONFIG"] = args.config
 
     if args.api_key:
         for env_name in configured_api_key_envs(args.config, args.backend):
@@ -109,57 +108,42 @@ def setup_environment(args: argparse.Namespace) -> None:
 
     backend = args.backend.upper()
     os.environ["OCEANGRAPH_BACKEND"] = backend
-    os.environ["MIRAGE_BACKEND"] = backend
 
     if args.model:
         os.environ["OCEANGRAPH_MODEL"] = args.model
-        os.environ["MIRAGE_MODEL"] = args.model
 
-    os.environ["MIRAGE_COUNTERFACTUAL_VERIFICATION"] = (
+    os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] = (
         "0" if args.no_counterfactual_verification else "1"
     )
 
     if args.input:
         os.environ["OCEANGRAPH_INPUT_DIR"] = args.input
-        os.environ["MIRAGE_INPUT_DIR"] = args.input
     if args.output:
         os.environ["OCEANGRAPH_OUTPUT_DIR"] = args.output
-        os.environ["MIRAGE_OUTPUT_DIR"] = args.output
 
     if args.num_qa_pairs:
         os.environ["OCEANGRAPH_NUM_QA_PAIRS"] = str(args.num_qa_pairs)
-        os.environ["MIRAGE_NUM_QA_PAIRS"] = str(args.num_qa_pairs)
     if args.max_workers:
         os.environ["OCEANGRAPH_MAX_WORKERS"] = str(args.max_workers)
-        os.environ["MIRAGE_MAX_WORKERS"] = str(args.max_workers)
     if args.embedding_model:
         os.environ["OCEANGRAPH_EMBEDDING_MODEL"] = args.embedding_model
-        os.environ["MIRAGE_EMBEDDING_MODEL"] = args.embedding_model
     if args.offline_models:
         os.environ["OCEANGRAPH_OFFLINE_MODELS"] = "1"
-        os.environ["MIRAGE_OFFLINE_MODELS"] = "1"
     if args.reranker_model:
         os.environ["OCEANGRAPH_RERANKER_MODEL"] = args.reranker_model
-        os.environ["MIRAGE_RERANKER_MODEL"] = args.reranker_model
     if args.max_depth:
         os.environ["OCEANGRAPH_MAX_DEPTH"] = str(args.max_depth)
-        os.environ["MIRAGE_MAX_DEPTH"] = str(args.max_depth)
     if args.no_strict_multihop:
         os.environ["OCEANGRAPH_STRICT_MULTIHOP"] = "0"
-        os.environ["MIRAGE_STRICT_MULTIHOP"] = "0"
     if args.min_supporting_chunks:
         os.environ["OCEANGRAPH_MIN_SUPPORTING_CHUNKS"] = str(args.min_supporting_chunks)
-        os.environ["MIRAGE_MIN_SUPPORTING_CHUNKS"] = str(args.min_supporting_chunks)
     if args.no_jsonl:
         os.environ["OCEANGRAPH_OUTPUT_JSONL"] = "0"
-        os.environ["MIRAGE_OUTPUT_JSONL"] = "0"
 
     if args.deduplication:
         os.environ["OCEANGRAPH_RUN_DEDUPLICATION"] = "1"
-        os.environ["MIRAGE_RUN_DEDUPLICATION"] = "1"
     if args.evaluation:
         os.environ["OCEANGRAPH_RUN_EVALUATION"] = "1"
-        os.environ["MIRAGE_RUN_EVALUATION"] = "1"
 
 
 def validate_args(args: argparse.Namespace) -> list[str]:
@@ -223,8 +207,8 @@ def main() -> None:
     setup_environment(args)
 
     try:
-        from mirage.main import run_pipeline
-        from mirage.utils.preflight import run_preflight_checks
+        from oceangraph.engine import run_pipeline
+        from oceangraph.utils.preflight import run_preflight_checks
     except ImportError as exc:
         logger.error("Failed to import the internal generation engine: %s", exc)
         logger.info("Install the project with: pip install -e .")

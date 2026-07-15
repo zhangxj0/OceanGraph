@@ -410,19 +410,16 @@ def main(default_domain: str | None = None) -> int:
 
     env = os.environ.copy()
     env["OCEANGRAPH_CONFIG"] = str(config_path)
-    env["MIRAGE_CONFIG"] = str(config_path)
     env["DATASET_DOMAIN"] = domain.domain
     env["DATASET_EXPERT_PERSONA"] = domain.expert_persona
     env["OCEANGRAPH_BACKEND"] = args.backend.upper()
-    env["MIRAGE_BACKEND"] = args.backend.upper()
     env["LLM_BACKEND"] = args.backend.upper()
     if args.hf_endpoint:
         env["HF_ENDPOINT"] = args.hf_endpoint
     if args.offline_models:
         env["OCEANGRAPH_OFFLINE_MODELS"] = "1"
-        env["MIRAGE_OFFLINE_MODELS"] = "1"
 
-    python = Path(os.environ.get("OCEANGRAPH_PYTHON", os.environ.get("MIRAGE_PYTHON", sys.executable)))
+    python = Path(os.environ.get("OCEANGRAPH_PYTHON", sys.executable))
 
     framework_cmd = [
         str(python),

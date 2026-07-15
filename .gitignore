@@ -16,7 +16,7 @@ data/*
 # Other data folders
 Samples/
 full_iec_old/
-embeddings/
+/embeddings/
 
 
 # ========== IEC RELATED ==========

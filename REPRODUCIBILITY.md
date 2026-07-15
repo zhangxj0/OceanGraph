@@ -1,35 +1,49 @@
-# OceanGraph-R1 Reproducibility Guide
+# OceanGraph-R1 复现指南
 
-This guide reproduces the validated DeepSeek text-only baseline and the
-Search-R1 export path without storing credentials in the repository.
+本文档用于复现当前已验证的纯文本多跳问答数据生成流程。推荐路由为：
 
-OceanGraph does not send images to model APIs. PDF figures may be extracted by
-legacy ingestion code, but `pipeline.modality: text` removes their paths and
-keeps only textual chunk content before generation and export.
+- `Qwen3.7-Plus`：语料分析、检索规划、问答生成与失败样本修正。
+- `deepseek-v4-pro`：候选选择、答案验证、严格多跳必要性验证与可选质量评估。
+- `BAAI/bge-m3`：本地文本向量嵌入与评估向量。
+- `BAAI/bge-large-en-v1.5`：本地文本重排。
 
-## 1. Validated environment
+整个数据生成流程为纯文本模式，不会向模型 API 发送图片。代码中部分历史函数名仍包含 `VLM`，但在
+`pipeline.modality: text` 下只传递文本内容，预检和运行日志中的 `Has image` 应为 `False`。
 
-- Ubuntu 24.04-compatible Linux
-- Python 3.12
-- NVIDIA RTX 4090 with 24 GB VRAM
-- `deepseek-v4-pro` through the DeepSeek OpenAI-compatible API
-- `BAAI/bge-m3` embeddings and FAISS retrieval
+## 1. 已验证环境
 
-Unit tests also run on CPU-only machines. A CUDA GPU with at least 16 GB VRAM is
-recommended for full corpus processing.
+完整流程于 2026-07-15 在以下环境验证：
 
-## 2. Install
+- Ubuntu 22.04，Python `3.12.3`
+- NVIDIA RTX 4090 24 GB，驱动 `550.54.14`
+- Torch `2.7.0a0+7c8ec84dab.nv25.3`
+- Transformers `4.49.0`
+- Sentence Transformers `3.4.1`
+- FAISS CPU `1.10.0`
+
+`requirements.txt` 记录了服务器实际可运行环境的确切版本。TXT/Markdown 小规模复现建议使用
+16 GB 以上显存；单元测试可在 CPU 环境运行。
+
+## 2. 获取代码并安装
 
 ```bash
 git clone https://github.com/zhangxj0/OceanGraph.git
 cd OceanGraph
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e ".[dev]"
+git checkout codex/finalize-oceangraph
 ```
 
-Run the deterministic local checks:
+在已包含指定 NVIDIA Torch 构建的 Paratera 镜像中安装：
+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
+```
+
+`torch==2.7.0a0+7c8ec84dab.nv25.3` 是 Paratera NVIDIA PyTorch 镜像提供的定制构建，通常不能从
+PyPI 重新下载。迁移时应优先复用同一镜像；若使用其他 CUDA 镜像，请先安装与其匹配的 PyTorch，
+再按照 `requirements.txt` 安装其余包，并记录实际 Torch/CUDA 版本。
+
+安装后执行本地回归检查：
 
 ```bash
 python -m compileall -q src scripts tests run_oceangraph.py
@@ -37,117 +51,173 @@ python -m pytest -q
 python run_oceangraph.py --help
 ```
 
-The validated revision reports 10 passing tests.
+当前版本应有 `31 passed`。
 
-## 3. Configure DeepSeek securely
+## 3. 配置模型路由
 
-Never write the API key into YAML, shell scripts, logs, or Git history.
+复制推荐配置，生成的 `config.yaml` 已被 Git 忽略：
 
 ```bash
-export DEEPSEEK_API_KEY="YOUR_ROTATED_KEY"
-cp configs/deepseek.yaml.example config.deepseek.yaml
+cp configs/oceangraph.yaml.example config.yaml
 ```
 
-PowerShell equivalent:
+只通过环境变量提供密钥，禁止将密钥写入 YAML、脚本、日志或 Git：
+
+```bash
+export PARATERA_API_KEY="YOUR_PARATERA_KEY"
+export DEEPSEEK_API_KEY="YOUR_DEEPSEEK_KEY"
+```
+
+PowerShell：
 
 ```powershell
-$env:DEEPSEEK_API_KEY = "YOUR_ROTATED_KEY"
-Copy-Item configs/deepseek.yaml.example config.deepseek.yaml
+Copy-Item configs/oceangraph.yaml.example config.yaml
+$env:PARATERA_API_KEY = "YOUR_PARATERA_KEY"
+$env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 ```
 
-The example routes generation, selection, verification, and correction through
-`deepseek-v4-pro`. This baseline is text-only. Use the Qwen vision-capable
-generator profile in `src/mirage/config.yaml.example` for image-bearing chunks.
+推荐配置固定了以下关键行为：
 
-## 4. Prepare a corpus
+- `generation` 与 `correction` 路由到 Qwen。
+- `selection` 与 `verification` 路由到 DeepSeek。
+- `default`、`corpus` 与 `retrieval` 路由到 Qwen，避免意外访问 OpenAI 默认地址。
+- `pipeline.modality: text` 禁止图片进入模型调用。
+- `evaluation.run_evaluation: false` 默认不启动额外评估，先保证数据生成完成。
 
-Place at least three related ocean-science TXT or Markdown documents in one
-input directory. Each accepted question should require facts from at least two
-different chunks.
+## 4. 准备最小语料
+
+建议准备至少 3 个相互关联的 TXT 或 Markdown 文档，每个目标问题应需要至少两个不同文本块。
 
 ```bash
 mkdir -p data/repro_ocean
+cp /path/to/ocean/files/*.txt data/repro_ocean/
 cp /path/to/ocean/files/*.md data/repro_ocean/
 ```
 
-For the first smoke run, use a small corpus and request one accepted QA pair.
-
-## 5. Cache embeddings
-
-On a machine with internet access, cache BGE-M3 once:
+首次联网运行会下载 BGE-M3 和 BGE-large。也可以提前缓存：
 
 ```bash
-python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
+python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3'); SentenceTransformer('BAAI/bge-large-en-v1.5')"
 ```
 
-On an isolated server, confirm the cache exists and add `--offline-models`.
-This sets `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1`, preventing slow
-Hugging Face network probes while retaining local GPU inference.
+模型缓存完成后，隔离服务器运行时增加 `--offline-models`，避免 Hugging Face 网络探测。
 
-## 6. Run the validated baseline
+## 5. 先运行预检
+
+必须显式传入配置文件，确保 Qwen/DeepSeek 路由生效：
+
+```bash
+python run_oceangraph.py --config config.yaml --backend openai --preflight
+```
+
+预检应确认：
+
+- generation 模型为 `Qwen3.7-Plus`；
+- verification 模型为 `deepseek-v4-pro`；
+- 两个 API 均可调用；
+- BGE-M3 与文本重排模型可加载；
+- 纯文本模式生效。
+
+若 DeepSeek 返回 HTTP `402 Insufficient Balance`，应先充值或更换有余额的密钥。此错误属于服务端
+账户状态，不是 OceanGraph 代码故障。
+
+## 6. 生成两条完整样本
+
+第一次建议只生成两条，并把并发设为 1，便于定位 API 限流或余额问题：
 
 ```bash
 python run_oceangraph.py \
-  --config config.deepseek.yaml \
-  --input data/repro_ocean \
-  --output output/repro_deepseek \
+  --config config.yaml \
   --backend openai \
-  --model deepseek-v4-pro \
+  --input data/repro_ocean \
+  --output output/repro_qwen_deepseek \
+  --num-qa-pairs 2 \
+  --max-workers 1 \
   --embedding-model bge_m3 \
   --reranker-model text_embedding \
-  --offline-models \
-  --num-qa-pairs 1 \
-  --max-workers 1 \
-  --max-depth 3 \
-  --min-supporting-chunks 2
+  --max-depth 2 \
+  --min-supporting-chunks 2 \
+  --deduplication \
+  --offline-models
 ```
 
-Remove `--offline-models` on the initial connected run if the embedding model is
-not cached yet. Increase `--num-qa-pairs` only after the one-item smoke run
-passes.
+若本地尚无模型缓存，首次运行去掉 `--offline-models`。生成和严格验证成功后，再按需增加
+`--num-qa-pairs` 与 `--max-workers`。
 
-## 7. Validate outputs
+## 7. 验收生成结果
 
-The run is considered successful when:
+重点检查 `output/repro_qwen_deepseek/`：
 
-1. `qa_multihop_pass.json` contains at least one record.
-2. `verification_result` includes question, answer, and content-necessity checks.
-3. `multihop_necessity_result.passes` is `true`.
-4. At least two chunks are listed in `necessary_chunks`.
-5. `evidence_graph` and `search_trajectory` are present.
-6. No API key appears in logs or generated artifacts.
+- `qa_multihop_pass.json` 与 `qa_multihop_pass.jsonl`：通过严格验证的样本。
+- `qa_multihop_fail.json` 与 `qa_multihop_fail.jsonl`：拒绝样本及原因。
+- `qa_deduplicated.json`：去重后的最终数据。
+- `chunks.json`：检索语料块。
+- `chunks_with_complete_context.json`：补全上下文后的语料块。
+- `oceangraph_run_config.json`：本次运行参数快照，不包含 API 密钥。
 
-Important outputs are written under `output/repro_deepseek/`:
+一条合格样本至少满足：
 
-- `qa_multihop_pass.json` and `qa_multihop_pass.jsonl`
-- `qa_multihop_fail.json` and `qa_multihop_fail.jsonl`
-- `chunks.json`
-- `chunks_with_complete_context.json`
-- `oceangraph_run_config.json`
+1. `multihop_necessity_result.passes` 为 `true`。
+2. `necessary_chunks` 至少包含两个不同文本块。
+3. 不存在能够单独回答问题的 `shortcut_chunks`。
+4. `supporting_facts`、`evidence_spans`、`reasoning_path` 与 `sub_questions` 均存在。
+5. 最终答案中没有“等等”“重新计算”等可见自我修正草稿。
+6. 输出、配置和日志中均不包含 API 密钥。
 
-## 8. Export Search-R1 data
+## 8. 可选完整评估
+
+确认 DeepSeek 余额充足后，可在生成命令末尾增加 `--evaluation`。评估会继续使用 DeepSeek 验证
+路由作为裁判，并使用本地 BGE-M3 计算向量指标，不调用 Gemini、RAGAS 或 LangChain。
+
+若样本已生成，但评估因 402 或网络中断失败，无需重新生成数据。可单独续跑：
+
+```bash
+OCEANGRAPH_CONFIG=config.yaml python -m oceangraph.evaluation.metrics \
+  output/repro_qwen_deepseek/qa_deduplicated.json \
+  --corpus output/repro_qwen_deepseek/chunks.json \
+  --output-dir output/repro_qwen_deepseek/evaluation \
+  --no-multimodal
+```
+
+PowerShell：
+
+```powershell
+$env:OCEANGRAPH_CONFIG = "config.yaml"
+python -m oceangraph.evaluation.metrics `
+  output/repro_qwen_deepseek/qa_deduplicated.json `
+  --corpus output/repro_qwen_deepseek/chunks.json `
+  --output-dir output/repro_qwen_deepseek/evaluation `
+  --no-multimodal
+```
+
+评估结果写入 `evaluation/subset_evaluation_report.json`。
+
+## 9. 导出 Search-R1 格式
+
+Search-R1/RL 训练本身尚未包含在当前已验证范围内；项目只提供数据转换入口：
 
 ```bash
 python scripts/oceangraph_to_search_r1.py \
-  --qa-file output/repro_deepseek/qa_multihop_pass.json \
-  --chunks-file output/repro_deepseek/chunks.json \
-  --output-dir output/repro_deepseek/search_r1 \
+  --qa-file output/repro_qwen_deepseek/qa_deduplicated.json \
+  --chunks-file output/repro_qwen_deepseek/chunks.json \
+  --output-dir output/repro_qwen_deepseek/search_r1 \
   --short-answer-mode heuristic \
   --no-parquet
 ```
 
-Verify that `conversion_summary.json` reports `converted > 0`. The export also
-contains `train.jsonl`, `corpus.jsonl`, and `oceangraph_2wiki_like.jsonl`.
+检查 `conversion_summary.json` 中 `converted > 0`，并确认生成 `train.jsonl`、`corpus.jsonl` 和
+`oceangraph_2wiki_like.jsonl`。
 
-## 9. Reproducibility controls
+## 10. 已验证结果与限制
 
-- Keep `shuffling.seed: 42` fixed.
-- Record the Git commit SHA, model ID, API endpoint, and corpus checksum.
-- Keep temperature at `0.0` for every routed profile.
-- Preserve accepted and rejected records for quality-gate auditing.
-- Compare schema validity, acceptance rate, necessary chunk count, token usage,
-  and Search-R1 conversion count across repeated runs.
+- 本地与服务器回归测试：`31 passed`。
+- 两条样本的生成、自动修正、DeepSeek 严格多跳验证和去重流程已跑通。
+- 一次完整两样本评估成功；后续最新复测在最终评估阶段因 DeepSeek 账户余额不足返回 402，但此前
+  的生成与严格验证均已成功，且评估可按第 8 节独立续跑。
+- 远程模型即使温度为 `0.0` 也不保证逐 token 完全一致，因此复现标准是 schema、证据必要性、
+  严格多跳通过率和输出文件完整性，而不是文本逐字一致。
+- FAISS CPU 的 AVX2 提示或 GPU FAISS 回退提示通常不影响正确性；当前验证环境使用
+  `faiss-cpu==1.10.0`。
 
-API responses can still vary because the remote model service is not guaranteed
-to be bitwise deterministic. Structural tests and evidence-necessity checks are
-the stable reproducibility criteria.
+为每次正式实验记录 Git commit、语料校验和、模型 ID、API endpoint、随机种子、接受/拒绝数量、
+token 用量和评估报告，才能进行可审计的横向比较。
