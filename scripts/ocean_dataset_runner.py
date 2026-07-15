@@ -179,6 +179,40 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
                 "stream": False,
             },
         },
+        "models": {
+            "profiles": {
+                "generator": {
+                    "backend": backend,
+                    "url": args.api_url if backend_lower == "openai" else "",
+                    "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
+                    "model": args.llm_model,
+                    "vision_model": args.vlm_model,
+                    "supports_vision": True,
+                    "temperature": 0.0,
+                    "structured_output": backend_lower == "openai",
+                    "timeout": 300,
+                },
+                "verifier": {
+                    "backend": backend,
+                    "url": args.api_url if backend_lower == "openai" else "",
+                    "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
+                    "model": args.llm_model,
+                    "vision_model": args.vlm_model,
+                    "supports_vision": True,
+                    "temperature": 0.0,
+                    "structured_output": backend_lower == "openai",
+                    "timeout": 300,
+                },
+            },
+            "stages": {
+                "corpus": "generator",
+                "retrieval": "generator",
+                "generation": "generator",
+                "selection": "verifier",
+                "verification": "verifier",
+                "correction": "generator",
+            },
+        },
         "rate_limiting": {
             "requests_per_minute": args.requests_per_minute,
             "burst_size": args.burst_size,
@@ -202,6 +236,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
         "embedding": {
             "model": args.embedding_model,
             "cache_embeddings": True,
+            "local_files_only": args.offline_models,
             "batch_size": args.embed_batch_size,
         },
         "reranker": {"default": args.reranker_model},
@@ -219,6 +254,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
             "strict_multihop_verification": not args.relaxed,
             "min_supporting_chunks": args.min_supporting_chunks,
             "output_jsonl": True,
+            "counterfactual_verification": True,
         },
         "qa_correction": {"enabled": True, "max_attempts": 1},
         "deduplication": {"enabled": args.deduplication},
@@ -299,6 +335,7 @@ def parse_args(default_domain: str | None = None) -> argparse.Namespace:
     parser.add_argument("--llm-model", default=os.environ.get("OCEAN_LLM_MODEL", "deepseek-chat"))
     parser.add_argument("--vlm-model", default=os.environ.get("OCEAN_VLM_MODEL", os.environ.get("OCEAN_LLM_MODEL", "deepseek-chat")))
     parser.add_argument("--embedding-model", default=os.environ.get("OCEAN_EMBEDDING_MODEL", "bge_m3"))
+    parser.add_argument("--offline-models", action="store_true", help="Use only locally cached Hugging Face models")
     parser.add_argument("--reranker-model", default=os.environ.get("OCEAN_RERANKER_MODEL", "text_embedding"))
     parser.add_argument(
         "--qa-type",
@@ -366,6 +403,7 @@ def main(default_domain: str | None = None) -> int:
         "num_qa_pairs": args.num_qa_pairs,
         "qa_type": args.qa_type,
         "strict_multihop": not args.relaxed,
+        "offline_models": args.offline_models,
     }
     (args.output / "oceangraph_manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False),
@@ -382,6 +420,9 @@ def main(default_domain: str | None = None) -> int:
     env["LLM_BACKEND"] = args.backend.upper()
     if args.hf_endpoint:
         env["HF_ENDPOINT"] = args.hf_endpoint
+    if args.offline_models:
+        env["OCEANGRAPH_OFFLINE_MODELS"] = "1"
+        env["MIRAGE_OFFLINE_MODELS"] = "1"
 
     python = Path(os.environ.get("OCEANGRAPH_PYTHON", os.environ.get("MIRAGE_PYTHON", sys.executable)))
 
@@ -413,6 +454,8 @@ def main(default_domain: str | None = None) -> int:
     ]
     if args.relaxed:
         framework_cmd.append("--no-strict-multihop")
+    if args.offline_models:
+        framework_cmd.append("--offline-models")
     if args.deduplication:
         framework_cmd.append("--deduplication")
     if args.evaluation:

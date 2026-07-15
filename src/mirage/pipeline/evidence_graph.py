@@ -95,6 +95,7 @@ def build_evidence_graph(
     chunks: List[Dict[str, Any]],
     qa_item: Dict[str, Any] | None = None,
     qa_metadata: Dict[str, Any] | None = None,
+    necessity_result: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     """Build a compact evidence graph for a generated QA item.
 
@@ -104,6 +105,9 @@ def build_evidence_graph(
     """
     qa_item = qa_item or {}
     qa_metadata = qa_metadata or {}
+    necessity_result = necessity_result or {}
+    necessary_ids = set(necessity_result.get("necessary_chunks", []) or [])
+    redundant_ids = set(necessity_result.get("redundant_chunks", []) or [])
     nodes: List[Dict[str, Any]] = []
     edges: List[Dict[str, Any]] = []
     chunk_ids: List[str] = []
@@ -120,6 +124,13 @@ def build_evidence_graph(
         if not concepts:
             concepts = extract_keyphrases(content)
 
+        if chunk_id in necessary_ids:
+            necessity = "necessary"
+        elif chunk_id in redundant_ids:
+            necessity = "redundant"
+        else:
+            necessity = "unverified"
+
         nodes.append({
             "id": chunk_id,
             "type": "chunk",
@@ -127,6 +138,7 @@ def build_evidence_graph(
             "chunk_index": idx,
             "classification": chunk.get("classification", "seed" if idx == 1 else ""),
             "concepts": concepts,
+            "necessity": necessity,
         })
 
         for concept in concepts[:6]:
@@ -140,6 +152,8 @@ def build_evidence_graph(
             })
 
     supporting_ids = _supporting_chunk_ids(qa_item, chunks or [])
+    if necessary_ids:
+        supporting_ids = [chunk_id for chunk_id in chunk_ids if chunk_id in necessary_ids]
     for left, right in zip(supporting_ids, supporting_ids[1:]):
         edges.append({"source": left, "target": right, "type": "multi_hop_bridge", "weight": 1.0})
 
@@ -176,7 +190,13 @@ def build_evidence_graph(
         "edges": edges,
         "supporting_chunk_ids": supporting_ids,
         "path_length": max(0, len(supporting_ids) - 1),
-        "construction": "lexical_concepts_with_supporting_fact_edges",
+        "necessary_chunk_ids": list(necessary_ids),
+        "redundant_chunk_ids": list(redundant_ids),
+        "construction": (
+            "counterfactual_minimal_evidence_graph"
+            if necessary_ids
+            else "lexical_concepts_with_supporting_fact_edges"
+        ),
     }
 
 
@@ -185,24 +205,50 @@ def build_search_trajectory(context_result: Dict[str, Any]) -> List[Dict[str, An
     trajectory: List[Dict[str, Any]] = []
     for iter_log in context_result.get("iteration_logs", []) or []:
         depth = iter_log.get("depth")
+        model_route = iter_log.get("model_route", {})
         by_query: Dict[str, Dict[str, Any]] = {}
         for query in iter_log.get("search_strings") or []:
-            by_query[query] = {"depth": depth, "query": query, "retrieved": [], "selected": []}
+            by_query[query] = {
+                "depth": depth,
+                "query": query,
+                "model_route": model_route,
+                "retrieved": [],
+                "selected": [],
+            }
         for item in iter_log.get("retrieved_chunks", []) or []:
             query = item.get("search_query") or ""
             step = by_query.setdefault(
-                query, {"depth": depth, "query": query, "retrieved": [], "selected": []}
+                query,
+                {
+                    "depth": depth,
+                    "query": query,
+                    "model_route": model_route,
+                    "retrieved": [],
+                    "selected": [],
+                },
             )
             chunk_ref = {
                 "chunk_id": item.get("chunk_id"),
                 "file_name": item.get("file_name"),
                 "score": item.get("score"),
+                "rank": item.get("rank"),
                 "verdict": item.get("verdict"),
+                "reason": item.get("reason"),
+                "action": (
+                    "select"
+                    if item.get("verdict") in {"EXPLANATORY", "RELATED"}
+                    else "reject"
+                ),
             }
             step["retrieved"].append(chunk_ref)
             if item.get("verdict") in {"EXPLANATORY", "RELATED"}:
                 step["selected"].append(chunk_ref)
         trajectory.extend(by_query.values())
+    if trajectory:
+        trajectory[-1]["termination"] = {
+            "status": context_result.get("status"),
+            "reason": context_result.get("termination_reason"),
+        }
     return trajectory
 
 

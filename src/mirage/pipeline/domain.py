@@ -349,7 +349,7 @@ def query_llm_for_domain(topic_model: BERTopic) -> Tuple[str, str]:
     prompt = PROMPTS["domain_and_expert_from_topics"].format(topic_list_str=topic_list_str)
     
     # Call LLM
-    response = call_llm_simple(prompt)
+    response = call_llm_simple(prompt, stage="corpus")
     
     # Parse response
     domain = "Unknown"

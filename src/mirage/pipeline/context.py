@@ -20,7 +20,12 @@ import faiss
 import numpy as np
 from typing import List, Dict, Tuple, Optional, Union
 from pathlib import Path
-from mirage.core.llm import call_vlm_interweaved, setup_logging, batch_call_vlm_interweaved
+from mirage.core.llm import (
+    batch_call_vlm_interweaved,
+    call_vlm_interweaved,
+    get_model_route_info,
+    setup_logging,
+)
 from mirage.embeddings.models import NomicVLEmbed as NomicEmbedder
 from mirage.embeddings.rerankers_multimodal import MonoVLMReranker, VLMReranker, TextEmbeddingReranker
 from sentence_transformers import SentenceTransformer
@@ -501,7 +506,7 @@ def verify_chunk_completeness(chunks: List[Dict], expert_persona: str,
     prompt = prompt_template.format(expert_persona=expert_persona, domain=domain)
     prompt += "\n\nAnalyze the following chunks to determine if the context is complete:"
     
-    response = call_vlm_interweaved(prompt, chunks)
+    response = call_vlm_interweaved(prompt, chunks, stage="retrieval")
     return parse_verification_response(response)
 
 
@@ -610,7 +615,7 @@ CANDIDATE CHUNK:
     
     full_prompt = prompt + "\n\n" + verification_request
     
-    response = call_vlm_interweaved(full_prompt, chunks_for_vlm)
+    response = call_vlm_interweaved(full_prompt, chunks_for_vlm, stage="retrieval")
     return parse_addition_verification_response(response)
 
 
@@ -668,7 +673,11 @@ CANDIDATE CHUNK:
     
     # Execute batch call
     print(f"    Batch verifying {len(requests)} candidates...")
-    responses = batch_call_vlm_interweaved(requests, show_progress=False)
+    responses = batch_call_vlm_interweaved(
+        requests,
+        show_progress=False,
+        stage="retrieval",
+    )
     
     # Parse all responses
     results = []
@@ -862,7 +871,8 @@ def build_complete_context(
             'explanation': None,
             'search_strings': None,
             'retrieved_chunks': [],
-            'chunks_added_this_iteration': []
+            'chunks_added_this_iteration': [],
+            'model_route': get_model_route_info("retrieval", vision=True),
         }
         
         # Verify completeness
@@ -965,7 +975,7 @@ def build_complete_context(
                         not is_duplicate_content(chunk) and
                         not (file_name == initial_file_name and chunk_id == initial_chunk_id)):
                         candidates_to_verify.append((search_string, chunk))
-                        candidate_info.append((file_name, chunk_id, chunk['score']))
+                        candidate_info.append((file_name, chunk_id, chunk['score'], j))
                         print(f"    Queued chunk {file_name}:{chunk_id} (score: {chunk['score']:.4f}) for verification")
                     else:
                         print(f"    [SKIP] Chunk {file_name}:{chunk_id} already added")
@@ -993,7 +1003,7 @@ def build_complete_context(
                 verification_results = [(status, explanation)]
             
             # Process results and log
-            for (search_string, chunk), (status, explanation), (file_name, chunk_id, score) in zip(
+            for (search_string, chunk), (status, explanation), (file_name, chunk_id, score, rank) in zip(
                 candidates_to_verify, verification_results, candidate_info
             ):
                 # Log retrieved chunk info
@@ -1002,6 +1012,7 @@ def build_complete_context(
                     'chunk_id': chunk_id,
                     'file_name': file_name,
                     'score': float(score),
+                    'rank': rank,
                     'verdict': status,
                     'reason': explanation[:200] if explanation else ''
                 }

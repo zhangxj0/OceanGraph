@@ -107,6 +107,7 @@ try:
     QA_STRICT_MULTIHOP = _qa_gen.get('strict_multihop_verification', True)
     QA_MIN_SUPPORTING_CHUNKS = _qa_gen.get('min_supporting_chunks', 2)
     QA_OUTPUT_JSONL = _qa_gen.get('output_jsonl', True)
+    QA_COUNTERFACTUAL_VERIFICATION = _qa_gen.get('counterfactual_verification', True)
     
     # FAISS config
     _faiss = get_faiss_config()
@@ -168,6 +169,7 @@ except (ImportError, Exception):
     QA_STRICT_MULTIHOP = True
     QA_MIN_SUPPORTING_CHUNKS = 2
     QA_OUTPUT_JSONL = True
+    QA_COUNTERFACTUAL_VERIFICATION = True
     
     # FAISS defaults
     FAISS_USE_GPU = False
@@ -208,6 +210,10 @@ if os.environ.get("MIRAGE_MIN_SUPPORTING_CHUNKS"):
     QA_MIN_SUPPORTING_CHUNKS = int(os.environ.get("MIRAGE_MIN_SUPPORTING_CHUNKS"))
 if os.environ.get("MIRAGE_OUTPUT_JSONL") is not None:
     QA_OUTPUT_JSONL = os.environ.get("MIRAGE_OUTPUT_JSONL") == "1"
+if os.environ.get("MIRAGE_COUNTERFACTUAL_VERIFICATION") is not None:
+    QA_COUNTERFACTUAL_VERIFICATION = (
+        os.environ.get("MIRAGE_COUNTERFACTUAL_VERIFICATION") == "1"
+    )
 
 # Helper function to recompute all derived output paths
 def _update_output_paths():
@@ -1232,7 +1238,6 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         
         for qa in pairs_to_verify:
             qa['short_answers'] = ensure_short_answers(qa)
-            evidence_graph = build_evidence_graph(context_chunks, qa, qa_metadata)
             verification = verify_qa(
                 context_chunks, qa['question'], qa['answer'], expert_persona, domain
             )
@@ -1245,8 +1250,15 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     qa['answer'],
                     expert_persona,
                     domain,
-                    min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS
+                    min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
+                    counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
                 )
+            evidence_graph = build_evidence_graph(
+                context_chunks,
+                qa,
+                qa_metadata,
+                necessity_result=multihop_necessity,
+            )
             
             qa_entry = {
                 'chunk_id': i,
@@ -1342,9 +1354,6 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 new_failures = []
                 for corrected in corrected_pairs:
                     corrected['short_answers'] = ensure_short_answers(corrected)
-                    corrected_evidence_graph = build_evidence_graph(
-                        context_chunks, corrected, qa_metadata
-                    )
                     corrected_verification = verify_qa(
                         context_chunks, corrected['question'], corrected['answer'], 
                         expert_persona, domain
@@ -1358,8 +1367,15 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                             corrected['answer'],
                             expert_persona,
                             domain,
-                            min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS
+                            min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
+                            counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
                         )
+                    corrected_evidence_graph = build_evidence_graph(
+                        context_chunks,
+                        corrected,
+                        qa_metadata,
+                        necessity_result=corrected_multihop_necessity,
+                    )
                     
                     corrected_entry = {
                         'chunk_id': i,
@@ -2181,6 +2197,7 @@ def run_pipeline():
     print(f"   - Max Depth: {MAX_DEPTH}")
     print(f"   - Strict Multihop Verification: {QA_STRICT_MULTIHOP}")
     print(f"   - Min Supporting Chunks: {QA_MIN_SUPPORTING_CHUNKS}")
+    print(f"   - Counterfactual Verification: {QA_COUNTERFACTUAL_VERIFICATION}")
     print(f"   - Run Evaluation: {RUN_EVALUATION}")
     print(f"   - Checkpointing: ENABLED")
     print("=" * 70)

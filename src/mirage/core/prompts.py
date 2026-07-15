@@ -546,6 +546,29 @@ Status<|#|><CAN_ANSWER | PARTIAL_ONLY | CANNOT_ANSWER><|#|>Explanation<|#|><Brie
 <|#|>END<|#|>
 """
 
+PROMPTS["counterfactual_ablation_check"] = """
+You are a(n) {expert_persona} from the domain of {domain_context} working as an adversarial evidence verifier.
+
+One candidate evidence chunk has been removed. Decide whether the REMAINING chunks still contain enough evidence to answer the question with the proposed answer.
+
+Question:
+{question}
+
+Proposed Answer:
+{answer}
+
+Rules:
+- CAN_ANSWER: the remaining chunks still contain all facts needed for the complete answer; the removed chunk was redundant.
+- PARTIAL_ONLY: the remaining chunks support only part of the answer; the removed chunk was necessary.
+- CANNOT_ANSWER: the remaining chunks cannot support the proposed answer; the removed chunk was necessary.
+- Judge only from the remaining chunks and do not use outside knowledge.
+
+Expected Output Format:
+<|#|>START<|#|>
+Status<|#|><CAN_ANSWER | PARTIAL_ONLY | CANNOT_ANSWER><|#|>Explanation<|#|><Brief single-sentence justification>
+<|#|>END<|#|>
+"""
+
 #%% QA Correction Prompt
 
 PROMPTS["question_answer_generation_corrected"] = """

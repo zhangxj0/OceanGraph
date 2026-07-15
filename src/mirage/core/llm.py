@@ -1,6 +1,7 @@
 
 import time
 import re
+import hashlib
 import requests
 import logging
 import base64
@@ -19,6 +20,7 @@ from functools import partial
 
 # Default values - actual values loaded lazily when needed
 _config_initialized = False
+_MODEL_ROUTER = None
 BACKEND = os.environ.get("LLM_BACKEND", "GEMINI")
 API_URL = ""
 LLM_MODEL_NAME = ""
@@ -101,6 +103,7 @@ def _initialize_config():
     """
     global _config_initialized, BACKEND, API_URL, LLM_MODEL_NAME, VLM_MODEL_NAME
     global API_KEY, GEMINI_RPM, GEMINI_BURST, LOG_FILE, TERMINAL_LOG_FILE, HEADERS
+    global _MODEL_ROUTER
     
     if _config_initialized:
         return
@@ -154,12 +157,79 @@ def _initialize_config():
         HEADERS = {"Content-Type": "application/json"}
     else:
         HEADERS = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+
+    try:
+        from mirage.core.config import load_config
+        from oceangraph.providers import StageModelRouter
+
+        _MODEL_ROUTER = StageModelRouter.from_config(
+            load_config(),
+            fallback_backend=BACKEND,
+            fallback_url=API_URL,
+            fallback_llm_model=LLM_MODEL_NAME,
+            fallback_vlm_model=VLM_MODEL_NAME,
+            fallback_api_key=API_KEY,
+        )
+    except Exception as exc:
+        logging.warning("Stage model routing unavailable; using legacy backend: %s", exc)
     
     # Warn if API key is missing for backends that require it
-    if not API_KEY and BACKEND in ("GEMINI", "OPENAI"):
+    routed_key_available = _MODEL_ROUTER is not None and _MODEL_ROUTER.has_api_key()
+    if not API_KEY and not routed_key_available and BACKEND in ("GEMINI", "OPENAI"):
         print(f"[WARN] No API key found for {BACKEND}. Set {BACKEND}_API_KEY environment variable or configure api_key_path in config.yaml")
     
     _config_initialized = True
+
+
+def _get_model_profile(stage: str = "default", vision: bool = False):
+    """Resolve the configured model profile for a logical pipeline stage."""
+    _initialize_config()
+    if _MODEL_ROUTER is None:
+        raise RuntimeError("Model router was not initialized")
+    return _MODEL_ROUTER.resolve(stage, vision=vision)
+
+
+def get_model_route_info(stage: str = "default", vision: bool = False) -> Dict[str, Any]:
+    """Return non-secret routing metadata for observability and dataset provenance."""
+    profile = _get_model_profile(stage, vision=vision)
+    return {
+        "stage": stage,
+        "profile": profile.name,
+        "backend": profile.backend,
+        "model": profile.model_name(vision=vision),
+        "temperature": profile.temperature,
+        "thinking": profile.thinking,
+        "structured_output": profile.structured_output,
+    }
+
+
+def _request_fingerprint(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+
+
+def _chunk_image_path(chunk: Dict[str, Any]) -> Optional[str]:
+    artifact = chunk.get("artifact", [])
+    if isinstance(artifact, list) and artifact:
+        return str(artifact[0])
+    image_path = chunk.get("image_path")
+    if image_path:
+        return str(image_path)
+    if chunk.get("chunk_type") in {"standalone image", "image"}:
+        match = re.search(r"!\[Image\]\(([^)]+)\)", str(artifact))
+        return match.group(1) if match else None
+    return None
+
+
+def _chunks_require_vision(chunks: List[Dict]) -> bool:
+    return any(
+        image_path and Path(image_path).exists()
+        for image_path in (_chunk_image_path(chunk) for chunk in chunks)
+    )
+
+
+def _gemini_profile_url(profile, model_name: str) -> str:
+    template = profile.url or GEMINI_URL
+    return template.format(model=model_name) + f"?key={profile.api_key}"
 
 
 def test_llm_connection() -> bool:
@@ -269,7 +339,13 @@ def test_vlm_connection(test_image: str = None) -> bool:
         print(f"[ERROR] VLM API connection error: {e}")
         return False
 
-def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -> str:
+def call_llm_simple(
+    prompt: str,
+    max_retries: int = 5,
+    use_cache: bool = True,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> str:
     """Simple LLM call with text-only input. Supports OLLAMA, GEMINI, OPENAI.
     
     Args:
@@ -284,6 +360,9 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
         Exception: If all retry attempts fail
     """
     _initialize_config()
+    profile = _get_model_profile(stage)
+    model_name = profile.model_name()
+    cache_model = profile.cache_identity(stage=stage, response_format=response_format)
     
     # Check cache first
     if use_cache:
@@ -291,33 +370,39 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
             from mirage.utils.llm_cache import get_llm_cache
             cache = get_llm_cache()
             if cache:
-                cached = cache.get('llm_simple', prompt, model=LLM_MODEL_NAME)
+                cached = cache.get('llm_simple', prompt, model=cache_model)
                 if cached is not None:
                     print(f"Cache hit for LLM call ({len(cached)} chars)")
                     return cached
         except ImportError:
             pass
     
-    print(f"Calling LLM (text-only) via {BACKEND}...")
+    print(f"Calling LLM stage={stage} via {profile.name}/{profile.backend} ({model_name})...")
     attempt = 0
     wait_time = 2
     
     # Log LLM request
-    content_preview = f"Content: {prompt[:50]}...{prompt[-50:]}" if len(prompt) > 100 else f"Content: {prompt}"
-    logging.info(f"LLM Request [{BACKEND}] - {content_preview}")
+    logging.info(
+        "LLM Request stage=%s profile=%s model=%s prompt_sha=%s prompt_chars=%s",
+        stage,
+        profile.name,
+        model_name,
+        _request_fingerprint(prompt),
+        len(prompt),
+    )
     
     while attempt < max_retries:
         attempt += 1
         try:
-            if BACKEND == "OLLAMA":
+            if profile.backend == "OLLAMA":
                 # Ollama API format
                 data = {
-                    "model": LLM_MODEL_NAME,
+                    "model": model_name,
                     "messages": [{"role": "user", "content": prompt}],
                     "stream": False,
-                    "options": {"temperature": 0.0}
+                    "options": {"temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(API_URL, json=data, timeout=300)
+                response = requests.post(profile.url, json=data, timeout=profile.timeout)
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["message"]["content"]
@@ -329,14 +414,14 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
                 else:
                     raise Exception(f"HTTP {response.status_code}")
                     
-            elif BACKEND == "GEMINI":
+            elif profile.backend == "GEMINI":
                 # Google Gemini direct API format
-                url = GEMINI_URL.format(model=LLM_MODEL_NAME) + f"?key={API_KEY}"
+                url = _gemini_profile_url(profile, model_name)
                 data = {
                     "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.0}
+                    "generationConfig": {"temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(url, headers=HEADERS, json=data, timeout=300)
+                response = requests.post(url, headers=profile.headers, json=data, timeout=profile.timeout)
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["candidates"][0]["content"]["parts"][0]["text"]
@@ -350,14 +435,18 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
                     error_msg = response.text[:200] if response.text else f"HTTP {response.status_code}"
                     raise Exception(error_msg)
                     
-            elif BACKEND == "OPENAI":
+            elif profile.backend == "OPENAI":
                 # OpenAI API format
-                data = {
-                    "model": LLM_MODEL_NAME,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.0
-                }
-                response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
+                data = profile.openai_payload(
+                    [{"role": "user", "content": prompt}],
+                    response_format=response_format,
+                )
+                response = requests.post(
+                    profile.url,
+                    headers=profile.headers,
+                    json=data,
+                    timeout=profile.timeout,
+                )
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["choices"][0]["message"]["content"]
@@ -368,14 +457,19 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
                         usage.get("completion_tokens", 0)
                     )
                 else:
-                    raise Exception(f"HTTP {response.status_code}")
+                    raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
                     
             else:  # OpenAI-compatible API
-                data = {
-                    "model": LLM_MODEL_NAME,
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-                response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
+                data = profile.openai_payload(
+                    [{"role": "user", "content": prompt}],
+                    response_format=response_format,
+                )
+                response = requests.post(
+                    profile.url,
+                    headers=profile.headers,
+                    json=data,
+                    timeout=profile.timeout,
+                )
                 if response.status_code == 200:
                     response_data = response.json()
                     result = response_data["choices"][0]["message"]["content"]
@@ -383,9 +477,9 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
                     raise Exception(f"HTTP {response.status_code}")
             
             print(f"[OK] LLM response received ({len(result)} chars)")
-            logging.info(f"LLM Response (Complete) - {len(result)} chars")
-            logging.info(f"LLM Response Content: {result}")
-            logging.info("-" * 60)
+            logging.info("LLM Response stage=%s chars=%s", stage, len(result))
+            if os.environ.get("OCEANGRAPH_LOG_MODEL_CONTENT") == "1":
+                logging.info("LLM Response Content: %s", result)
             
             # Cache the response
             if use_cache:
@@ -393,7 +487,7 @@ def call_llm_simple(prompt: str, max_retries: int = 5, use_cache: bool = True) -
                     from mirage.utils.llm_cache import get_llm_cache
                     cache = get_llm_cache()
                     if cache:
-                        cache.set('llm_simple', prompt, result, model=LLM_MODEL_NAME)
+                        cache.set('llm_simple', prompt, result, model=cache_model)
                 except ImportError:
                     pass
             
@@ -487,7 +581,13 @@ def call_vlm_simple(prompt: str, image_path: str) -> str:
                 }
                 response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    resp_json = response.json()
+                    result = resp_json["choices"][0]["message"]["content"]
+                    usage = resp_json.get("usage", {})
+                    _update_token_stats(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
                 else:
                     raise Exception(f"HTTP {response.status_code}")
                     
@@ -505,7 +605,13 @@ def call_vlm_simple(prompt: str, image_path: str) -> str:
                 }
                 response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    resp_json = response.json()
+                    result = resp_json["choices"][0]["message"]["content"]
+                    usage = resp_json.get("usage", {})
+                    _update_token_stats(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
                 else:
                     raise Exception(f"HTTP {response.status_code}")
             
@@ -779,7 +885,13 @@ def call_vlm_multi_images_ollama(prompt: str, image_paths: List[str]) -> str:
             print(f"Response: {response.text}")
         return ""
 
-def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True) -> str:
+def call_vlm_interweaved(
+    prompt: str,
+    chunks: List[Dict],
+    use_cache: bool = True,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> str:
     """VLM call with interleaved text and images from chunks.
     Supports OLLAMA, GEMINI, OPENAI.
     
@@ -791,6 +903,14 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
         use_cache: Whether to use LLM response cache (default: True)
     """
     _initialize_config()
+    vision_required = _chunks_require_vision(chunks)
+    profile = _get_model_profile(stage, vision=vision_required)
+    model_name = profile.model_name(vision=vision_required)
+    cache_model = profile.cache_identity(
+        stage=stage,
+        vision=vision_required,
+        response_format=response_format,
+    )
     
     # Check cache first
     if use_cache:
@@ -798,18 +918,28 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
             from mirage.utils.llm_cache import get_llm_cache
             cache = get_llm_cache()
             if cache:
-                cached = cache.get('vlm_interweaved', prompt, chunks, model=VLM_MODEL_NAME)
+                cached = cache.get('vlm_interweaved', prompt, chunks, model=cache_model)
                 if cached is not None:
                     print(f"Cache hit for VLM call ({len(cached)} chars)")
                     return cached
         except ImportError:
             pass
     
-    print(f"Calling VLM with {len(chunks)} chunks (interweaved) via {BACKEND}...")
+    print(
+        f"Calling VLM stage={stage} with {len(chunks)} chunks "
+        f"via {profile.name}/{profile.backend} ({model_name})..."
+    )
     attempt = 0
     wait_time = 2
     
-    logging.info(f"VLM Request [{BACKEND}] - {len(chunks)} chunks")
+    logging.info(
+        "VLM Request stage=%s profile=%s model=%s prompt_sha=%s chunks=%s",
+        stage,
+        profile.name,
+        model_name,
+        _request_fingerprint(prompt),
+        len(chunks),
+    )
     
     def _extract_image_path(chunk):
         """Helper to extract image path from chunk
@@ -843,7 +973,7 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
     while True:
         attempt += 1
         try:
-            if BACKEND == "OLLAMA":
+            if profile.backend == "OLLAMA":
                 # Ollama: message chaining for interleaved content
                 messages = [{"role": "user", "content": prompt}]
                 for i, chunk in enumerate(chunks):
@@ -855,12 +985,12 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                     messages.append(msg)
                 
                 data = {
-                    "model": VLM_MODEL_NAME,
+                    "model": model_name,
                     "messages": messages,
                     "stream": False,
-                    "options": {"num_ctx": 16384, "temperature": 0.0}
+                    "options": {"num_ctx": 16384, "temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(API_URL, json=data, timeout=300)
+                response = requests.post(profile.url, json=data, timeout=profile.timeout)
                 if response.status_code == 200:
                     result = response.json()["message"]["content"]
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
@@ -869,7 +999,7 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                 else:
                     raise Exception(f"HTTP {response.status_code}")
                     
-            elif BACKEND == "GEMINI":
+            elif profile.backend == "GEMINI":
                 # Google Gemini: parts array with text and inline_data
                 parts = [{"text": prompt}]
                 for i, chunk in enumerate(chunks):
@@ -883,12 +1013,12 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                         mime_type = get_image_mime_type(image_path)
                         parts.append({"inline_data": {"mime_type": mime_type, "data": base64_image}})
                 
-                url = GEMINI_URL.format(model=VLM_MODEL_NAME) + f"?key={API_KEY}"
+                url = _gemini_profile_url(profile, model_name)
                 data = {
                     "contents": [{"parts": parts}],
-                    "generationConfig": {"temperature": 0.0}
+                    "generationConfig": {"temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(url, headers=HEADERS, json=data, timeout=300)
+                response = requests.post(url, headers=profile.headers, json=data, timeout=profile.timeout)
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["candidates"][0]["content"]["parts"][0]["text"]
@@ -905,7 +1035,7 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                     error_msg = response.text[:200] if response.text else f"HTTP {response.status_code}"
                     raise Exception(error_msg)
                     
-            elif BACKEND == "OPENAI":
+            elif profile.backend == "OPENAI":
                 # OpenAI: content array with text and image_url types
                 content = [{"type": "text", "text": prompt}]
                 for i, chunk in enumerate(chunks):
@@ -920,19 +1050,30 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                         image_url = f"data:{mime_type};base64,{base64_image}"
                         content.append({"type": "image_url", "image_url": {"url": image_url}})
                 
-                data = {
-                    "model": VLM_MODEL_NAME,
-                    "messages": [{"role": "user", "content": content}],
-                    "temperature": 0.0
-                }
-                response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
+                data = profile.openai_payload(
+                    [{"role": "user", "content": content}],
+                    vision=vision_required,
+                    response_format=response_format,
+                )
+                response = requests.post(
+                    profile.url,
+                    headers=profile.headers,
+                    json=data,
+                    timeout=profile.timeout,
+                )
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    resp_json = response.json()
+                    result = resp_json["choices"][0]["message"]["content"]
+                    usage = resp_json.get("usage", {})
+                    _update_token_stats(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
                     # Note: Do NOT decrement attempt - rate limits count against max retries
                     raise Exception(f"Server error {response.status_code}")
                 else:
-                    raise Exception(f"HTTP {response.status_code}")
+                    raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
                     
             else:  # OpenAI-compatible API
                 content = [{"type": "text", "text": prompt}]
@@ -954,11 +1095,26 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                         text_block += f"<|#|>Image<|#|>None<|#|>CHUNK{i+1}<|#|>END<|#|>"
                         content.append({"type": "text", "text": text_block})
                 
-                data = {"model": VLM_MODEL_NAME, "messages": [{"role": "user", "content": content}]}
-                local_headers = {**HEADERS, "Connection": "close"}
-                response = requests.post(API_URL, headers=local_headers, json=data, timeout=300)
+                data = profile.openai_payload(
+                    [{"role": "user", "content": content}],
+                    vision=vision_required,
+                    response_format=response_format,
+                )
+                local_headers = {**profile.headers, "Connection": "close"}
+                response = requests.post(
+                    profile.url,
+                    headers=local_headers,
+                    json=data,
+                    timeout=profile.timeout,
+                )
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    resp_json = response.json()
+                    result = resp_json["choices"][0]["message"]["content"]
+                    usage = resp_json.get("usage", {})
+                    _update_token_stats(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
                     # Note: Do NOT decrement attempt - rate limits count against max retries
                     raise Exception(f"Server error {response.status_code}")
@@ -966,9 +1122,9 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                     raise Exception(f"HTTP {response.status_code}")
             
             print(f"[OK] VLM response received ({len(result)} chars)")
-            logging.info(f"VLM Response - {len(chunks)} chunks")
-            logging.info(f"VLM Response Content: {result}")
-            logging.info("-" * 60)
+            logging.info("VLM Response stage=%s chunks=%s chars=%s", stage, len(chunks), len(result))
+            if os.environ.get("OCEANGRAPH_LOG_MODEL_CONTENT") == "1":
+                logging.info("VLM Response Content: %s", result)
             
             # Cache the response
             if use_cache:
@@ -976,7 +1132,7 @@ def call_vlm_interweaved(prompt: str, chunks: List[Dict], use_cache: bool = True
                     from mirage.utils.llm_cache import get_llm_cache
                     cache = get_llm_cache()
                     if cache:
-                        cache.set('vlm_interweaved', prompt, result, chunks, model=VLM_MODEL_NAME)
+                        cache.set('vlm_interweaved', prompt, result, chunks, model=cache_model)
                 except ImportError:
                     pass
             
@@ -1398,19 +1554,28 @@ def get_rate_limiter() -> RateLimiter:
     return _rate_limiter
 
 
-async def _async_call_llm_simple(prompt: str, session: aiohttp.ClientSession, 
-                                  rate_limiter: RateLimiter, timeout: int = 300) -> str:
+async def _async_call_llm_simple(
+    prompt: str,
+    session: aiohttp.ClientSession,
+    rate_limiter: RateLimiter,
+    timeout: int = 300,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> str:
     """Async version of call_llm_simple. Supports all backends."""
     await rate_limiter.acquire()
+    profile = _get_model_profile(stage)
+    model_name = profile.model_name()
+    request_timeout = profile.timeout or timeout
     try:
-        if BACKEND == "OLLAMA":
+        if profile.backend == "OLLAMA":
             data = {
-                "model": LLM_MODEL_NAME,
+                "model": model_name,
                 "messages": [{"role": "user", "content": prompt}],
                 "stream": False,
-                "options": {"temperature": 0.0}
+                "options": {"temperature": profile.temperature or 0.0}
             }
-            async with session.post(API_URL, json=data, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.post(profile.url, json=data, timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     result_json = await resp.json()
                     # Track token usage (Ollama format)
@@ -1422,14 +1587,14 @@ async def _async_call_llm_simple(prompt: str, session: aiohttp.ClientSession,
                 else:
                     raise Exception(f"HTTP {resp.status}")
                     
-        elif BACKEND == "GEMINI":
-            url = GEMINI_URL.format(model=LLM_MODEL_NAME) + f"?key={API_KEY}"
+        elif profile.backend == "GEMINI":
+            url = _gemini_profile_url(profile, model_name)
             data = {
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.0}
+                "generationConfig": {"temperature": profile.temperature or 0.0}
             }
-            async with session.post(url, headers=HEADERS, json=data, 
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.post(url, headers=profile.headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     resp_json = await resp.json()
                     # Track token usage
@@ -1443,14 +1608,13 @@ async def _async_call_llm_simple(prompt: str, session: aiohttp.ClientSession,
                     text = await resp.text()
                     raise Exception(f"HTTP {resp.status}: {text[:100]}")
                     
-        elif BACKEND == "OPENAI":
-            data = {
-                "model": LLM_MODEL_NAME,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.0
-            }
-            async with session.post(API_URL, headers=HEADERS, json=data,
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+        elif profile.backend == "OPENAI":
+            data = profile.openai_payload(
+                [{"role": "user", "content": prompt}],
+                response_format=response_format,
+            )
+            async with session.post(profile.url, headers=profile.headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     resp_json = await resp.json()
                     # Track token usage
@@ -1461,15 +1625,16 @@ async def _async_call_llm_simple(prompt: str, session: aiohttp.ClientSession,
                     )
                     return resp_json["choices"][0]["message"]["content"]
                 else:
-                    raise Exception(f"HTTP {resp.status}")
+                    text = await resp.text()
+                    raise Exception(f"HTTP {resp.status}: {text[:200]}")
                     
         else:  # OpenAI-compatible
-            data = {
-                "model": LLM_MODEL_NAME,
-                "messages": [{"role": "user", "content": prompt}]
-            }
-            async with session.post(API_URL, headers=HEADERS, json=data, 
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            data = profile.openai_payload(
+                [{"role": "user", "content": prompt}],
+                response_format=response_format,
+            )
+            async with session.post(profile.url, headers=profile.headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     response_data = await resp.json()
                     return response_data["choices"][0]["message"]["content"]
@@ -1479,11 +1644,21 @@ async def _async_call_llm_simple(prompt: str, session: aiohttp.ClientSession,
         rate_limiter.release()
 
 
-async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict], 
-                                       session: aiohttp.ClientSession,
-                                       rate_limiter: RateLimiter, timeout: int = 300) -> str:
+async def _async_call_vlm_interweaved(
+    prompt: str,
+    chunks: List[Dict],
+    session: aiohttp.ClientSession,
+    rate_limiter: RateLimiter,
+    timeout: int = 300,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> str:
     """Async version of call_vlm_interweaved. Supports all backends."""
     await rate_limiter.acquire()
+    vision_required = _chunks_require_vision(chunks)
+    profile = _get_model_profile(stage, vision=vision_required)
+    model_name = profile.model_name(vision=vision_required)
+    request_timeout = profile.timeout or timeout
     
     def _extract_image_path(chunk):
         """Helper to extract image path from chunk"""
@@ -1498,7 +1673,7 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
         return chunk.get('image_path')
     
     try:
-        if BACKEND == "OLLAMA":
+        if profile.backend == "OLLAMA":
             messages = [{"role": "user", "content": prompt}]
             for i, chunk in enumerate(chunks):
                 chunk_text = chunk.get('content', '')
@@ -1509,13 +1684,13 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                 messages.append(msg)
             
             data = {
-                "model": VLM_MODEL_NAME,
+                "model": model_name,
                 "messages": messages,
                 "stream": False,
-                "options": {"num_ctx": 16384, "temperature": 0.0}
+                "options": {"num_ctx": 16384, "temperature": profile.temperature or 0.0}
             }
-            async with session.post(API_URL, json=data, 
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.post(profile.url, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     result_json = await resp.json()
                     # Track token usage (Ollama format)
@@ -1527,7 +1702,7 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                 else:
                     raise Exception(f"HTTP {resp.status}")
                     
-        elif BACKEND == "GEMINI":
+        elif profile.backend == "GEMINI":
             # Gemini: parts array with text and inline_data
             parts = [{"text": prompt}]
             for i, chunk in enumerate(chunks):
@@ -1539,13 +1714,13 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                     mime_type = get_image_mime_type(image_path)
                     parts.append({"inline_data": {"mime_type": mime_type, "data": base64_image}})
             
-            url = GEMINI_URL.format(model=VLM_MODEL_NAME) + f"?key={API_KEY}"
+            url = _gemini_profile_url(profile, model_name)
             data = {
                 "contents": [{"parts": parts}],
-                "generationConfig": {"temperature": 0.0}
+                "generationConfig": {"temperature": profile.temperature or 0.0}
             }
-            async with session.post(url, headers=HEADERS, json=data,
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.post(url, headers=profile.headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     resp_json = await resp.json()
                     # Track token usage
@@ -1559,7 +1734,7 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                     text = await resp.text()
                     raise Exception(f"HTTP {resp.status}: {text[:100]}")
                     
-        elif BACKEND == "OPENAI":
+        elif profile.backend == "OPENAI":
             # OpenAI: content array with text and image_url
             content = [{"type": "text", "text": prompt}]
             for i, chunk in enumerate(chunks):
@@ -1572,13 +1747,13 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                     image_url = f"data:{mime_type};base64,{base64_image}"
                     content.append({"type": "image_url", "image_url": {"url": image_url}})
             
-            data = {
-                "model": VLM_MODEL_NAME,
-                "messages": [{"role": "user", "content": content}],
-                "temperature": 0.0
-            }
-            async with session.post(API_URL, headers=HEADERS, json=data,
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            data = profile.openai_payload(
+                [{"role": "user", "content": content}],
+                vision=vision_required,
+                response_format=response_format,
+            )
+            async with session.post(profile.url, headers=profile.headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     resp_json = await resp.json()
                     # Track token usage
@@ -1589,7 +1764,8 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                     )
                     return resp_json["choices"][0]["message"]["content"]
                 else:
-                    raise Exception(f"HTTP {resp.status}")
+                    text = await resp.text()
+                    raise Exception(f"HTTP {resp.status}: {text[:200]}")
                     
         else:  # OpenAI-compatible
             content = [{"type": "text", "text": prompt}]
@@ -1610,11 +1786,15 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
                     text_block += f"<|#|>Image<|#|>None<|#|>CHUNK{i+1}<|#|>END<|#|>"
                     content.append({"type": "text", "text": text_block})
             
-            data = {"model": VLM_MODEL_NAME, "messages": [{"role": "user", "content": content}]}
-            local_headers = {**HEADERS, "Connection": "close"}
+            data = profile.openai_payload(
+                [{"role": "user", "content": content}],
+                vision=vision_required,
+                response_format=response_format,
+            )
+            local_headers = {**profile.headers, "Connection": "close"}
             
-            async with session.post(API_URL, headers=local_headers, json=data,
-                                   timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.post(profile.url, headers=local_headers, json=data,
+                                   timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     response_data = await resp.json()
                     return response_data["choices"][0]["message"]["content"]
@@ -1624,7 +1804,12 @@ async def _async_call_vlm_interweaved(prompt: str, chunks: List[Dict],
         rate_limiter.release()
 
 
-async def _batch_llm_calls_async(prompts: List[str], max_retries: int = 3) -> List[str]:
+async def _batch_llm_calls_async(
+    prompts: List[str],
+    max_retries: int = 3,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> List[str]:
     """Execute multiple LLM calls concurrently with rate limiting
     
     Args:
@@ -1640,7 +1825,13 @@ async def _batch_llm_calls_async(prompts: List[str], max_retries: int = 3) -> Li
     async def process_single(idx: int, prompt: str, session: aiohttp.ClientSession):
         for attempt in range(max_retries):
             try:
-                result = await _async_call_llm_simple(prompt, session, rate_limiter)
+                result = await _async_call_llm_simple(
+                    prompt,
+                    session,
+                    rate_limiter,
+                    stage=stage,
+                    response_format=response_format,
+                )
                 results[idx] = result
                 return
             except Exception as e:
@@ -1658,8 +1849,12 @@ async def _batch_llm_calls_async(prompts: List[str], max_retries: int = 3) -> Li
     return results
 
 
-async def _batch_vlm_calls_async(requests: List[Tuple[str, List[Dict]]], 
-                                  max_retries: int = 3) -> List[str]:
+async def _batch_vlm_calls_async(
+    requests: List[Tuple[str, List[Dict]]],
+    max_retries: int = 3,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> List[str]:
     """Execute multiple VLM calls concurrently with rate limiting
     
     Args:
@@ -1676,7 +1871,14 @@ async def _batch_vlm_calls_async(requests: List[Tuple[str, List[Dict]]],
                             session: aiohttp.ClientSession):
         for attempt in range(max_retries):
             try:
-                result = await _async_call_vlm_interweaved(prompt, chunks, session, rate_limiter)
+                result = await _async_call_vlm_interweaved(
+                    prompt,
+                    chunks,
+                    session,
+                    rate_limiter,
+                    stage=stage,
+                    response_format=response_format,
+                )
                 results[idx] = result
                 return
             except Exception as e:
@@ -1717,8 +1919,13 @@ def _run_async_batch(coro):
         raise
 
 
-def batch_call_llm(prompts: List[str], show_progress: bool = True,
-                   use_cache: bool = True) -> List[str]:
+def batch_call_llm(
+    prompts: List[str],
+    show_progress: bool = True,
+    use_cache: bool = True,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> List[str]:
     """Synchronous wrapper for batch LLM calls with rate limiting and caching
     
     Args:
@@ -1732,6 +1939,8 @@ def batch_call_llm(prompts: List[str], show_progress: bool = True,
     _initialize_config()
     if not prompts:
         return []
+    profile = _get_model_profile(stage)
+    cache_model = profile.cache_identity(stage=stage, response_format=response_format)
     
     # Check cache for existing responses
     cache = None
@@ -1746,7 +1955,7 @@ def batch_call_llm(prompts: List[str], show_progress: bool = True,
                 # Convert prompts to (prompt, None) format for get_batch
                 requests = [(p, None) for p in prompts]
                 cached_responses, miss_indices = cache.get_batch(
-                    'llm_simple', requests, model=LLM_MODEL_NAME
+                    'llm_simple', requests, model=cache_model
                 )
                 if len(miss_indices) < len(prompts):
                     cache_hits = len(prompts) - len(miss_indices)
@@ -1768,7 +1977,13 @@ def batch_call_llm(prompts: List[str], show_progress: bool = True,
         print(f"Batch LLM: Processing {len(uncached_prompts)} requests (RPM={GEMINI_RPM}, burst={GEMINI_BURST})...")
     
     start_time = time.time()
-    uncached_results = _run_async_batch(_batch_llm_calls_async(uncached_prompts))
+    uncached_results = _run_async_batch(
+        _batch_llm_calls_async(
+            uncached_prompts,
+            stage=stage,
+            response_format=response_format,
+        )
+    )
     elapsed = time.time() - start_time
     
     if show_progress:
@@ -1783,14 +1998,24 @@ def batch_call_llm(prompts: List[str], show_progress: bool = True,
     # Save new results to cache
     if cache and use_cache:
         requests = [(prompts[i], None) for i in miss_indices]
-        cache.set_batch('llm_simple', requests, uncached_results, list(range(len(miss_indices))), model=LLM_MODEL_NAME)
+        cache.set_batch(
+            'llm_simple',
+            requests,
+            uncached_results,
+            list(range(len(miss_indices))),
+            model=cache_model,
+        )
     
     return results
 
 
-def batch_call_vlm_interweaved(requests: List[Tuple[str, List[Dict]]], 
-                                show_progress: bool = True,
-                                use_cache: bool = True) -> List[str]:
+def batch_call_vlm_interweaved(
+    requests: List[Tuple[str, List[Dict]]],
+    show_progress: bool = True,
+    use_cache: bool = True,
+    stage: str = "default",
+    response_format: Optional[Dict[str, Any]] = None,
+) -> List[str]:
     """Synchronous wrapper for batch VLM calls with rate limiting and caching
     
     Args:
@@ -1804,6 +2029,13 @@ def batch_call_vlm_interweaved(requests: List[Tuple[str, List[Dict]]],
     _initialize_config()
     if not requests:
         return []
+    vision_required = any(_chunks_require_vision(chunks) for _, chunks in requests)
+    profile = _get_model_profile(stage, vision=vision_required)
+    cache_model = profile.cache_identity(
+        stage=stage,
+        vision=vision_required,
+        response_format=response_format,
+    )
     
     # Check cache for existing responses
     cache = None
@@ -1816,7 +2048,7 @@ def batch_call_vlm_interweaved(requests: List[Tuple[str, List[Dict]]],
             cache = get_llm_cache()
             if cache:
                 cached_responses, miss_indices = cache.get_batch(
-                    'vlm_interweaved', requests, model=VLM_MODEL_NAME
+                    'vlm_interweaved', requests, model=cache_model
                 )
                 if len(miss_indices) < len(requests):
                     cache_hits = len(requests) - len(miss_indices)
@@ -1838,7 +2070,13 @@ def batch_call_vlm_interweaved(requests: List[Tuple[str, List[Dict]]],
         print(f"Batch VLM: Processing {len(uncached_requests)} requests (RPM={GEMINI_RPM}, burst={GEMINI_BURST})...")
     
     start_time = time.time()
-    uncached_results = _run_async_batch(_batch_vlm_calls_async(uncached_requests))
+    uncached_results = _run_async_batch(
+        _batch_vlm_calls_async(
+            uncached_requests,
+            stage=stage,
+            response_format=response_format,
+        )
+    )
     elapsed = time.time() - start_time
     
     if show_progress:
@@ -1852,7 +2090,13 @@ def batch_call_vlm_interweaved(requests: List[Tuple[str, List[Dict]]],
     
     # Save new results to cache
     if cache and use_cache:
-        cache.set_batch('vlm_interweaved', requests, uncached_results, miss_indices, model=VLM_MODEL_NAME)
+        cache.set_batch(
+            'vlm_interweaved',
+            uncached_requests,
+            uncached_results,
+            list(range(len(uncached_requests))),
+            model=cache_model,
+        )
     
     return results
 

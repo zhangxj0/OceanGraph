@@ -13,6 +13,20 @@ _CONFIG_PATH = Path(__file__).parent / "config.yaml"
 _config_cache: Optional[Dict[str, Any]] = None
 
 
+def _apply_runtime_environment(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply process-wide runtime flags derived from configuration."""
+    embedding_config = config.get('embedding') or {}
+    truthy_values = {'1', 'true', 'yes', 'on'}
+    offline_requested = bool(embedding_config.get('local_files_only', False)) or any(
+        os.environ.get(name, '').strip().lower() in truthy_values
+        for name in ('OCEANGRAPH_OFFLINE_MODELS', 'MIRAGE_OFFLINE_MODELS')
+    )
+    if offline_requested:
+        os.environ.setdefault('HF_HUB_OFFLINE', '1')
+        os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
+    return config
+
+
 def load_config(config_path: str = None) -> Dict[str, Any]:
     """Load configuration from YAML file with caching.
     
@@ -22,7 +36,7 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     global _config_cache
     
     if _config_cache is not None and config_path is None:
-        return _config_cache
+        return _apply_runtime_environment(_config_cache)
     
     env_config_path = os.environ.get("MIRAGE_CONFIG")
     path = Path(config_path or env_config_path) if (config_path or env_config_path) else _CONFIG_PATH
@@ -35,7 +49,7 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
             path = workspace_config
         else:
             # Return default configuration - allows import without config file
-            return _get_default_config()
+            return _apply_runtime_environment(_get_default_config())
     
     with open(path, 'r') as f:
         config = yaml.safe_load(f)
@@ -43,7 +57,7 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     if config_path is None:
         _config_cache = config
     
-    return config
+    return _apply_runtime_environment(config)
 
 
 def _get_default_config() -> Dict[str, Any]:
@@ -82,12 +96,16 @@ def _get_default_config() -> Dict[str, Any]:
             'qa_max_workers': 6,
             'dedup_max_workers': 4
         },
+        'embedding': {
+            'local_files_only': False,
+        },
         'qa_generation': {
             'num_qa_pairs': 100,
             'type': 'multihop',
             'strict_multihop_verification': True,
             'min_supporting_chunks': 2,
             'output_jsonl': True,
+            'counterfactual_verification': True,
         }
     }
 
@@ -102,6 +120,11 @@ def get_backend_config() -> Dict[str, Any]:
         'name': config['backend']['active'].upper(),
         **backend_config
     }
+
+
+def get_model_routing_config() -> Dict[str, Any]:
+    """Get stage-specific model profiles and routing configuration."""
+    return load_config().get('models', {})
 
 
 def get_api_key(backend_name: str = None) -> str:
@@ -221,6 +244,7 @@ def get_qa_generation_config() -> Dict[str, Any]:
         'strict_multihop_verification': True,
         'min_supporting_chunks': 2,
         'output_jsonl': True,
+        'counterfactual_verification': True,
     })
 
 

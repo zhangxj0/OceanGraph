@@ -5,7 +5,6 @@ output/
 SemanticChunks/
 trials/
 archive/
-tests/
 examples/
 
 # Data folder - allow sample dataset

@@ -16,6 +16,7 @@ import re
 import logging
 import os
 from typing import Any, Dict, List, Tuple
+from pydantic import ValidationError
 from tqdm import tqdm
 from mirage.core.llm import call_vlm_interweaved, setup_logging, batch_call_vlm_interweaved
 from mirage.pipeline.context import build_complete_context
@@ -26,6 +27,8 @@ from mirage.pipeline.evidence_graph import (
     ensure_short_answers,
 )
 from mirage.core.prompts import PROMPTS, PROMPTS_CHUNK
+from oceangraph.schemas import QAResponse
+from oceangraph.verification import evaluate_multihop_gate
 
 # Configuration (override via config.yaml or command line)
 INPUT_CHUNKS_FILE = "output/results/chunks.json"
@@ -35,9 +38,19 @@ OUTPUT_IRRELEVANT = "irrelevant_chunk.json"
 MAX_CHUNKS = None  # Process all chunks (set to integer for testing, e.g., 100)
 CHUNK_ADDITION_MODE = "RELATED"  # EXPLANATORY (only direct answers) or RELATED (both)
 
-def call_ai_service(prompt: str, chunks: List[Dict]) -> str:
+def call_ai_service(
+    prompt: str,
+    chunks: List[Dict],
+    stage: str = "default",
+    response_format: Dict[str, Any] | None = None,
+) -> str:
     """Unified call to VLM using interleaved chunks"""
-    return call_vlm_interweaved(prompt, chunks)
+    return call_vlm_interweaved(
+        prompt,
+        chunks,
+        stage=stage,
+        response_format=response_format,
+    )
 
 
 def _as_list(value: Any) -> List:
@@ -96,42 +109,25 @@ def _parse_json_qa_response(response: str) -> Tuple[List[Dict], Dict]:
     if not data:
         return [], {}
 
-    qa_pairs_raw = data.get("qa_pairs", [])
-    if not isinstance(qa_pairs_raw, list):
+    try:
+        validated = QAResponse.model_validate(data)
+    except ValidationError as exc:
+        logging.warning("Structured QA response failed schema validation: %s", exc)
         return [], {}
 
     qa_metadata = {
-        "keywords_per_chunk": data.get("keywords_per_chunk", {}),
-        "related_keywords": data.get("related_keywords", ""),
-        "chunk_count": _coerce_int(data.get("chunk_count"), 0),
+        "keywords_per_chunk": validated.keywords_per_chunk,
+        "related_keywords": validated.related_keywords,
+        "chunk_count": validated.chunk_count,
     }
-
     qa_pairs = []
-    for item in qa_pairs_raw:
-        if not isinstance(item, dict):
-            continue
-
-        question = str(item.get("question", "")).strip()
-        answer = str(item.get("answer", "")).strip()
-        if not question or not answer:
-            continue
-
-        qa_pairs.append({
-            "question": question,
-            "answer": answer,
-            "short_answers": _as_list(item.get("short_answers")),
-            "relevance_score": str(_coerce_int(item.get("relevance_score"), 0)),
-            "difficulty_score": str(_coerce_int(item.get("difficulty_score"), 0)),
-            "question_type": item.get("question_type", "multihop"),
-            "answer_type": item.get("answer_type", ""),
-            "subdomain": item.get("subdomain", ""),
-            "hop_count": _coerce_int(item.get("hop_count"), qa_metadata["chunk_count"]),
-            "sub_questions": _as_list(item.get("sub_questions")),
-            "reasoning_path": item.get("reasoning_path", ""),
-            "supporting_facts": _as_list(item.get("supporting_facts")),
-            "evidence_spans": _as_list(item.get("evidence_spans")),
-        })
-
+    for item in validated.qa_pairs:
+        record = item.model_dump()
+        if not record["hop_count"]:
+            record["hop_count"] = validated.chunk_count
+        record["relevance_score"] = str(record["relevance_score"])
+        record["difficulty_score"] = str(record["difficulty_score"])
+        qa_pairs.append(record)
     return qa_pairs, qa_metadata
 
 def check_chunk_relevance(chunk_content: str, expert_persona: str, domain: str) -> bool:
@@ -149,7 +145,7 @@ def check_chunk_relevance(chunk_content: str, expert_persona: str, domain: str) 
     
     # Use a simple text-only LLM call for relevance check (no images needed)
     from mirage.core.llm import call_llm_simple
-    response = call_llm_simple(prompt)
+    response = call_llm_simple(prompt, stage="corpus")
     
     tuple_delimiter = PROMPTS.get("DEFAULT_TUPLE_DELIMITER", "<|#|>")
     
@@ -200,7 +196,12 @@ def generate_qa(chunks: List[Dict], expert_persona: str, domain: str) -> tuple:
         domain_relevance=domain_relevance
     )
     
-    response = call_ai_service(prompt, chunks)
+    response = call_ai_service(
+        prompt,
+        chunks,
+        stage="generation",
+        response_format={"type": "json_object"},
+    )
     
     # Parse multiple Q&A pairs from response using delimiter format
     qa_pairs = []
@@ -419,9 +420,13 @@ def select_qa_pairs(qa_pairs: list, chunks: List[Dict], expert_persona: str, dom
     # Execute batch or sequential based on count
     if len(requests) > 1:
         print(f"  Batch evaluating {len(requests)} QA pairs...")
-        responses = batch_call_vlm_interweaved(requests, show_progress=False)
+        responses = batch_call_vlm_interweaved(
+            requests,
+            show_progress=False,
+            stage="selection",
+        )
     else:
-        responses = [call_ai_service(requests[0][0], chunks)]
+        responses = [call_ai_service(requests[0][0], chunks, stage="selection")]
     
     # Process responses
     selected_pairs = []
@@ -503,7 +508,7 @@ def verify_qa(chunks: List[Dict], question: str, answer: str, expert_persona: st
         expert_persona=expert_persona,
         domain_context=domain_context
     )
-    response = call_ai_service(prompt, chunks)
+    response = call_ai_service(prompt, chunks, stage="verification")
     return response
 
 
@@ -544,9 +549,13 @@ def batch_verify_qa(chunks: List[Dict], qa_pairs: List[Dict], expert_persona: st
     # Execute batch
     if len(requests) > 1:
         print(f"  Batch verifying {len(requests)} QA pairs...")
-        responses = batch_call_vlm_interweaved(requests, show_progress=False)
+        responses = batch_call_vlm_interweaved(
+            requests,
+            show_progress=False,
+            stage="verification",
+        )
     else:
-        responses = [call_ai_service(requests[0][0], chunks)]
+        responses = [call_ai_service(requests[0][0], chunks, stage="verification")]
     
     return responses
 
@@ -592,9 +601,10 @@ def verify_multihop_necessity(
     answer: str,
     expert_persona: str,
     domain: str,
-    min_supporting_chunks: int = 2
+    min_supporting_chunks: int = 2,
+    counterfactual_verification: bool = True,
 ) -> Dict:
-    """Reject shortcut questions that can be answered by any single chunk."""
+    """Reject shortcuts and require a counterfactually necessary evidence set."""
     usable_chunks = [
         chunk for chunk in chunks
         if isinstance(chunk, dict) and str(chunk.get("content", "")).strip()
@@ -631,9 +641,15 @@ def verify_multihop_necessity(
         chunk_labels.append(_chunk_source_id(chunk, idx))
 
     if len(requests) > 1:
-        responses = batch_call_vlm_interweaved(requests, show_progress=False)
+        responses = batch_call_vlm_interweaved(
+            requests,
+            show_progress=False,
+            stage="verification",
+        )
     else:
-        responses = [call_ai_service(requests[0][0], requests[0][1])]
+        responses = [
+            call_ai_service(requests[0][0], requests[0][1], stage="verification")
+        ]
 
     checks = []
     shortcut_chunks = []
@@ -654,23 +670,70 @@ def verify_multihop_necessity(
         elif status == "PARTIAL_ONLY":
             partial_chunks.append(label)
 
-    if shortcut_chunks:
-        status = "SHORTCUT_FOUND"
-        passes = False
-    elif unknown_chunks:
-        status = "UNKNOWN_SINGLE_CHUNK_CHECK"
-        passes = False
-    else:
-        status = "MULTIHOP_REQUIRED"
-        passes = len(partial_chunks) >= min_supporting_chunks
+    counterfactual_checks = []
+    ablation_statuses = {}
+    if counterfactual_verification and not shortcut_chunks and not unknown_chunks:
+        ablation_requests = []
+        removed_labels = []
+        for removed_idx, removed_label in enumerate(chunk_labels):
+            remaining_chunks = [
+                chunk for idx, chunk in enumerate(usable_chunks) if idx != removed_idx
+            ]
+            prompt = PROMPTS["counterfactual_ablation_check"].format(
+                question=question,
+                answer=answer,
+                expert_persona=expert_persona,
+                domain_context=domain_context,
+            )
+            ablation_requests.append((prompt, remaining_chunks))
+            removed_labels.append(removed_label)
+
+        if len(ablation_requests) > 1:
+            ablation_responses = batch_call_vlm_interweaved(
+                ablation_requests,
+                show_progress=False,
+                stage="verification",
+            )
+        else:
+            ablation_responses = [
+                call_ai_service(
+                    ablation_requests[0][0],
+                    ablation_requests[0][1],
+                    stage="verification",
+                )
+            ]
+
+        for removed_label, response in zip(removed_labels, ablation_responses):
+            status_value, explanation = _parse_single_chunk_shortcut_response(response)
+            is_necessary = status_value in {"PARTIAL_ONLY", "CANNOT_ANSWER"}
+            counterfactual_checks.append({
+                "removed_chunk": removed_label,
+                "remaining_context_status": status_value,
+                "necessary": is_necessary,
+                "explanation": explanation,
+            })
+            ablation_statuses[removed_label] = status_value
+
+    gate = evaluate_multihop_gate(
+        {check["chunk"]: check["status"] for check in checks},
+        ablation_statuses,
+        min_supporting_chunks=min_supporting_chunks,
+        counterfactual_verification=counterfactual_verification,
+    )
 
     return {
-        "status": status,
-        "passes": passes,
+        "status": gate["status"],
+        "passes": gate["passes"],
         "min_supporting_chunks": min_supporting_chunks,
         "distinct_chunk_count": len(distinct_sources),
-        "shortcut_chunks": shortcut_chunks,
+        "shortcut_chunks": gate["shortcut_chunks"],
         "single_chunk_checks": checks,
+        "counterfactual_verification": counterfactual_verification,
+        "counterfactual_checks": counterfactual_checks,
+        "necessary_chunks": gate["necessary_chunks"],
+        "redundant_chunks": gate["redundant_chunks"],
+        "minimal_evidence_count": gate["minimal_evidence_count"],
+        "method": "single_chunk_shortcut_plus_leave_one_out_ablation",
     }
 
 
@@ -895,7 +958,7 @@ def correct_failed_qa(chunks: List[Dict], failed_qa_pairs: List[Dict],
         failed_qa_feedback=failed_qa_feedback
     )
     
-    response = call_ai_service(prompt, chunks)
+    response = call_ai_service(prompt, chunks, stage="correction")
     
     # Parse corrected QA pairs (same format as generate_qa)
     corrected_pairs = []

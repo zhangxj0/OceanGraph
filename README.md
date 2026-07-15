@@ -55,6 +55,9 @@ For evaluation dependencies:
 pip install -e ".[eval]"
 ```
 
+For the exact DeepSeek baseline, isolated-server setup, validation criteria, and
+Search-R1 conversion steps, see [REPRODUCIBILITY.md](REPRODUCIBILITY.md).
+
 ## Quick start
 
 Set the API key for your selected backend:
@@ -67,6 +70,20 @@ $env:OPENAI_API_KEY = "YOUR_OPENAI_KEY"
 export OPENAI_API_KEY="YOUR_OPENAI_KEY"
 ```
 
+For the recommended stage-routed setup, keep credentials in environment
+variables and copy the `models` section from `src/mirage/config.yaml.example`:
+
+```powershell
+$env:DASHSCOPE_API_KEY = "YOUR_DASHSCOPE_KEY"
+$env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
+```
+
+This routes corpus analysis, retrieval, generation, and correction to
+`qwen3.7-plus`, while text-only selection and verification use
+`deepseek-v4-pro`. If a verification request contains a real image, the router
+automatically falls back to the configured vision-capable generator rather than
+sending image content to a text-only verifier.
+
 Run an OceanGraph pipeline over an input directory:
 
 ```bash
@@ -75,11 +92,17 @@ python run_oceangraph.py \
   --output output/oceangraph_demo \
   --backend openai \
   --embedding-model bge_m3 \
+  --offline-models \
   --reranker-model text_embedding \
   --num-qa-pairs 20 \
   --max-depth 2 \
   --min-supporting-chunks 2
 ```
+
+Use `--offline-models` on isolated servers after the embedding model has been
+cached locally. The equivalent YAML setting is
+`embedding.local_files_only: true`; both forms prevent Hugging Face network
+probes while retaining local GPU inference.
 
 Or use the installed command:
 
@@ -152,10 +175,13 @@ organization, and `OCEANGRAPH_FRAMEWORK.md` for a detailed framework overview.
 --output, -o                Destination for generated dataset artifacts
 --backend, -b               gemini, openai, or ollama
 --embedding-model           auto, qwen3_vl, nomic, or bge_m3
+--offline-models            Use only locally cached Hugging Face models
 --reranker-model            gemini_vlm, qwen3_vl, or text_embedding
 --num-qa-pairs              Target number of accepted QA pairs
 --max-depth                 Maximum multi-hop retrieval depth
 --min-supporting-chunks     Minimum distinct chunks for strict verification
+--no-counterfactual-verification
+                            Disable leave-one-out evidence necessity checks
 --no-strict-multihop        Disable the single-chunk shortcut check
 --no-jsonl                  Disable JSONL output copies
 --preflight                 Run environment checks only

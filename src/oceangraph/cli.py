@@ -15,8 +15,36 @@ import multiprocessing as mp
 import os
 import sys
 from pathlib import Path
+from typing import Optional
+
+import yaml
 
 from oceangraph import FRAMEWORK_NAME, FRAMEWORK_VERSION
+
+
+def configured_api_key_envs(config_path: Optional[str], backend: str) -> list[str]:
+    """Return standard and stage-routed API key environment variables."""
+    default_env = {
+        "gemini": "GEMINI_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }.get(backend.lower())
+    env_names = [default_env] if default_env else []
+    path = Path(config_path) if config_path else None
+    if path and path.is_file():
+        try:
+            config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            config = {}
+        models = config.get("models") or {}
+        profiles = models.get("profiles", {}) if isinstance(models, dict) else {}
+        for profile in profiles.values():
+            if not isinstance(profile, dict):
+                continue
+            profile_backend = str(profile.get("backend", backend)).lower()
+            api_key_env = profile.get("api_key_env")
+            if profile_backend == backend.lower() and api_key_env:
+                env_names.append(str(api_key_env))
+    return list(dict.fromkeys(env_names))
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,9 +81,15 @@ Pipeline agents:
     parser.add_argument("--num-qa-pairs", type=int, default=100, help="Target number of accepted QA pairs")
     parser.add_argument("--max-workers", type=int, default=4, help="Number of parallel workers")
     parser.add_argument("--embedding-model", default="auto", help="Embedding model: auto, qwen3_vl, nomic, or bge_m3")
+    parser.add_argument("--offline-models", action="store_true", help="Use only locally cached Hugging Face models")
     parser.add_argument("--reranker-model", default="gemini_vlm", help="Reranker model: gemini_vlm, qwen3_vl, or text_embedding")
     parser.add_argument("--max-depth", type=int, default=2, help="Maximum depth for multi-hop context retrieval")
     parser.add_argument("--no-strict-multihop", action="store_true", help="Disable single-chunk shortcut checks")
+    parser.add_argument(
+        "--no-counterfactual-verification",
+        action="store_true",
+        help="Disable leave-one-out evidence necessity checks",
+    )
     parser.add_argument("--min-supporting-chunks", type=int, help="Minimum distinct chunks required by strict verification")
     parser.add_argument("--no-jsonl", action="store_true", help="Do not write JSONL copies of QA outputs")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
@@ -70,10 +104,8 @@ def setup_environment(args: argparse.Namespace) -> None:
         os.environ["MIRAGE_CONFIG"] = args.config
 
     if args.api_key:
-        if args.backend == "gemini":
-            os.environ["GEMINI_API_KEY"] = args.api_key
-        elif args.backend == "openai":
-            os.environ["OPENAI_API_KEY"] = args.api_key
+        for env_name in configured_api_key_envs(args.config, args.backend):
+            os.environ[env_name] = args.api_key
 
     backend = args.backend.upper()
     os.environ["OCEANGRAPH_BACKEND"] = backend
@@ -82,6 +114,10 @@ def setup_environment(args: argparse.Namespace) -> None:
     if args.model:
         os.environ["OCEANGRAPH_MODEL"] = args.model
         os.environ["MIRAGE_MODEL"] = args.model
+
+    os.environ["MIRAGE_COUNTERFACTUAL_VERIFICATION"] = (
+        "0" if args.no_counterfactual_verification else "1"
+    )
 
     if args.input:
         os.environ["OCEANGRAPH_INPUT_DIR"] = args.input
@@ -99,6 +135,9 @@ def setup_environment(args: argparse.Namespace) -> None:
     if args.embedding_model:
         os.environ["OCEANGRAPH_EMBEDDING_MODEL"] = args.embedding_model
         os.environ["MIRAGE_EMBEDDING_MODEL"] = args.embedding_model
+    if args.offline_models:
+        os.environ["OCEANGRAPH_OFFLINE_MODELS"] = "1"
+        os.environ["MIRAGE_OFFLINE_MODELS"] = "1"
     if args.reranker_model:
         os.environ["OCEANGRAPH_RERANKER_MODEL"] = args.reranker_model
         os.environ["MIRAGE_RERANKER_MODEL"] = args.reranker_model
@@ -129,14 +168,14 @@ def validate_args(args: argparse.Namespace) -> list[str]:
         errors.append(f"Input directory does not exist: {args.input}")
 
     if not args.preflight and args.backend != "ollama":
-        api_key = args.api_key
-        if args.backend == "gemini":
-            api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        elif args.backend == "openai":
-            api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        env_names = configured_api_key_envs(args.config, args.backend)
+        api_key = args.api_key or next(
+            (os.environ.get(env_name) for env_name in env_names if os.environ.get(env_name)),
+            None,
+        )
         if not api_key:
-            env_var = "GEMINI_API_KEY" if args.backend == "gemini" else "OPENAI_API_KEY"
-            errors.append(f"API key required for {args.backend}. Use --api-key or set {env_var}.")
+            env_hint = " or ".join(env_names)
+            errors.append(f"API key required for {args.backend}. Use --api-key or set {env_hint}.")
     return errors
 
 
