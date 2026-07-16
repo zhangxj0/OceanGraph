@@ -332,18 +332,23 @@ You are a(n) {expert_persona} in the domain of {domain_context}. Your task is to
 **EXECUTION PROTOCOL:**
 1.  **Analyze:** Identify distinct chunks and extract critical technical keywords for each.
 2.  **Map:** Identify "Bridge Keywords"--concepts that intersect or relate across different chunks.
-3.  **Synthesize:** Construct one or more questions that **require** combining information from multiple chunks to answer. If a question can be answered by a single chunk, it is invalid.
-4.  **Decompose:** Verify the logic by mapping specific parts of the question and answer back to their source chunks.
+3.  **Synthesize:** Construct one or more independent QA pairs. Each pair must ask for exactly ONE final unknown while requiring information from multiple chunks to resolve it. If a question can be answered by a single chunk, it is invalid.
+4.  **Decompose:** Record the hidden single-hop reasoning steps in `sub_questions`. These are reasoning annotations only and must NOT be concatenated into the visible `question`.
 
 **CRITICAL CONSTRAINTS:**
 *   **Multi-Hop Requirement:** The questions must be unsolvable without synthesizing facts from at least two distinct locations in the text.
+*   **Atomic Question Requirement:** Every visible `question` must contain exactly one interrogative target and request exactly one final output.
+    *   Use bridge composition: clues from one chunk identify or constrain an entity, then another chunk supplies the single requested attribute.
+    *   Never join two answer requests with "and", "also", "respectively", a semicolon, or multiple question marks.
+    *   A question such as "Which company was acquired, and how much capital was returned?" is INVALID even if each part uses a different chunk.
+    *   A question such as "Which company was acquired by the firm that appointed Eric Aboaf as CFO in 2024?" is VALID when identifying the firm and resolving the acquisition require different chunks.
 *   **Self-Sufficiency:** Questions must be standalone. Generate the MINIMUM number of questions needed to comprehensively span the content without redundancy
     *   **NEVER** use vague phrases like "the provided text," "the second figure," or "Section 1."
     *   **ALWAYS** explicitly name the specific entity, standard, or concept (e.g., "In the Q3 Financial Report..." or "According to the ISO 9001 guidelines...").
 *   **Strict Grounding:** Answer ONLY using the provided content. Do not hallucinate external details.
-*   **Final-Answer Consistency:** Perform calculations and reconsiderations silently before emitting JSON. The `answer` must contain only the final, internally consistent conclusion; never include drafting language such as "wait," "let me re-read," alternative questions, or a claim that is corrected later in the same answer.
+*   **Minimal Final Answer:** The `answer` must be exactly one minimal entity, number, date, yes/no label, or short noun phrase. Do not include explanations, evidence, introductory wording, or a second answer. Perform calculations and reconsiderations silently before emitting JSON.
 *   **Dependency Coverage:** Every prerequisite used by the answer must appear in `supporting_facts` and `evidence_spans`. Do not infer a classification, action, or downstream result when an intermediate measurement, calibration, threshold, or mapping rule is absent from the selected chunks.
-*   **Reward-Friendly Short Answers:** Always include `short_answers` for each QA pair. These must be minimal exact-match targets: entity names, list items, numeric values, or yes/no labels. Do not include explanations, evidence, or full sentences. If a question needs an explanatory `answer`, make `short_answers` contain only the core answer span that should receive EM/F1 credit.
+*   **Single Canonical Short Answer:** `short_answers` must contain exactly one item, and that item must be textually identical to `answer` after trimming punctuation. Aliases and alternative phrasings are not allowed in generated records.
 
 **Ocean-domain guidance when applicable:**
 Prefer questions that cross at least two of these evidence types: physical oceanography, marine chemistry, marine ecology, marine geology, ocean engineering, air-sea interaction, climate-ocean coupling, remote sensing, observing systems, and regional ocean processes.
@@ -362,18 +367,17 @@ Return exactly one valid JSON object and no prose outside it. Use this schema:
   "qa_pairs": [
     {{
       "question": "specific, standalone multi-hop question",
-      "answer": "concise answer grounded only in the chunks",
+      "answer": "one minimal final answer such as Visible Alpha or 4.4 billion USD",
       "short_answers": [
-        "canonical minimal answer for exact-match scoring",
-        "optional alias or reordered list form"
+        "the same single canonical answer as answer"
       ],
       "question_type": "bridge | comparison | causal | temporal | spatial | numeric_aggregation",
-      "answer_type": "entity | description | numeric | list | yes_no",
+      "answer_type": "entity | numeric | date | yes_no | short_text",
       "subdomain": "physical_oceanography | marine_chemistry | marine_ecology | marine_geology | ocean_engineering | climate_ocean | remote_sensing | observing_systems | mixed",
       "hop_count": <integer>,
       "sub_questions": [
-        "single-hop sub-question answered by one chunk",
-        "single-hop sub-question answered by another chunk"
+        "hidden single-hop step used to identify or constrain the bridge entity",
+        "hidden single-hop step that resolves the one final requested attribute"
       ],
       "reasoning_path": "one or two sentences explaining how the sub-answers combine",
       "supporting_facts": [
@@ -411,11 +415,14 @@ You are a {expert_persona} in {domain_context}. Your task is to accept or reject
 2. **Triviality:** Answerable using general knowledge; does not require the specific content.
 3. **Non-Technical:** Asks about page numbers, prefaces, document structure, or metadata.
 4. **Ambiguity:** Unclear or confusing without seeing the source text.
+5. **Compound Question:** The visible question asks for two or more outputs, contains multiple interrogative targets, uses multiple question marks, or joins separate requests with "and", "respectively", or a semicolon. Hidden reasoning may have multiple steps, but the user-facing question must have one final unknown.
+6. **Non-Minimal Answer:** The answer contains explanation, a full sentence, multiple clauses, or more than one requested value. The answer must be one entity, number, date, yes/no label, or short noun phrase.
 
 **SELECT (High Quality):**
 1. **Self-Contained:** A user reading *only* the question knows exactly what specific standard, machine, or concept is being referenced.
 2. **Grounded:** The answer is technically accurate and derived directly from the content.
 3. **Expert Value:** High relevance to {domain_relevance} with appropriate technical depth.
+4. **Atomic Multi-Hop Form:** Multiple chunks are needed to resolve one final answer target; intermediate sub-questions are not exposed as separate requests.
 
 **SCORING (0-10 in discrete steps):**
 *   **Relevance:** Value to an {expert_persona}. (0-3: Low relevance or rejected, 4-6: Moderate relevance, 7-8: High relevance, 9-10: Critical/essential knowledge)
@@ -472,11 +479,12 @@ Analyze the QA pair and return the appropriate labels based on the following log
         - Question refers to unseen context with vague references (e.g., "the provided text," "this figure," "the table")
         - Question lacks specific identifiers
         - Question mentions a figure/diagram/schematic/image but the answer can be derived ENTIRELY from text (misleading visual reference - the question claims to need visual content but doesn't)
+        - Question asks for multiple outputs, contains multiple interrogative targets, or concatenates separate sub-questions
     *   **QUESTION_CORRECT:** Use if the question is unambiguous, fully self-contained, AND any visual references are genuinely necessary for the answer (e.g., reading values from graphs, identifying components in diagrams).
 
 2.  **Answer Accuracy Check:**
     *   **ANSWER_CORRECT:** Use if the answer is factually supported by specific data/text in the content.
-    *   **ANSWER_INCORRECT:** Use if the answer is unsupported or factually wrong.
+    *   **ANSWER_INCORRECT:** Use if the answer is unsupported, factually wrong, explanatory rather than minimal, or contains multiple answer values.
 
 3.  **Content Dependency Check:**
     *   **REQUIRES_CONTENT:** Use if the answer relies on unique data/facts found only in this content.
@@ -587,9 +595,11 @@ Correction Requirements:
     2. Ensure Specificity to fix ANSWER_INCORRECT: The answer shall correctly answer the question based on the content.
     3. Strict Accuracy to fix CAN_ANSWER_WITHOUT_CONTENT: The answer must rely exclusively on facts and values present in the content. Do not contradict the content or hallucinate external info.
     4. Strict Multi-Hop Repair: If feedback says "Strict multihop verifier failed" or "SHORTCUT_FOUND", rewrite the question so that no single chunk can answer it. The corrected question must require at least two distinct chunks.
+    5. Atomic Question Repair: The visible question must ask for exactly ONE final unknown. Convert compound questions into a bridge question where earlier facts identify or constrain an entity and the final clause requests one attribute. Never concatenate two sub-questions.
+    6. Minimal Answer Repair: Return exactly one minimal entity, number, date, yes/no label, or short noun phrase. Do not include a full sentence, explanation, citation, or second answer. `ShortAnswer` must be identical to `Answer` after trimming punctuation.
 
 Output Format:
-<|#|>START<|#|>Question<|#|><Corrected, specific, self-contained question><|#|>Answer<|#|><Accurate answer citing specific content sources><|#|>Relevance<|#|><0-10><|#|>Difficulty<|#|><0-10><|#|>END<|#|> 
+<|#|>START<|#|>Question<|#|><One corrected atomic multi-hop question><|#|>Answer<|#|><One minimal final answer><|#|>ShortAnswer<|#|><The same minimal final answer><|#|>AnswerType<|#|><entity | numeric | date | yes_no | short_text><|#|>Relevance<|#|><0-10><|#|>Difficulty<|#|><0-10><|#|>END<|#|>
 
 ------------------------------------------------
  Example (Fixing vague reference & specificity):
@@ -599,10 +609,11 @@ Question: How do I reset the device mentioned in the text?
 Answer: You should hold the button down for a few seconds until it resets.
 Verification Feedback: QUESTION_INCORRECT - The question uses "the device mentioned in the text" which is vague. It must name the specific product. CAN_ANSWER_WITHOUT_CONTENT - The answer is too general and applies to many devices; it lacks the specific steps found in the content.
 Content Context:
-"User Manual for EcoTemp S3 Thermostat. To perform a factory reset, press and hold the central dial for exactly 10 seconds until the display turns blue. The system will reboot and ask for the default PIN (0000)."
+"[Chunk 1] The EcoTemp S3 service manual states that holding the central dial for exactly 10 seconds initiates its factory-reset sequence."
+"[Chunk 2] The EcoTemp status matrix maps the factory-reset sequence to a blue display and the firmware-update sequence to an amber display."
 CORRECTED RESPONSE:
 <|#|>START<|#|>
-Question<|#|>According to the User Manual for the EcoTemp S3 Thermostat, what are the specific steps and visual indicators required to perform a factory reset?<|#|>Answer<|#|>To factory reset the EcoTemp S3 Thermostat, the central dial must be pressed and held for exactly 10 seconds until the display turns blue, after which the system will reboot.<|#|>Relevance<|#|>9<|#|>Difficulty<|#|>3
+Question<|#|>Which display color confirms the reset sequence on the EcoTemp S3 procedure initiated by holding its central dial for 10 seconds?<|#|>Answer<|#|>Blue<|#|>ShortAnswer<|#|>Blue<|#|>AnswerType<|#|>short_text<|#|>Relevance<|#|>9<|#|>Difficulty<|#|>3
 <|#|>END<|#|>
 """
 

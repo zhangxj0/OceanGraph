@@ -2,6 +2,19 @@
 
 All notable changes to OceanGraph-R1 are documented here.
 
+## [2.1.0] - 2026-07-16
+
+### Added
+- A deterministic atomic-QA quality gate that rejects compound questions,
+  multiple answer targets, non-minimal answers, and mismatched short answers.
+- Regression coverage for real compound multi-hop failures in Chinese.
+
+### Changed
+- Generation now produces one user-facing question with one canonical minimal
+  answer while retaining hidden multi-hop sub-questions and evidence traces.
+- Selection, verification, and correction prompts now enforce the same atomic
+  multi-hop output contract.
+
 ## [2.0.0] - 2026-07-15
 
 ### Added

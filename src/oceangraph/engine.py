@@ -1178,7 +1178,10 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         build_search_trajectory,
         ensure_short_answers,
     )
-    from oceangraph.verification.quality import has_visible_self_correction
+    from oceangraph.verification.quality import (
+        atomic_qa_violations,
+        has_visible_self_correction,
+    )
     
     successful_qa = []
     failed_qa = []
@@ -1293,6 +1296,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 verification,
                 question=qa['question'],
                 answer=qa['answer'],
+                short_answers=qa['short_answers'],
                 chunks=context_chunks
             )
             multihop_passed = (
@@ -1310,6 +1314,15 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         correction_feedback += (
                             "\nAnswer contains visible drafting or self-correction. "
                             "Return only one final, internally consistent answer."
+                        )
+                    quality_violations = atomic_qa_violations(
+                        qa['question'], qa['answer'], qa['short_answers']
+                    )
+                    if quality_violations:
+                        correction_feedback += (
+                            "\nAtomic QA quality gate failed: "
+                            + ", ".join(quality_violations)
+                            + ". Rewrite as one question with one minimal final answer."
                         )
                     if QA_STRICT_MULTIHOP and not multihop_passed:
                         correction_feedback += (
@@ -1418,6 +1431,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         corrected_verification,
                         question=corrected['question'],
                         answer=corrected['answer'],
+                        short_answers=corrected['short_answers'],
                         chunks=context_chunks
                     )
                     corrected_multihop_passed = (
@@ -1435,6 +1449,16 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                             corrected_feedback += (
                                 "\nAnswer still contains visible drafting or self-correction. "
                                 "Return only one final, internally consistent answer."
+                            )
+                        corrected_quality_violations = atomic_qa_violations(
+                            corrected['question'],
+                            corrected['answer'],
+                            corrected['short_answers'],
+                        )
+                        if corrected_quality_violations:
+                            corrected_feedback += (
+                                "\nAtomic QA quality gate still failed: "
+                                + ", ".join(corrected_quality_violations)
                             )
                         if QA_STRICT_MULTIHOP and not corrected_multihop_passed:
                             corrected_feedback += (

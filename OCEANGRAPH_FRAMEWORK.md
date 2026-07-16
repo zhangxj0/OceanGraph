@@ -4,8 +4,13 @@ OceanGraph-R1 is a domain-aware multi-agent framework for constructing
 evidence-grounded and strictly verified multi-hop QA datasets in ocean science.
 
 The framework turns heterogeneous ocean science documents into dataset records
-that include long answers for audit, short answers for EM/F1 reward, supporting
-facts, evidence spans, evidence graphs, and retrieval traces.
+that include one canonical minimal answer for EM/F1 reward, supporting facts,
+evidence spans, evidence graphs, and retrieval traces for audit.
+
+Each user-facing question is atomic: it requests one final answer span. Multiple
+`sub_questions` remain hidden reasoning annotations used to identify bridge
+entities and traverse evidence, rather than separate requests concatenated into
+the visible question.
 
 ## Multi-Agent Architecture
 

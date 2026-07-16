@@ -29,7 +29,10 @@ from oceangraph.pipeline.evidence_graph import (
 from oceangraph.core.prompts import PROMPTS, PROMPTS_CHUNK
 from oceangraph.schemas import QAResponse
 from oceangraph.verification import evaluate_multihop_gate
-from oceangraph.verification.quality import has_visible_self_correction
+from oceangraph.verification.quality import (
+    atomic_qa_violations,
+    has_visible_self_correction,
+)
 
 # Configuration (override via config.yaml or command line)
 INPUT_CHUNKS_FILE = "output/results/chunks.json"
@@ -886,8 +889,13 @@ def has_misleading_visual_reference(question: str, answer: str, chunks: List[Dic
     return False
 
 
-def is_verification_successful(verification_result: str, question: str = None, 
-                                answer: str = None, chunks: List[Dict] = None) -> bool:
+def is_verification_successful(
+    verification_result: str,
+    question: str = None,
+    answer: str = None,
+    short_answers: List[str] = None,
+    chunks: List[Dict] = None,
+) -> bool:
     """Check if verification indicates success.
     
     New format: <|#|>START<|#|>Status<|#|><Label 1>, <Label 2>, <Label 3><|#|>Explanation<|#|><text><|#|>END<|#|>
@@ -910,6 +918,9 @@ def is_verification_successful(verification_result: str, question: str = None,
     has_all_good = all(good in status_content.upper() for good in required_good)
     
     if answer and has_visible_self_correction(answer):
+        return False
+
+    if question and answer and atomic_qa_violations(question, answer, short_answers):
         return False
 
     # Additional code-level check for misleading visual references
@@ -1011,6 +1022,10 @@ def correct_failed_qa(chunks: List[Dict], failed_qa_pairs: List[Dict],
                         qa_dict["question"] = value
                     elif key.lower() == "answer":
                         qa_dict["answer"] = value
+                    elif key.lower() == "shortanswer":
+                        qa_dict["short_answers"] = [value]
+                    elif key.lower() == "answertype":
+                        qa_dict["answer_type"] = value
                     elif key.lower() == "relevance":
                         qa_dict["relevance_score"] = value
                     elif key.lower() == "difficulty":
@@ -1151,6 +1166,7 @@ if __name__ == "__main__":
                     qa_pair.get("verification_result", ""),
                     question=qa_pair.get("question", ""),
                     answer=qa_pair.get("answer", ""),
+                    short_answers=qa_pair.get("short_answers", []),
                     chunks=context_chunks
                 ):
                     successful_count += 1

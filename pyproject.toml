@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oceangraph-r1"
-version = "2.0.0"
+version = "2.1.0"
 description = "A domain-aware multi-agent framework for ocean science multi-hop search reasoning datasets"
 readme = "OCEANGRAPH_FRAMEWORK.md"
 license = {text = "Apache-2.0"}

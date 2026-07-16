@@ -5,10 +5,14 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-2.1.0-005F73.svg" alt="Version 2.1.0">
   <img src="https://img.shields.io/badge/python-3.12-blue.svg" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache-2.0 license">
   <img src="https://img.shields.io/badge/domain-ocean%20science-0077B6.svg" alt="Ocean science">
 </p>
+
+**Current release:** `v2.1.0` · **Release branch:**
+`codex/v2.1.0-atomic-qa-20260716` · **Last updated:** `2026-07-16`
 
 OceanGraph-R1 turns ocean-science corpora into structured, verifiable multi-hop
 question-answer datasets for retrieval and reasoning evaluation. It accepts
@@ -25,9 +29,9 @@ and verifies that each accepted question requires evidence from multiple chunks.
   physical oceanography and climate, carbon and biogeochemistry, remote sensing
   and observing systems, marine ecology and fisheries, and coastal hazards and
   human systems.
-- **Evidence-grounded multi-hop QA** — Builds reasoning paths, supporting
-  facts, and evidence spans, then rejects questions that can be answered from a
-  single chunk.
+- **Atomic evidence-grounded multi-hop QA** — Asks for one minimal final
+  answer while preserving hidden multi-step reasoning paths, supporting facts,
+  and evidence spans; compound questions and single-chunk shortcuts are rejected.
 - **Text-only corpus generation** — Converts PDF, HTML, TXT, and Markdown
   sources into text chunks and never sends extracted images to model APIs.
 - **Structured outputs** — Exports accepted and rejected QA pairs as JSON and
