@@ -11,8 +11,8 @@
   <img src="https://img.shields.io/badge/domain-ocean%20science-0077B6.svg" alt="Ocean science">
 </p>
 
-**Current release:** `v2.1.0` · **Release branch:**
-`codex/v2.1.0-atomic-qa-20260716` · **Last updated:** `2026-07-16`
+**Current release:** `v2.1.0` · **Release branch:** `v2.1.0` ·
+**Last updated:** `2026-07-16`
 
 OceanGraph-R1 turns ocean-science corpora into structured, verifiable multi-hop
 question-answer datasets for retrieval and reasoning evaluation. It accepts
