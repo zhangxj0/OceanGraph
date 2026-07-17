@@ -16,9 +16,14 @@ the visible question.
 
 | Agent | Role |
 |---|---|
-| Domain Corpus Agent | Converts heterogeneous ocean-science documents into semantic chunks and applies the five-domain ocean taxonomy. |
-| Evidence Reasoning Agent | Completes multi-hop evidence context through iterative retrieval, evidence selection, and cross-chunk reasoning. |
-| QA Verification Agent | Generates structured QA records, rejects single-chunk shortcuts with consolidated or exhaustive review, and builds supporting facts, evidence spans, and evidence-graph supervision. |
+| Corpus Agent | Converts heterogeneous ocean-science documents into semantic chunks, applies the five-domain ocean taxonomy, and builds the retrieval index. |
+| Evidence Agent | Detects information gaps and completes multi-hop evidence context through iterative retrieval and evidence selection. |
+| QA Agent | Generates atomic questions, minimal answers, hidden sub-questions, reasoning paths, supporting facts, and evidence spans. |
+| Verifier Agent | Independently checks atomicity, evidence grounding, and multi-hop necessity, then emits the final acceptance decision and evidence graph. |
+
+The v2.2 runtime writes an ordered `agent_trace` to every QA record. The trace
+distinguishes generation from verification without changing the validated v2.1
+retrieval, prompting, or acceptance semantics.
 
 ## Main Commands
 
@@ -58,10 +63,11 @@ Accepted QA samples include:
 - `evidence_graph`
 - `search_history` and `search_trajectory`
 - `multihop_necessity_result`
+- `agent_trace`
 
 ## Paper-Facing Contribution Summary
 
-OceanGraph-R1 contributes a unified three-agent data construction structure for
+OceanGraph-R1 contributes a unified four-agent data construction structure for
 ocean science search reasoning: domain-aware corpus modeling, recursive evidence
-reasoning, cost-bounded single-chunk shortcut rejection, optional exhaustive
-counterfactual auditing, and evidence-graph supervision.
+completion, atomic QA synthesis, independent cost-bounded verification, optional
+exhaustive counterfactual auditing, and evidence-graph supervision.

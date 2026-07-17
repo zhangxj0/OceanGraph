@@ -8,6 +8,13 @@ def test_recommended_config_routes_qwen_and_deepseek():
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     profiles = config["models"]["profiles"]
 
+    assert config["framework"]["version"] == "2.2.0"
+    assert config["framework"]["agents"] == [
+        "corpus",
+        "evidence",
+        "qa",
+        "verifier",
+    ]
     assert profiles["generator"]["url"] == (
         "https://llmapi.paratera.com/v1/chat/completions"
     )

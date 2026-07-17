@@ -12,6 +12,7 @@ recursive-include scripts *.py
 
 # Include assets (images for documentation)
 recursive-include assets *.png *.jpg *.jpeg *.gif *.svg
+recursive-include figures *.png *.svg
 
 # Include data placeholders
 include data/.gitkeep

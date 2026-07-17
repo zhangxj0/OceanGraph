@@ -912,10 +912,10 @@ class OceanGraph:
         Run the complete OceanGraph pipeline.
         
         Executes all steps:
-            1. Document conversion (PDF/HTML -> Markdown)
-            2. Semantic chunking
-            3. Embedding & FAISS indexing
-            4. Multi-hop QA generation
+            1. Corpus Agent: parsing, chunking, taxonomy, and indexing
+            2. Evidence Agent: evidence retrieval and context completion
+            3. QA Agent: QA synthesis and reasoning annotation
+            4. Verifier Agent: atomicity, grounding, and multi-hop necessity
             5. (Optional) Deduplication
             6. (Optional) Evaluation
         
@@ -982,6 +982,15 @@ class OceanGraph:
             "backend": cfg.backend,
             "num_qa_pairs_requested": cfg.num_qa_pairs,
             **token_stats,
+        }
+        from oceangraph.agents import (
+            AGENT_ARCHITECTURE_VERSION,
+            get_agent_manifest,
+        )
+
+        stats["agent_architecture"] = {
+            "version": AGENT_ARCHITECTURE_VERSION,
+            "agents": get_agent_manifest(),
         }
         
         return OceanGraphResults(

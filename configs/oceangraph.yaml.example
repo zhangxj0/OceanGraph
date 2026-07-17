@@ -11,6 +11,12 @@
 #   export DEEPSEEK_API_KEY="your-key-here"
 # =============================================================================
 
+framework:
+  name: OceanGraph-R1
+  version: 2.2.0
+  agent_architecture: four_agent
+  agents: [corpus, evidence, qa, verifier]
+
 # -----------------------------------------------------------------------------
 # Backend Configuration
 # -----------------------------------------------------------------------------

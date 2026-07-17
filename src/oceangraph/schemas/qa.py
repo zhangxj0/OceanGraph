@@ -21,6 +21,18 @@ class EvidenceSpan(BaseModel):
     span: str
 
 
+class AgentTraceEvent(BaseModel):
+    """Per-record provenance emitted by one v2.2 runtime agent."""
+
+    model_config = ConfigDict(extra="allow", str_strip_whitespace=True)
+
+    agent_id: str
+    agent_name: str
+    status: str
+    actions: List[str] = Field(default_factory=list)
+    outputs: Dict[str, Any] = Field(default_factory=dict)
+
+
 class QAPair(BaseModel):
     model_config = ConfigDict(extra="allow", str_strip_whitespace=True)
 
@@ -37,6 +49,7 @@ class QAPair(BaseModel):
     reasoning_path: str = ""
     supporting_facts: List[SupportingFact] = Field(default_factory=list)
     evidence_spans: List[EvidenceSpan] = Field(default_factory=list)
+    agent_trace: List[AgentTraceEvent] = Field(default_factory=list)
 
     @field_validator("short_answers", "sub_questions", mode="before")
     @classmethod

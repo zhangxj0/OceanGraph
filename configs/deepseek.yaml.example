@@ -1,3 +1,9 @@
+framework:
+  name: OceanGraph-R1
+  version: 2.2.0
+  agent_architecture: four_agent
+  agents: [corpus, evidence, qa, verifier]
+
 pipeline:
   modality: text
 

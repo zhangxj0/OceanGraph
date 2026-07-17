@@ -67,6 +67,7 @@ logs/
 
 # ========== IMAGES (except assets) ==========
 *.png
+!figures/oceangraph_main_figure_4agent_image2_v3_equal_height.png
 *.jpg
 *.jpeg
 *.gif

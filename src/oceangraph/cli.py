@@ -19,7 +19,12 @@ from typing import Optional
 
 import yaml
 
-from oceangraph import FRAMEWORK_NAME, FRAMEWORK_VERSION
+from oceangraph import (
+    AGENT_ARCHITECTURE_VERSION,
+    FRAMEWORK_NAME,
+    FRAMEWORK_VERSION,
+    get_agent_manifest,
+)
 
 
 def configured_api_key_envs(config_path: Optional[str], backend: str) -> list[str]:
@@ -61,9 +66,10 @@ Examples:
   python run_oceangraph.py -i data/ocean_docs -o output/oceangraph_demo --deduplication --evaluation
 
 Pipeline agents:
-  1. Domain Corpus Agent
-  2. Evidence Reasoning Agent
-  3. QA Verification Agent
+  1. Corpus Agent
+  2. Evidence Agent
+  3. QA Agent
+  4. Verifier Agent
 """,
     )
 
@@ -272,11 +278,12 @@ def write_run_metadata(args: argparse.Namespace) -> None:
             )),
             "counterfactual_verification": counterfactual,
         },
-        "agents": [
-            "domain_corpus",
-            "evidence_reasoning",
-            "qa_verification",
-        ],
+        "agents": [spec["agent_id"] for spec in get_agent_manifest()],
+        "agent_architecture": {
+            "version": AGENT_ARCHITECTURE_VERSION,
+            "sequence": ["corpus", "evidence", "qa", "verifier"],
+            "manifest": get_agent_manifest(),
+        },
     }
     (output_dir / "oceangraph_run_config.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False),

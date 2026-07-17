@@ -1,9 +1,16 @@
 from argparse import Namespace
+import json
 import os
+import sys
 
 import yaml
 
-from oceangraph.cli import setup_environment, validate_args
+from oceangraph.cli import (
+    parse_args,
+    setup_environment,
+    validate_args,
+    write_run_metadata,
+)
 
 
 def _write_config(path):
@@ -109,3 +116,28 @@ def test_setup_environment_applies_explicit_strict_audit_options(tmp_path, monke
     assert os.environ["OCEANGRAPH_MAX_VERIFICATION_CHUNKS"] == "6"
     assert os.environ["OCEANGRAPH_MAX_UNKNOWN_VERDICTS"] == "0"
     assert os.environ["OCEANGRAPH_MODEL_SELECTION"] == "1"
+
+
+def test_run_metadata_records_four_agent_architecture(tmp_path, monkeypatch):
+    output_dir = tmp_path / "output"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "oceangraph",
+            "--input",
+            str(tmp_path),
+            "--output",
+            str(output_dir),
+        ],
+    )
+    args = parse_args()
+
+    write_run_metadata(args)
+
+    metadata = json.loads(
+        (output_dir / "oceangraph_run_config.json").read_text(encoding="utf-8")
+    )
+    assert metadata["framework_version"] == "2.2.0"
+    assert metadata["agents"] == ["corpus", "evidence", "qa", "verifier"]
+    assert metadata["agent_architecture"]["sequence"] == metadata["agents"]

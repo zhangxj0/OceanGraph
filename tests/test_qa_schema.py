@@ -21,6 +21,15 @@ def test_qa_response_coerces_scores_and_validates_evidence():
                         {"chunk": "Chunk 1", "span": "dissolved carbon"},
                         {"chunk": "Chunk 2", "span": "particles"},
                     ],
+                    "agent_trace": [
+                        {
+                            "agent_id": "verifier",
+                            "agent_name": "Verifier Agent",
+                            "status": "accepted",
+                            "actions": ["atomicity_check", "evidence_grounding"],
+                            "outputs": {"necessary": True},
+                        }
+                    ],
                 }
             ],
             "keywords_per_chunk": {"chunk_1": ["carbon"], "chunk_2": ["particles"]},
@@ -30,6 +39,7 @@ def test_qa_response_coerces_scores_and_validates_evidence():
 
     assert response.qa_pairs[0].relevance_score == 9
     assert len(response.qa_pairs[0].supporting_facts) == 2
+    assert response.qa_pairs[0].agent_trace[0].agent_id == "verifier"
 
 
 def test_qa_response_rejects_empty_question():

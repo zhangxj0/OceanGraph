@@ -13,7 +13,7 @@ long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists
 
 setup(
     name="oceangraph-r1",
-    version="2.0.0",
+    version="2.2.0",
     author="OceanGraph-R1 Authors",
     author_email="contact@example.com",
     description="A domain-aware multi-agent framework for ocean science multi-hop search reasoning datasets",

@@ -1210,20 +1210,29 @@ def get_domain_and_expert(chunks_file: str, embeddings: Optional[np.ndarray] = N
 def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: str) -> tuple:
     """Process a single chunk for QA generation (for parallel execution)"""
     i, chunk = chunk_data
-    from oceangraph.pipeline.context import build_complete_context
-    from oceangraph.pipeline.qa_generator import (
-        generate_qa, select_qa_pairs, verify_qa, is_verification_successful,
-        correct_failed_qa, get_structured_qa_fields,
-        verify_multihop_necessity, is_multihop_necessity_successful
+    from oceangraph.agents import (
+        CorpusAgent,
+        EvidenceAgent,
+        QAAgent,
+        VerifierAgent,
+        make_agent_event,
     )
-    from oceangraph.pipeline.evidence_graph import (
-        build_evidence_graph,
-        build_search_trajectory,
-        ensure_short_answers,
-    )
+    from oceangraph.pipeline.qa_generator import get_structured_qa_fields
+    from oceangraph.pipeline.evidence_graph import build_search_trajectory
     from oceangraph.verification.quality import (
-        atomic_qa_violations,
         has_visible_self_correction,
+    )
+
+    corpus_agent = CorpusAgent()
+    evidence_agent = EvidenceAgent()
+    qa_agent = QAAgent()
+    verifier_agent = VerifierAgent(
+        strict_multihop=QA_STRICT_MULTIHOP,
+        min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
+        counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
+        verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
+        max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
+        max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
     )
     
     successful_qa = []
@@ -1240,8 +1249,14 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             'artifact': chunk.get('artifact', 'None') if isinstance(chunk, dict) else 'None'
         }
         
-        # 4.1 Build complete context via multihop retrieval
-        context_result = build_complete_context(
+        corpus_trace = corpus_agent.trace_source(
+            chunk_id=initial_chunk_dict['chunk_id'],
+            file_name=initial_chunk_dict['file_name'],
+            domain=domain,
+        )
+
+        # 4.1 Evidence Agent: build complete context via multihop retrieval
+        context_result = evidence_agent.complete_context(
             initial_chunk=initial_chunk_dict,
             max_depth=MAX_DEPTH,
             max_breadth=MAX_BREADTH,
@@ -1253,6 +1268,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             min_context_chunks=QA_MIN_SUPPORTING_CHUNKS if (QA_STRICT_MULTIHOP or QA_TYPE == "multihop") else 1,
         )
         context_chunks = context_result.get('chunks', [])
+        evidence_trace = evidence_agent.trace_context(context_result)
+        base_agent_trace = [corpus_trace, evidence_trace]
         
         chunk_with_context = {
             'original_chunk_id': initial_chunk_dict['chunk_id'],
@@ -1267,15 +1284,18 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             'context_chunks': context_chunks,
             'search_history': context_result.get('search_history', []),
             'termination_reason': context_result.get('termination_reason', ''),
-            'iteration_logs': context_result.get('iteration_logs', [])  # Detailed retrieval logs
+            'iteration_logs': context_result.get('iteration_logs', []),  # Detailed retrieval logs
+            'agent_trace': base_agent_trace,
         }
         
-        # 4.2 Generate QA pairs
-        qa_pairs, qa_metadata = generate_qa(context_chunks, expert_persona, domain)
+        # 4.2 QA Agent: synthesize candidate QA pairs and reasoning annotations
+        qa_pairs, qa_metadata = qa_agent.generate(
+            context_chunks, expert_persona, domain
+        )
         search_trajectory = build_search_trajectory(context_result)
         
-        # 4.3 Select relevant pairs
-        selected, rejected = select_qa_pairs(
+        # 4.3 QA Agent: select relevant candidates
+        selected, rejected = qa_agent.select(
             qa_pairs,
             context_chunks,
             expert_persona,
@@ -1283,37 +1303,24 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             use_model_review=QA_MODEL_SELECTION,
         )
         
-        # 4.4 Verify selected pairs with correction support
+        # 4.4 Verifier Agent: independently verify selected pairs
         pairs_to_verify = selected.copy()
         pairs_for_correction = []  # Collect failed pairs for correction
         
         for qa in pairs_to_verify:
-            qa['short_answers'] = ensure_short_answers(qa)
-            verification = verify_qa(
-                context_chunks, qa['question'], qa['answer'], expert_persona, domain
-            )
-
-            multihop_necessity = {}
-            if QA_STRICT_MULTIHOP:
-                multihop_necessity = verify_multihop_necessity(
-                    context_chunks,
-                    qa['question'],
-                    qa['answer'],
-                    expert_persona,
-                    domain,
-                    min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
-                    counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
-                    qa_pair=qa,
-                    verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
-                    max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
-                    max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
-                )
-            evidence_graph = build_evidence_graph(
+            qa_agent.prepare_candidate(qa)
+            decision = verifier_agent.verify(
                 context_chunks,
                 qa,
                 qa_metadata,
-                necessity_result=multihop_necessity,
+                expert_persona,
+                domain,
             )
+            agent_trace = [
+                *base_agent_trace,
+                qa_agent.trace_candidate(qa, status="completed"),
+                decision.trace_event(),
+            ]
             
             qa_entry = {
                 'chunk_id': i,
@@ -1330,7 +1337,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'iteration_logs': context_result.get('iteration_logs', []),
                 'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                 'related_keywords': qa_metadata.get('related_keywords', ''),
-                'evidence_graph': evidence_graph,
+                'evidence_graph': decision.evidence_graph,
+                'agent_trace': agent_trace,
                 'expert_persona': expert_persona,
                 'domain': domain,
                 'question': qa['question'],
@@ -1340,50 +1348,32 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'SELECTED'),
                 'selection_reason': qa.get('selection_reason', ''),
-                'verification_result': verification,
+                'verification_result': decision.verification_result,
                 'strict_multihop_verification': QA_STRICT_MULTIHOP,
-                'multihop_necessity_result': multihop_necessity
+                'multihop_necessity_result': decision.multihop_necessity_result,
             }
-            
-            verification_passed = is_verification_successful(
-                verification,
-                question=qa['question'],
-                answer=qa['answer'],
-                short_answers=qa['short_answers'],
-                chunks=context_chunks
-            )
-            multihop_passed = (
-                not QA_STRICT_MULTIHOP or
-                is_multihop_necessity_successful(multihop_necessity)
-            )
 
-            if verification_passed and multihop_passed:
+            if decision.accepted:
                 successful_qa.append(qa_entry)
             else:
                 # Collect for correction attempt if enabled
-                verifier_uncertain = str(
-                    multihop_necessity.get('status', '')
-                ).startswith('UNKNOWN_')
-                if QA_CORRECTION_ENABLED and not verifier_uncertain:
-                    correction_feedback = verification
+                if QA_CORRECTION_ENABLED and not decision.verifier_uncertain:
+                    correction_feedback = decision.verification_result
                     if has_visible_self_correction(qa['answer']):
                         correction_feedback += (
                             "\nAnswer contains visible drafting or self-correction. "
                             "Return only one final, internally consistent answer."
                         )
-                    quality_violations = atomic_qa_violations(
-                        qa['question'], qa['answer'], qa['short_answers']
-                    )
-                    if quality_violations:
+                    if decision.quality_violations:
                         correction_feedback += (
                             "\nAtomic QA quality gate failed: "
-                            + ", ".join(quality_violations)
+                            + ", ".join(decision.quality_violations)
                             + ". Rewrite as one question with one minimal final answer."
                         )
-                    if QA_STRICT_MULTIHOP and not multihop_passed:
+                    if QA_STRICT_MULTIHOP and not decision.multihop_passed:
                         correction_feedback += (
                             f"\nStrict multihop verifier failed: "
-                            f"{multihop_necessity.get('status', 'UNKNOWN')}"
+                            f"{decision.multihop_necessity_result.get('status', 'UNKNOWN')}"
                         )
                     pairs_for_correction.append({
                         'question': qa['question'],
@@ -1394,12 +1384,12 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     })
                 else:
                     # Final failure (correction disabled) - store with reason
-                    if verifier_uncertain:
+                    if decision.verifier_uncertain:
                         qa_entry['failure_reason'] = (
                             'Multihop verifier returned an uncertain result; '
                             'correction skipped to avoid unproductive API retries'
                         )
-                    elif not verification_passed:
+                    elif not decision.verification_passed:
                         qa_entry['failure_reason'] = 'Failed verification (correction disabled)'
                     else:
                         qa_entry['failure_reason'] = 'Failed strict multihop verification (correction disabled)'
@@ -1409,6 +1399,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         if QA_CORRECTION_ENABLED and pairs_for_correction:
             correction_attempt = 0
             current_failures = pairs_for_correction
+            corrected_pairs = []
             
             while correction_attempt < QA_CORRECTION_MAX_ATTEMPTS and current_failures:
                 correction_attempt += 1
@@ -1426,40 +1417,26 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 ]
                 
                 # Call correction function
-                corrected_pairs = correct_failed_qa(
+                corrected_pairs = qa_agent.correct(
                     context_chunks, failed_for_correction, expert_persona, domain
                 )
                 
-                # Verify corrected pairs
+                # Verifier Agent independently rechecks corrected candidates
                 new_failures = []
                 for corrected in corrected_pairs:
-                    corrected['short_answers'] = ensure_short_answers(corrected)
-                    corrected_verification = verify_qa(
-                        context_chunks, corrected['question'], corrected['answer'], 
-                        expert_persona, domain
-                    )
-
-                    corrected_multihop_necessity = {}
-                    if QA_STRICT_MULTIHOP:
-                        corrected_multihop_necessity = verify_multihop_necessity(
-                            context_chunks,
-                            corrected['question'],
-                            corrected['answer'],
-                            expert_persona,
-                            domain,
-                            min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
-                            counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
-                            qa_pair=corrected,
-                            verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
-                            max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
-                            max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
-                        )
-                    corrected_evidence_graph = build_evidence_graph(
+                    qa_agent.prepare_candidate(corrected)
+                    corrected_decision = verifier_agent.verify(
                         context_chunks,
                         corrected,
                         qa_metadata,
-                        necessity_result=corrected_multihop_necessity,
+                        expert_persona,
+                        domain,
                     )
+                    corrected_agent_trace = [
+                        *base_agent_trace,
+                        qa_agent.trace_candidate(corrected, status="corrected"),
+                        corrected_decision.trace_event(),
+                    ]
                     
                     corrected_entry = {
                         'chunk_id': i,
@@ -1476,7 +1453,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         'iteration_logs': context_result.get('iteration_logs', []),
                         'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                         'related_keywords': qa_metadata.get('related_keywords', ''),
-                        'evidence_graph': corrected_evidence_graph,
+                        'evidence_graph': corrected_decision.evidence_graph,
+                        'agent_trace': corrected_agent_trace,
                         'expert_persona': expert_persona,
                         'domain': domain,
                         'question': corrected['question'],
@@ -1486,54 +1464,34 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         'difficulty_score': corrected.get('difficulty_score', '0'),
                         'selection_status': 'CORRECTED',
                         'selection_reason': f'Corrected on attempt {correction_attempt}',
-                        'verification_result': corrected_verification,
+                        'verification_result': corrected_decision.verification_result,
                         'strict_multihop_verification': QA_STRICT_MULTIHOP,
-                        'multihop_necessity_result': corrected_multihop_necessity,
+                        'multihop_necessity_result': corrected_decision.multihop_necessity_result,
                         'correction_attempt': correction_attempt
                     }
-                    
-                    corrected_verification_passed = is_verification_successful(
-                        corrected_verification,
-                        question=corrected['question'],
-                        answer=corrected['answer'],
-                        short_answers=corrected['short_answers'],
-                        chunks=context_chunks
-                    )
-                    corrected_multihop_passed = (
-                        not QA_STRICT_MULTIHOP or
-                        is_multihop_necessity_successful(corrected_multihop_necessity)
-                    )
 
-                    if corrected_verification_passed and corrected_multihop_passed:
+                    if corrected_decision.accepted:
                         print(f"    Corrected pair passed verification")
                         successful_qa.append(corrected_entry)
                     else:
                         # Accumulate feedback for next attempt
-                        corrected_feedback = corrected_verification
+                        corrected_feedback = corrected_decision.verification_result
                         if has_visible_self_correction(corrected['answer']):
                             corrected_feedback += (
                                 "\nAnswer still contains visible drafting or self-correction. "
                                 "Return only one final, internally consistent answer."
                             )
-                        corrected_quality_violations = atomic_qa_violations(
-                            corrected['question'],
-                            corrected['answer'],
-                            corrected['short_answers'],
-                        )
-                        if corrected_quality_violations:
+                        if corrected_decision.quality_violations:
                             corrected_feedback += (
                                 "\nAtomic QA quality gate still failed: "
-                                + ", ".join(corrected_quality_violations)
+                                + ", ".join(corrected_decision.quality_violations)
                             )
-                        if QA_STRICT_MULTIHOP and not corrected_multihop_passed:
+                        if QA_STRICT_MULTIHOP and not corrected_decision.multihop_passed:
                             corrected_feedback += (
                                 f"\nStrict multihop verifier failed: "
-                                f"{corrected_multihop_necessity.get('status', 'UNKNOWN')}"
+                                f"{corrected_decision.multihop_necessity_result.get('status', 'UNKNOWN')}"
                             )
-                        corrected_verifier_uncertain = str(
-                            corrected_multihop_necessity.get('status', '')
-                        ).startswith('UNKNOWN_')
-                        if corrected_verifier_uncertain:
+                        if corrected_decision.verifier_uncertain:
                             corrected_entry['failure_reason'] = (
                                 'Multihop verifier returned an uncertain result after '
                                 'correction; further retries skipped'
@@ -1564,6 +1522,15 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     failed_qa.append(qa_entry)
         
         for qa in rejected:
+            rejected_agent_trace = [
+                *base_agent_trace,
+                qa_agent.trace_candidate(qa, status="rejected"),
+                make_agent_event(
+                    "verifier",
+                    status="not_run",
+                    outputs={"reason": "rejected_by_qa_agent"},
+                ),
+            ]
             failed_qa.append({
                 'chunk_id': i,
                 'original_chunk': chunk_content,
@@ -1577,6 +1544,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'iteration_logs': context_result.get('iteration_logs', []),
                 'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                 'related_keywords': qa_metadata.get('related_keywords', ''),
+                'agent_trace': rejected_agent_trace,
                 'question': qa['question'],
                 'answer': qa['answer'],
                 **get_structured_qa_fields(qa),
@@ -2233,6 +2201,9 @@ def run_pipeline():
     
     # Initialize GPU lock for thread-safe access
     init_gpu_lock()
+    from oceangraph.agents import CorpusAgent
+
+    corpus_agent = CorpusAgent()
     
     # =========================================================================
     # INITIALIZE CHECKPOINT MANAGER AND LLM CACHE
@@ -2317,18 +2288,23 @@ def run_pipeline():
     # Priority 1: Use explicitly provided chunks file
     if INPUT_CHUNKS_FILE and os.path.exists(INPUT_CHUNKS_FILE):
         print(f"\nLoading chunks from provided file: {INPUT_CHUNKS_FILE}")
-        chunks = load_chunks(INPUT_CHUNKS_FILE)
+        chunks = corpus_agent.load_chunks(INPUT_CHUNKS_FILE, load_chunks)
         chunks_file = INPUT_CHUNKS_FILE
     
     # Priority 2: Use existing chunks in output directory
     elif os.path.exists(output_chunks_file):
         print(f"\nResuming from existing chunks: {output_chunks_file}")
-        chunks = load_chunks(output_chunks_file)
+        chunks = corpus_agent.load_chunks(output_chunks_file, load_chunks)
         chunks_file = output_chunks_file
     
     # Priority 3: Convert documents (may resume from checkpoint)
     else:
-        chunks = convert_documents_to_chunks_parallel(INPUT_PDF_DIR, OUTPUT_CHUNKS, _CHECKPOINT_MANAGER)
+        chunks = corpus_agent.build_chunks(
+            INPUT_PDF_DIR,
+            OUTPUT_CHUNKS,
+            convert_documents_to_chunks_parallel,
+            _CHECKPOINT_MANAGER,
+        )
         chunks_file = OUTPUT_CHUNKS
         if not chunks:
             print("No chunks generated. Exiting.")
@@ -2337,13 +2313,23 @@ def run_pipeline():
     print(f"   Total chunks: {len(chunks)}")
     
     # Step 2: Embed ALL chunks & build unified FAISS index
-    embeddings_dir, embeddings_array, chunk_ids = embed_all_chunks(chunks, chunks_file, OUTPUT_EMBEDDINGS_DIR)
+    embeddings_dir, embeddings_array, chunk_ids = corpus_agent.build_index(
+        chunks,
+        chunks_file,
+        OUTPUT_EMBEDDINGS_DIR,
+        embed_all_chunks,
+    )
     
     # Configure retrieval module
     configure_retrieval_paths(chunks_file, embeddings_dir)
     
     # Step 3: Get domain and expert role
-    domain, expert_persona = get_domain_and_expert(chunks_file, embeddings=embeddings_array, chunk_ids=chunk_ids)
+    domain, expert_persona = corpus_agent.recognize_domain(
+        chunks_file,
+        embeddings_array,
+        chunk_ids,
+        get_domain_and_expert,
+    )
     
     # Step 4: Generate QA with multihop context (PARALLEL)
     # Shuffle chunks if enabled

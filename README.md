@@ -5,13 +5,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-005F73.svg" alt="Version 2.1.0">
+  <img src="https://img.shields.io/badge/version-2.2.0-005F73.svg" alt="Version 2.2.0">
   <img src="https://img.shields.io/badge/python-3.12-blue.svg" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache-2.0 license">
   <img src="https://img.shields.io/badge/domain-ocean%20science-0077B6.svg" alt="Ocean science">
 </p>
 
-**Current release:** `v2.1.0` · **Release branch:** `v2.1.0` ·
+**Current release:** `v2.2.0` ·
 **Last updated:** `2026-07-17`
 
 OceanGraph-R1 turns ocean-science corpora into structured, verifiable multi-hop
@@ -20,7 +20,7 @@ PDF, HTML, TXT, and Markdown sources, plans domain-specific reasoning paths,
 and verifies that each accepted question requires evidence from multiple chunks.
 
 <p align="center">
-  <img src="figures/oceangraph_main_figure.svg" alt="OceanGraph-R1 workflow" width="100%">
+  <img src="figures/oceangraph_main_figure_4agent_image2_v3_equal_height.png" alt="OceanGraph-R1 four-agent workflow" width="100%">
 </p>
 
 ## Highlights
@@ -142,14 +142,20 @@ python run_oceangraph.py --preflight
 
 ## Pipeline
 
-OceanGraph-R1 coordinates three stages:
+OceanGraph-R1 coordinates four explicit runtime agents:
 
-1. **Domain Corpus Agent** labels source material using the ocean taxonomy and
-   assembles high-value multi-chunk contexts.
-2. **Evidence Reasoning Agent** generates questions, answers, sub-questions,
-   reasoning paths, and citation-ready evidence spans.
-3. **QA Verification Agent** validates evidence coverage and strict multi-hop
-   requirements before accepting an item.
+1. **Corpus Agent** parses and chunks source material, recognizes the ocean
+   domain, and builds the taxonomy-aware retrieval index.
+2. **Evidence Agent** detects missing information, retrieves complementary
+   evidence, and completes a multi-chunk context.
+3. **QA Agent** synthesizes atomic questions, minimal answers, hidden
+   sub-questions, and reasoning-path annotations.
+4. **Verifier Agent** independently checks atomicity, evidence grounding, and
+   multi-hop necessity before accepting an item.
+
+The agents reuse the validated v2.1 generation functions through explicit v2.2
+runtime boundaries. Every generated or rejected record contains an
+`agent_trace` showing which role ran, its status, and its principal outputs.
 
 The default `balanced` verifier keeps the single-chunk shortcut guard but checks
 up to four evidence-prioritized chunks in one consolidated DeepSeek request. It
@@ -181,7 +187,7 @@ A completed run writes the following key artifacts to the output directory:
 
 Each accepted record includes fields such as `question_type`, `answer_type`,
 `subdomain`, `declared_hop_count`, `sub_questions`, `reasoning_path`,
-`supporting_facts`, and `evidence_spans`.
+`supporting_facts`, `evidence_spans`, and the four-stage `agent_trace`.
 
 ## Ocean taxonomy
 

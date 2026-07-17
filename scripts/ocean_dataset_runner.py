@@ -147,11 +147,14 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
     return {
         "framework": {
             "name": "OceanGraph-R1",
+            "version": "2.2.0",
+            "agent_architecture_version": "2.2.0",
             "description": "Domain-aware multi-agent generation for ocean science multi-hop QA datasets",
             "agents": [
-                "domain_corpus",
-                "evidence_reasoning",
-                "qa_verification",
+                "corpus",
+                "evidence",
+                "qa",
+                "verifier",
             ],
         },
         "pipeline": {"modality": "text"},
