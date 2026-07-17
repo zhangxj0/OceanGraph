@@ -3,7 +3,7 @@
 本文档用于复现当前已验证的纯文本多跳问答数据生成流程。推荐路由为：
 
 - `Qwen3.7-Plus`：语料分析、检索规划、问答生成与失败样本修正。
-- `deepseek-v4-pro`：候选选择、答案验证、严格多跳必要性验证与可选质量评估。
+- `deepseek-v4-pro`：答案验证、合并式多跳必要性验证与可选质量评估；候选模型选择默认关闭。
 - `BAAI/bge-m3`：本地文本向量嵌入与评估向量。
 - `BAAI/bge-large-en-v1.5`：本地文本重排。
 
@@ -51,7 +51,7 @@ python -m pytest -q
 python run_oceangraph.py --help
 ```
 
-当前版本应有 `31 passed`。
+当前版本应有 `40 passed`。
 
 ## 3. 配置模型路由
 
@@ -79,10 +79,52 @@ $env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 推荐配置固定了以下关键行为：
 
 - `generation` 与 `correction` 路由到 Qwen。
-- `selection` 与 `verification` 路由到 DeepSeek。
+- `selection` 与 `verification` 路由到 DeepSeek，但推荐配置默认关闭冗余的候选模型选择。
 - `default`、`corpus` 与 `retrieval` 路由到 Qwen，避免意外访问 OpenAI 默认地址。
 - `pipeline.modality: text` 禁止图片进入模型调用。
 - `evaluation.run_evaluation: false` 默认不启动额外评估，先保证数据生成完成。
+- `multihop_verification_mode: balanced` 将逐块判断合并为一次调用，并优先检查生成记录声明的证据块。
+- `counterfactual_verification: false` 默认不执行逐块 leave-one-out 消融；正式发布前可对抽样子集启用严格审计。
+
+### 推荐审查档位
+
+大规模生成使用以下配置：
+
+```yaml
+qa_generation:
+  strict_multihop_verification: true
+  min_supporting_chunks: 2
+  model_selection: false
+  multihop_verification_mode: balanced
+  max_verification_chunks: 4
+  max_unknown_verdicts: 1
+  counterfactual_verification: false
+```
+
+该档位仍拒绝任何被审查证据块可单独完整回答的捷径样本，但允许无关背景块为
+`CANNOT_ANSWER`，并允许一次无法解析的逐块判断。每个进入最终审查的候选固定使用两次
+DeepSeek 请求：一次完整 QA 正确性检查和一次合并式多跳检查。旧默认对 `N` 个上下文块需要
+`2 + 2N` 次请求；`N=4` 时由 10 次降为 2 次。
+
+只在小规模质量审计或论文报告抽样时使用严格档位：
+
+```yaml
+qa_generation:
+  model_selection: true
+  multihop_verification_mode: strict
+  max_unknown_verdicts: 0
+  counterfactual_verification: true
+```
+
+命令行也可显式启用严格审计：
+
+```bash
+python run_oceangraph.py \
+  --config config.yaml \
+  --multihop-verification-mode strict \
+  --model-selection \
+  --counterfactual-verification
+```
 
 ## 4. 准备最小语料
 
@@ -158,11 +200,17 @@ python run_oceangraph.py \
 一条合格样本至少满足：
 
 1. `multihop_necessity_result.passes` 为 `true`。
-2. `necessary_chunks` 至少包含两个不同文本块。
+2. `balanced` 模式下 `supporting_chunks` 至少包含两个不同文本块；`strict` 反事实模式下检查 `necessary_chunks`。
 3. 不存在能够单独回答问题的 `shortcut_chunks`。
 4. `supporting_facts`、`evidence_spans`、`reasoning_path` 与 `sub_questions` 均存在。
 5. 最终答案中没有“等等”“重新计算”等可见自我修正草稿。
 6. 输出、配置和日志中均不包含 API 密钥。
+
+推荐配置下还应看到：
+
+- `multihop_necessity_result.method == "consolidated_single_pass"`；
+- `multihop_necessity_result.verification_api_calls == 1`；
+- `multihop_necessity_result.checked_chunk_count <= 4`。
 
 ## 8. 可选完整评估
 
@@ -210,7 +258,7 @@ python scripts/oceangraph_to_search_r1.py \
 
 ## 10. 已验证结果与限制
 
-- 本地与服务器回归测试：`31 passed`。
+- 当前本地回归测试：`40 passed`；服务器历史验证结果仍为 `31 passed`，新增低成本审查逻辑尚待下一次服务器复测。
 - 两条样本的生成、自动修正、DeepSeek 严格多跳验证和去重流程已跑通。
 - 一次完整两样本评估成功；后续最新复测在最终评估阶段因 DeepSeek 账户余额不足返回 402，但此前
   的生成与严格验证均已成功，且评估可按第 8 节独立续跑。

@@ -1,6 +1,10 @@
 """Deterministic verification gates for OceanGraph datasets."""
 
-from oceangraph.verification.necessity import evaluate_multihop_gate
+from oceangraph.verification.necessity import (
+    evaluate_multihop_gate,
+    parse_consolidated_multihop_response,
+    prioritize_verification_chunks,
+)
 from oceangraph.verification.quality import (
     atomic_qa_violations,
     has_visible_self_correction,
@@ -12,4 +16,6 @@ __all__ = [
     "evaluate_multihop_gate",
     "has_visible_self_correction",
     "is_atomic_short_answer_qa",
+    "parse_consolidated_multihop_response",
+    "prioritize_verification_chunks",
 ]

@@ -85,10 +85,39 @@ Pipeline agents:
     parser.add_argument("--reranker-model", default="text_embedding", help="Text reranker model")
     parser.add_argument("--max-depth", type=int, default=2, help="Maximum depth for multi-hop context retrieval")
     parser.add_argument("--no-strict-multihop", action="store_true", help="Disable single-chunk shortcut checks")
-    parser.add_argument(
-        "--no-counterfactual-verification",
+    counterfactual_group = parser.add_mutually_exclusive_group()
+    counterfactual_group.add_argument(
+        "--counterfactual-verification",
+        dest="counterfactual_verification",
         action="store_true",
+        help="Enable exhaustive leave-one-out evidence necessity checks in strict mode",
+    )
+    counterfactual_group.add_argument(
+        "--no-counterfactual-verification",
+        dest="counterfactual_verification",
+        action="store_false",
         help="Disable leave-one-out evidence necessity checks",
+    )
+    counterfactual_group.set_defaults(counterfactual_verification=None)
+    parser.add_argument(
+        "--multihop-verification-mode",
+        choices=["balanced", "strict"],
+        help="Balanced uses one consolidated call; strict checks chunks exhaustively",
+    )
+    parser.add_argument(
+        "--max-verification-chunks",
+        type=int,
+        help="Maximum evidence-prioritized chunks checked in balanced mode",
+    )
+    parser.add_argument(
+        "--max-unknown-verdicts",
+        type=int,
+        help="Allowed uncertain chunk verdicts in balanced mode",
+    )
+    parser.add_argument(
+        "--model-selection",
+        action="store_true",
+        help="Enable the optional model-based QA selection stage",
     )
     parser.add_argument("--min-supporting-chunks", type=int, help="Minimum distinct chunks required by strict verification")
     parser.add_argument("--no-jsonl", action="store_true", help="Do not write JSONL copies of QA outputs")
@@ -112,9 +141,31 @@ def setup_environment(args: argparse.Namespace) -> None:
     if args.model:
         os.environ["OCEANGRAPH_MODEL"] = args.model
 
-    os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] = (
-        "0" if args.no_counterfactual_verification else "1"
+    counterfactual_verification = getattr(
+        args, "counterfactual_verification", None
     )
+    if counterfactual_verification is None and getattr(
+        args, "no_counterfactual_verification", False
+    ):
+        counterfactual_verification = False
+    if counterfactual_verification is not None:
+        os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] = (
+            "1" if counterfactual_verification else "0"
+        )
+    if getattr(args, "multihop_verification_mode", None):
+        os.environ["OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"] = (
+            args.multihop_verification_mode
+        )
+    if getattr(args, "max_verification_chunks", None):
+        os.environ["OCEANGRAPH_MAX_VERIFICATION_CHUNKS"] = str(
+            args.max_verification_chunks
+        )
+    if getattr(args, "max_unknown_verdicts", None) is not None:
+        os.environ["OCEANGRAPH_MAX_UNKNOWN_VERDICTS"] = str(
+            args.max_unknown_verdicts
+        )
+    if getattr(args, "model_selection", False):
+        os.environ["OCEANGRAPH_MODEL_SELECTION"] = "1"
 
     if args.input:
         os.environ["OCEANGRAPH_INPUT_DIR"] = args.input
@@ -168,6 +219,33 @@ def write_run_metadata(args: argparse.Namespace) -> None:
         return
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        from oceangraph.core.config import load_config
+
+        qa_config = load_config().get("qa_generation", {})
+    except Exception:
+        qa_config = {}
+
+    strict_multihop = qa_config.get("strict_multihop_verification", True)
+    if os.environ.get("OCEANGRAPH_STRICT_MULTIHOP") is not None:
+        strict_multihop = os.environ["OCEANGRAPH_STRICT_MULTIHOP"] == "1"
+    model_selection = qa_config.get("model_selection", False)
+    if os.environ.get("OCEANGRAPH_MODEL_SELECTION") is not None:
+        model_selection = os.environ["OCEANGRAPH_MODEL_SELECTION"] == "1"
+    counterfactual = qa_config.get("counterfactual_verification", False)
+    if os.environ.get("OCEANGRAPH_COUNTERFACTUAL_VERIFICATION") is not None:
+        counterfactual = (
+            os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] == "1"
+        )
+    verification_mode = str(os.environ.get(
+        "OCEANGRAPH_MULTIHOP_VERIFICATION_MODE",
+        qa_config.get("multihop_verification_mode", "balanced"),
+    ) or "balanced").strip().lower()
+    if verification_mode not in {"balanced", "strict"}:
+        verification_mode = "balanced"
+    if verification_mode != "strict":
+        counterfactual = False
+
     metadata = {
         "framework": FRAMEWORK_NAME,
         "framework_version": FRAMEWORK_VERSION,
@@ -180,6 +258,20 @@ def write_run_metadata(args: argparse.Namespace) -> None:
         "embedding_model": args.embedding_model,
         "reranker_model": args.reranker_model,
         "max_depth": args.max_depth,
+        "qa_verification": {
+            "strict_multihop_verification": strict_multihop,
+            "model_selection": model_selection,
+            "multihop_verification_mode": verification_mode,
+            "max_verification_chunks": int(os.environ.get(
+                "OCEANGRAPH_MAX_VERIFICATION_CHUNKS",
+                qa_config.get("max_verification_chunks", 4),
+            )),
+            "max_unknown_verdicts": int(os.environ.get(
+                "OCEANGRAPH_MAX_UNKNOWN_VERDICTS",
+                qa_config.get("max_unknown_verdicts", 1),
+            )),
+            "counterfactual_verification": counterfactual,
+        },
         "agents": [
             "domain_corpus",
             "evidence_reasoning",

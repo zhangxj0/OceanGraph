@@ -28,7 +28,11 @@ from oceangraph.pipeline.evidence_graph import (
 )
 from oceangraph.core.prompts import PROMPTS, PROMPTS_CHUNK
 from oceangraph.schemas import QAResponse
-from oceangraph.verification import evaluate_multihop_gate
+from oceangraph.verification import (
+    evaluate_multihop_gate,
+    parse_consolidated_multihop_response,
+    prioritize_verification_chunks,
+)
 from oceangraph.verification.quality import (
     atomic_qa_violations,
     has_visible_self_correction,
@@ -388,15 +392,53 @@ def generate_qa(chunks: List[Dict], expert_persona: str, domain: str) -> tuple:
             "difficulty_score": "0"
         }], qa_metadata
 
-def select_qa_pairs(qa_pairs: list, chunks: List[Dict], expert_persona: str, domain: str) -> tuple[list, list]:
-    """Select/filter Q&A pairs using the selection agent. Returns (selected, rejected).
-    Uses batch processing when multiple QA pairs need to be evaluated.
-    """
+def select_qa_pairs(
+    qa_pairs: list,
+    chunks: List[Dict],
+    expert_persona: str,
+    domain: str,
+    use_model_review: bool = True,
+) -> tuple[list, list]:
+    """Filter malformed pairs locally and optionally run the selection agent."""
     print(f"Selecting Q&A pairs ({len(qa_pairs)} candidates)...")
     
     if not qa_pairs:
         return [], []
     
+    eligible_pairs = []
+    rejected_pairs = []
+    for qa_pair in qa_pairs:
+        qa_pair["short_answers"] = ensure_short_answers(qa_pair)
+        violations = atomic_qa_violations(
+            qa_pair.get("question", ""),
+            qa_pair.get("answer", ""),
+            qa_pair["short_answers"],
+        )
+        if violations:
+            qa_pair["selection_status"] = "LOCAL_REJECTED"
+            qa_pair["selection_reason"] = (
+                "Deterministic atomic QA gate failed: " + ", ".join(violations)
+            )
+            rejected_pairs.append(qa_pair)
+        else:
+            eligible_pairs.append(qa_pair)
+
+    if not eligible_pairs:
+        print(f"[OK] Selection complete: 0 selected, {len(rejected_pairs)} rejected")
+        return [], rejected_pairs
+
+    if not use_model_review:
+        for qa_pair in eligible_pairs:
+            qa_pair["selection_status"] = "LOCAL_SELECTED"
+            qa_pair["selection_reason"] = (
+                "Passed deterministic atomic QA gate; optional model selection disabled."
+            )
+        print(
+            f"[OK] Local selection complete: {len(eligible_pairs)} selected, "
+            f"{len(rejected_pairs)} rejected (0 selection API calls)"
+        )
+        return eligible_pairs, rejected_pairs
+
     tuple_delimiter = PROMPTS.get("DEFAULT_TUPLE_DELIMITER", "<|#|>")
     completion_delimiter = PROMPTS.get("DEFAULT_COMPLETION_DELIMITER", "<|#|>END<|#|>")
     
@@ -410,7 +452,7 @@ def select_qa_pairs(qa_pairs: list, chunks: List[Dict], expert_persona: str, dom
     
     # Prepare batch requests
     requests = []
-    for qa_pair in qa_pairs:
+    for qa_pair in eligible_pairs:
         prompt = PROMPTS["question_answer_selection"].format(
             content="[Refer to the chunks provided below]",
             question=qa_pair["question"],
@@ -434,9 +476,8 @@ def select_qa_pairs(qa_pairs: list, chunks: List[Dict], expert_persona: str, dom
     
     # Process responses
     selected_pairs = []
-    rejected_pairs = []
     
-    for idx, (qa_pair, response) in enumerate(zip(qa_pairs, responses), 1):
+    for idx, (qa_pair, response) in enumerate(zip(eligible_pairs, responses), 1):
         try:
             if response and not response.startswith("ERROR:"):
                 # Remove END delimiter if present
@@ -607,24 +648,39 @@ def verify_multihop_necessity(
     domain: str,
     min_supporting_chunks: int = 2,
     counterfactual_verification: bool = True,
+    qa_pair: Dict | None = None,
+    verification_mode: str = "balanced",
+    max_verification_chunks: int = 4,
+    max_unknown_chunks: int = 1,
 ) -> Dict:
-    """Reject shortcuts and require a counterfactually necessary evidence set."""
-    usable_chunks = [
-        chunk for chunk in chunks
-        if isinstance(chunk, dict) and str(chunk.get("content", "")).strip()
-    ]
+    """Reject single-chunk shortcuts with balanced or exhaustive verification."""
+    mode = str(verification_mode or "balanced").strip().lower()
+    if mode not in {"balanced", "strict"}:
+        logging.warning("Unknown multihop verification mode %r; using balanced", mode)
+        mode = "balanced"
 
-    distinct_sources = {
-        _chunk_source_id(chunk, idx)
-        for idx, chunk in enumerate(usable_chunks, 1)
-    }
-    if len(distinct_sources) < min_supporting_chunks:
+    usable_chunks = []
+    chunk_labels = []
+    seen_sources = set()
+    for raw_index, chunk in enumerate(chunks, 1):
+        if not isinstance(chunk, dict) or not str(chunk.get("content", "")).strip():
+            continue
+        label = _chunk_source_id(chunk, raw_index)
+        if label in seen_sources:
+            continue
+        seen_sources.add(label)
+        usable_chunks.append(chunk)
+        chunk_labels.append(label)
+
+    if len(chunk_labels) < min_supporting_chunks:
         return {
             "status": "INSUFFICIENT_CHUNKS",
             "passes": False,
             "min_supporting_chunks": min_supporting_chunks,
-            "distinct_chunk_count": len(distinct_sources),
+            "distinct_chunk_count": len(chunk_labels),
             "single_chunk_checks": [],
+            "verification_mode": mode,
+            "verification_api_calls": 0,
         }
 
     if domain:
@@ -632,8 +688,61 @@ def verify_multihop_necessity(
     else:
         domain_context = ""
 
+    if mode == "balanced":
+        selected_indices = prioritize_verification_chunks(
+            chunk_labels,
+            qa_pair,
+            max_chunks=max_verification_chunks,
+            min_supporting_chunks=min_supporting_chunks,
+        )
+        selected_chunks = [usable_chunks[index] for index in selected_indices]
+        selected_labels = [chunk_labels[index] for index in selected_indices]
+        prompt = PROMPTS["consolidated_multihop_check"].format(
+            question=question,
+            answer=answer,
+            expert_persona=expert_persona,
+            domain_context=domain_context,
+            chunk_count=len(selected_chunks),
+        )
+        response = call_ai_service(
+            prompt,
+            selected_chunks,
+            stage="verification",
+            response_format={"type": "json_object"},
+        )
+        statuses, checks = parse_consolidated_multihop_response(
+            response,
+            selected_labels,
+        )
+        gate = evaluate_multihop_gate(
+            statuses,
+            {},
+            min_supporting_chunks=min_supporting_chunks,
+            counterfactual_verification=False,
+            max_unknown_chunks=max_unknown_chunks,
+        )
+        return {
+            "status": gate["status"],
+            "passes": gate["passes"],
+            "min_supporting_chunks": min_supporting_chunks,
+            "distinct_chunk_count": len(chunk_labels),
+            "checked_chunk_count": len(selected_labels),
+            "checked_chunks": selected_labels,
+            "shortcut_chunks": gate["shortcut_chunks"],
+            "unknown_single_chunks": gate["unknown_single_chunks"],
+            "supporting_chunks": gate["partial_chunks"],
+            "single_chunk_checks": checks,
+            "counterfactual_verification": False,
+            "counterfactual_checks": [],
+            "necessary_chunks": [],
+            "redundant_chunks": [],
+            "minimal_evidence_count": 0,
+            "verification_mode": mode,
+            "verification_api_calls": 1,
+            "method": "consolidated_single_pass",
+        }
+
     requests = []
-    chunk_labels = []
     for idx, chunk in enumerate(usable_chunks, 1):
         prompt = PROMPTS["single_chunk_shortcut_check"].format(
             question=question,
@@ -642,7 +751,6 @@ def verify_multihop_necessity(
             domain_context=domain_context
         )
         requests.append((prompt, [chunk]))
-        chunk_labels.append(_chunk_source_id(chunk, idx))
 
     if len(requests) > 1:
         responses = batch_call_vlm_interweaved(
@@ -723,13 +831,14 @@ def verify_multihop_necessity(
         ablation_statuses,
         min_supporting_chunks=min_supporting_chunks,
         counterfactual_verification=counterfactual_verification,
+        max_unknown_chunks=0,
     )
 
     return {
         "status": gate["status"],
         "passes": gate["passes"],
         "min_supporting_chunks": min_supporting_chunks,
-        "distinct_chunk_count": len(distinct_sources),
+        "distinct_chunk_count": len(chunk_labels),
         "shortcut_chunks": gate["shortcut_chunks"],
         "single_chunk_checks": checks,
         "counterfactual_verification": counterfactual_verification,
@@ -737,6 +846,8 @@ def verify_multihop_necessity(
         "necessary_chunks": gate["necessary_chunks"],
         "redundant_chunks": gate["redundant_chunks"],
         "minimal_evidence_count": gate["minimal_evidence_count"],
+        "verification_mode": mode,
+        "verification_api_calls": len(requests) + len(counterfactual_checks),
         "method": "single_chunk_shortcut_plus_leave_one_out_ablation",
     }
 

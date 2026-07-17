@@ -1,7 +1,7 @@
 # OceanGraph-R1
 
 OceanGraph-R1 is a domain-aware multi-agent framework for constructing
-evidence-grounded and strictly verified multi-hop QA datasets in ocean science.
+evidence-grounded and cost-bounded multi-hop QA datasets in ocean science.
 
 The framework turns heterogeneous ocean science documents into dataset records
 that include one canonical minimal answer for EM/F1 reward, supporting facts,
@@ -18,7 +18,7 @@ the visible question.
 |---|---|
 | Domain Corpus Agent | Converts heterogeneous ocean-science documents into semantic chunks and applies the five-domain ocean taxonomy. |
 | Evidence Reasoning Agent | Completes multi-hop evidence context through iterative retrieval, evidence selection, and cross-chunk reasoning. |
-| QA Verification Agent | Generates structured QA records, rejects single-chunk shortcuts, and builds supporting facts, evidence spans, and evidence-graph supervision. |
+| QA Verification Agent | Generates structured QA records, rejects single-chunk shortcuts with consolidated or exhaustive review, and builds supporting facts, evidence spans, and evidence-graph supervision. |
 
 ## Main Commands
 
@@ -63,5 +63,5 @@ Accepted QA samples include:
 
 OceanGraph-R1 contributes a unified three-agent data construction structure for
 ocean science search reasoning: domain-aware corpus modeling, recursive evidence
-reasoning, adversarial single-chunk shortcut rejection, and evidence-graph
-supervision.
+reasoning, cost-bounded single-chunk shortcut rejection, optional exhaustive
+counterfactual auditing, and evidence-graph supervision.

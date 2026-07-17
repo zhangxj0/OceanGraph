@@ -483,12 +483,17 @@ Analyze the QA pair and return the appropriate labels based on the following log
     *   **QUESTION_CORRECT:** Use if the question is unambiguous, fully self-contained, AND any visual references are genuinely necessary for the answer (e.g., reading values from graphs, identifying components in diagrams).
 
 2.  **Answer Accuracy Check:**
-    *   **ANSWER_CORRECT:** Use if the answer is factually supported by specific data/text in the content.
+    *   **ANSWER_CORRECT:** Use if the minimal answer is factually supported by the supplied content considered collectively. Do not reject an answer for harmless casing, punctuation, or equivalent compact formatting.
     *   **ANSWER_INCORRECT:** Use if the answer is unsupported, factually wrong, explanatory rather than minimal, or contains multiple answer values.
 
 3.  **Content Dependency Check:**
     *   **REQUIRES_CONTENT:** Use if the answer relies on unique data/facts found only in this content.
     *   **CAN_ANSWER_WITHOUT_CONTENT:** Use if the question can be answered using general domain knowledge.
+
+**Fairness Rules:**
+- An atomic bridge question is valid when earlier clues identify or constrain an entity and the final clause asks for exactly one unknown.
+- Do not require a document title, citation, or every supplied chunk to support the answer.
+- Extra background chunks are not a defect if the required facts are present in at least two relevant chunks.
 
 **Expected Output Format:**
 <|#|>START<|#|>
@@ -554,6 +559,36 @@ Expected Output Format:
 <|#|>START<|#|>
 Status<|#|><CAN_ANSWER | PARTIAL_ONLY | CANNOT_ANSWER><|#|>Explanation<|#|><Brief single-sentence justification>
 <|#|>END<|#|>
+"""
+
+PROMPTS["consolidated_multihop_check"] = """
+You are a(n) {expert_persona} from the domain of {domain_context} working as a multi-hop shortcut verifier.
+
+Evaluate each of the {chunk_count} supplied chunks INDEPENDENTLY. For every check, pretend that the reader can see only that one chunk. Do not combine facts across chunks while making an individual judgment.
+
+Question:
+{question}
+
+Proposed Answer:
+{answer}
+
+Status rules:
+- CAN_ANSWER: this single chunk contains every fact needed to derive the proposed answer. Use this only for a genuine single-chunk shortcut.
+- PARTIAL_ONLY: this chunk contains a necessary bridge, constraint, or answer fact, but cannot answer the question alone.
+- CANNOT_ANSWER: this chunk is irrelevant or lacks useful evidence for this QA pair.
+
+Fairness rules:
+- A chunk does not need to contain the final answer text to be PARTIAL_ONLY; a bridge fact used to identify the answer-bearing entity is useful evidence.
+- Do not penalize irrelevant background chunks. They should be CANNOT_ANSWER, not a reason to reject the QA pair.
+- Judge only from the supplied text and do not use outside knowledge.
+- Return exactly one check for every chunk index from 1 through {chunk_count}.
+
+Return one JSON object only:
+{{
+  "single_chunk_checks": [
+    {{"chunk_index": 1, "status": "PARTIAL_ONLY", "explanation": "Brief reason"}}
+  ]
+}}
 """
 
 PROMPTS["counterfactual_ablation_check"] = """

@@ -119,7 +119,11 @@ qa_generation:
   strict_multihop_verification: true  # Reject questions answerable from any single chunk
   min_supporting_chunks: 2             # Minimum distinct chunks required for accepted QA
   output_jsonl: true                   # Also save qa_multihop_pass.jsonl for dataset release
-  counterfactual_verification: true    # Require at least N chunks to be necessary under leave-one-out ablation
+  model_selection: false               # Use deterministic prefilter; avoids one verifier call per candidate
+  multihop_verification_mode: balanced # One consolidated verifier call; use strict for exhaustive audits
+  max_verification_chunks: 4           # Prioritize declared evidence and cap review context/cost
+  max_unknown_verdicts: 1              # Tolerate one missing/uncertain per-chunk verdict in balanced mode
+  counterfactual_verification: false   # Enable only with strict mode for leave-one-out ablation audits
 
 # -----------------------------------------------------------------------------
 # Shuffling (for reproducibility)

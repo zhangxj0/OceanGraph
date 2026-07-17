@@ -25,6 +25,16 @@ def test_selection_accepts_unique_entities_without_document_title():
     assert "A document-title citation is optional" in prompt
 
 
+def test_consolidated_verifier_is_single_pass_and_fair_to_bridge_evidence():
+    prompt = PROMPTS["consolidated_multihop_check"]
+
+    assert "INDEPENDENTLY" in prompt
+    assert "genuine single-chunk shortcut" in prompt
+    assert "bridge fact" in prompt
+    assert "Do not penalize irrelevant background chunks" in prompt
+    assert '"single_chunk_checks"' in prompt
+
+
 def test_visible_self_correction_is_detected_deterministically():
     answer = "The band is CB-H. Wait, 35.06 is below 35.10, so it is CB-L."
 
@@ -43,6 +53,10 @@ def test_verification_and_correction_apply_deterministic_gate():
     assert "Atomic QA quality gate failed:" in engine
     assert '"supporting_facts",' in generator
     assert "**get_structured_qa_fields(f.get('original_qa', {}))" in engine
+    assert "optional model selection disabled" in generator
+    assert '"method": "consolidated_single_pass"' in generator
+    assert "verification_api_calls" in generator
+    assert "use_model_review=QA_MODEL_SELECTION" in engine
 
 
 def test_real_compound_samples_are_rejected_as_non_atomic():

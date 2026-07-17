@@ -123,7 +123,11 @@ def _get_default_config() -> Dict[str, Any]:
             'strict_multihop_verification': True,
             'min_supporting_chunks': 2,
             'output_jsonl': True,
-            'counterfactual_verification': True,
+            'model_selection': False,
+            'multihop_verification_mode': 'balanced',
+            'max_verification_chunks': 4,
+            'max_unknown_verdicts': 1,
+            'counterfactual_verification': False,
         }
     }
 
@@ -265,7 +269,11 @@ def get_qa_generation_config() -> Dict[str, Any]:
         'strict_multihop_verification': True,
         'min_supporting_chunks': 2,
         'output_jsonl': True,
-        'counterfactual_verification': True,
+        'model_selection': False,
+        'multihop_verification_mode': 'balanced',
+        'max_verification_chunks': 4,
+        'max_unknown_verdicts': 1,
+        'counterfactual_verification': False,
     })
 
 

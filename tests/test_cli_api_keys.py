@@ -45,6 +45,7 @@ def test_setup_environment_maps_cli_key_to_routed_profile(tmp_path, monkeypatch)
     _write_config(config_path)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("OCEANGRAPH_COUNTERFACTUAL_VERIFICATION", raising=False)
     args = Namespace(
         config=str(config_path),
         api_key="test-key",
@@ -70,3 +71,41 @@ def test_setup_environment_maps_cli_key_to_routed_profile(tmp_path, monkeypatch)
 
     assert os.environ["OPENAI_API_KEY"] == "test-key"
     assert os.environ["DEEPSEEK_API_KEY"] == "test-key"
+    assert "OCEANGRAPH_COUNTERFACTUAL_VERIFICATION" not in os.environ
+
+
+def test_setup_environment_applies_explicit_strict_audit_options(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yaml"
+    _write_config(config_path)
+    args = Namespace(
+        config=str(config_path),
+        api_key=None,
+        backend="ollama",
+        model=None,
+        counterfactual_verification=True,
+        multihop_verification_mode="strict",
+        max_verification_chunks=6,
+        max_unknown_verdicts=0,
+        model_selection=True,
+        input=None,
+        output=None,
+        num_qa_pairs=1,
+        max_workers=1,
+        embedding_model="bge_m3",
+        offline_models=False,
+        reranker_model="text_embedding",
+        max_depth=2,
+        no_strict_multihop=False,
+        min_supporting_chunks=2,
+        no_jsonl=False,
+        deduplication=False,
+        evaluation=False,
+    )
+
+    setup_environment(args)
+
+    assert os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] == "1"
+    assert os.environ["OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"] == "strict"
+    assert os.environ["OCEANGRAPH_MAX_VERIFICATION_CHUNKS"] == "6"
+    assert os.environ["OCEANGRAPH_MAX_UNKNOWN_VERDICTS"] == "0"
+    assert os.environ["OCEANGRAPH_MODEL_SELECTION"] == "1"

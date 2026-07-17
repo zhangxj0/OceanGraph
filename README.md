@@ -12,7 +12,7 @@
 </p>
 
 **Current release:** `v2.1.0` · **Release branch:** `v2.1.0` ·
-**Last updated:** `2026-07-16`
+**Last updated:** `2026-07-17`
 
 OceanGraph-R1 turns ocean-science corpora into structured, verifiable multi-hop
 question-answer datasets for retrieval and reasoning evaluation. It accepts
@@ -96,9 +96,11 @@ $env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 ```
 
 This routes corpus analysis, retrieval, generation, and correction to
-`Qwen3.7-Plus` through Paratera, while text-only selection and verification use
-`deepseek-v4-pro`. The default `pipeline.modality: text` setting strips image
-artifacts before retrieval, generation, verification, and dataset export.
+`Qwen3.7-Plus` through Paratera, while final text-only verification uses
+`deepseek-v4-pro`. Optional model selection is routed to DeepSeek but disabled
+by default because the deterministic atomic-QA gate already removes malformed
+candidates. The default `pipeline.modality: text` setting strips image artifacts
+before retrieval, generation, verification, and dataset export.
 
 Run an OceanGraph pipeline over an input directory:
 
@@ -149,9 +151,19 @@ OceanGraph-R1 coordinates three stages:
 3. **QA Verification Agent** validates evidence coverage and strict multi-hop
    requirements before accepting an item.
 
-The default strict verifier tests whether a candidate can be answered from any
-single chunk. Use `--no-strict-multihop` only when this guard is intentionally
-not required.
+The default `balanced` verifier keeps the single-chunk shortcut guard but checks
+up to four evidence-prioritized chunks in one consolidated DeepSeek request. It
+accepts a candidate when no checked chunk can answer alone and at least two
+chunks provide partial evidence; one unparseable chunk verdict is tolerated.
+Irrelevant background chunks do not cause rejection.
+
+For an accepted candidate with `N` context chunks, the previous default used
+`2 + 2N` verifier requests: model selection, full QA verification, `N`
+single-chunk checks, and `N` leave-one-out checks. The recommended default uses
+two requests: full QA verification plus one consolidated multi-hop check. With
+four chunks this reduces verifier request count from 10 to 2. Use
+`multihop_verification_mode: strict`, `model_selection: true`, and
+`counterfactual_verification: true` only for exhaustive audit subsets.
 
 ## Output
 
@@ -197,6 +209,13 @@ organization, and `OCEANGRAPH_FRAMEWORK.md` for a detailed framework overview.
 --num-qa-pairs              Target number of accepted QA pairs
 --max-depth                 Maximum multi-hop retrieval depth
 --min-supporting-chunks     Minimum distinct chunks for strict verification
+--multihop-verification-mode {balanced,strict}
+                            Choose consolidated or exhaustive shortcut checks
+--max-verification-chunks   Cap evidence chunks checked in balanced mode
+--max-unknown-verdicts      Allowed uncertain verdicts in balanced mode
+--model-selection           Enable optional model-based candidate selection
+--counterfactual-verification
+                            Enable leave-one-out checks in strict mode
 --no-counterfactual-verification
                             Disable leave-one-out evidence necessity checks
 --no-strict-multihop        Disable the single-chunk shortcut check

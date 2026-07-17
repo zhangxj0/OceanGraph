@@ -107,7 +107,18 @@ try:
     QA_STRICT_MULTIHOP = _qa_gen.get('strict_multihop_verification', True)
     QA_MIN_SUPPORTING_CHUNKS = _qa_gen.get('min_supporting_chunks', 2)
     QA_OUTPUT_JSONL = _qa_gen.get('output_jsonl', True)
-    QA_COUNTERFACTUAL_VERIFICATION = _qa_gen.get('counterfactual_verification', True)
+    QA_MODEL_SELECTION = _qa_gen.get('model_selection', False)
+    QA_MULTIHOP_VERIFICATION_MODE = _qa_gen.get(
+        'multihop_verification_mode', 'balanced'
+    )
+    QA_MAX_VERIFICATION_CHUNKS = max(
+        QA_MIN_SUPPORTING_CHUNKS,
+        int(_qa_gen.get('max_verification_chunks', 4) or 4),
+    )
+    QA_MAX_UNKNOWN_VERDICTS = max(
+        0, int(_qa_gen.get('max_unknown_verdicts', 1) or 0)
+    )
+    QA_COUNTERFACTUAL_VERIFICATION = _qa_gen.get('counterfactual_verification', False)
     
     # FAISS config
     _faiss = get_faiss_config()
@@ -167,7 +178,11 @@ except (ImportError, Exception):
     QA_STRICT_MULTIHOP = True
     QA_MIN_SUPPORTING_CHUNKS = 2
     QA_OUTPUT_JSONL = True
-    QA_COUNTERFACTUAL_VERIFICATION = True
+    QA_MODEL_SELECTION = False
+    QA_MULTIHOP_VERIFICATION_MODE = "balanced"
+    QA_MAX_VERIFICATION_CHUNKS = 4
+    QA_MAX_UNKNOWN_VERDICTS = 1
+    QA_COUNTERFACTUAL_VERIFICATION = False
     TEXT_ONLY_MODE = True
     
     # FAISS defaults
@@ -209,10 +224,38 @@ if os.environ.get("OCEANGRAPH_MIN_SUPPORTING_CHUNKS"):
     QA_MIN_SUPPORTING_CHUNKS = int(os.environ.get("OCEANGRAPH_MIN_SUPPORTING_CHUNKS"))
 if os.environ.get("OCEANGRAPH_OUTPUT_JSONL") is not None:
     QA_OUTPUT_JSONL = os.environ.get("OCEANGRAPH_OUTPUT_JSONL") == "1"
+if os.environ.get("OCEANGRAPH_MODEL_SELECTION") is not None:
+    QA_MODEL_SELECTION = os.environ.get("OCEANGRAPH_MODEL_SELECTION") == "1"
+if os.environ.get("OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"):
+    QA_MULTIHOP_VERIFICATION_MODE = os.environ.get(
+        "OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"
+    )
+if os.environ.get("OCEANGRAPH_MAX_VERIFICATION_CHUNKS"):
+    QA_MAX_VERIFICATION_CHUNKS = int(
+        os.environ.get("OCEANGRAPH_MAX_VERIFICATION_CHUNKS")
+    )
+if os.environ.get("OCEANGRAPH_MAX_UNKNOWN_VERDICTS"):
+    QA_MAX_UNKNOWN_VERDICTS = int(
+        os.environ.get("OCEANGRAPH_MAX_UNKNOWN_VERDICTS")
+    )
 if os.environ.get("OCEANGRAPH_COUNTERFACTUAL_VERIFICATION") is not None:
     QA_COUNTERFACTUAL_VERIFICATION = (
         os.environ.get("OCEANGRAPH_COUNTERFACTUAL_VERIFICATION") == "1"
     )
+QA_MULTIHOP_VERIFICATION_MODE = str(
+    QA_MULTIHOP_VERIFICATION_MODE or "balanced"
+).strip().lower()
+if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
+    logging.warning(
+        "Unknown multihop verification mode %r; using balanced",
+        QA_MULTIHOP_VERIFICATION_MODE,
+    )
+    QA_MULTIHOP_VERIFICATION_MODE = "balanced"
+if QA_MULTIHOP_VERIFICATION_MODE != "strict":
+    QA_COUNTERFACTUAL_VERIFICATION = False
+QA_MAX_VERIFICATION_CHUNKS = max(
+    QA_MIN_SUPPORTING_CHUNKS, QA_MAX_VERIFICATION_CHUNKS
+)
 
 # Helper function to recompute all derived output paths
 def _update_output_paths():
@@ -1232,7 +1275,13 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         search_trajectory = build_search_trajectory(context_result)
         
         # 4.3 Select relevant pairs
-        selected, rejected = select_qa_pairs(qa_pairs, context_chunks, expert_persona, domain)
+        selected, rejected = select_qa_pairs(
+            qa_pairs,
+            context_chunks,
+            expert_persona,
+            domain,
+            use_model_review=QA_MODEL_SELECTION,
+        )
         
         # 4.4 Verify selected pairs with correction support
         pairs_to_verify = selected.copy()
@@ -1254,6 +1303,10 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     domain,
                     min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
                     counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
+                    qa_pair=qa,
+                    verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
+                    max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
+                    max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
                 )
             evidence_graph = build_evidence_graph(
                 context_chunks,
@@ -1308,7 +1361,10 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 successful_qa.append(qa_entry)
             else:
                 # Collect for correction attempt if enabled
-                if QA_CORRECTION_ENABLED:
+                verifier_uncertain = str(
+                    multihop_necessity.get('status', '')
+                ).startswith('UNKNOWN_')
+                if QA_CORRECTION_ENABLED and not verifier_uncertain:
                     correction_feedback = verification
                     if has_visible_self_correction(qa['answer']):
                         correction_feedback += (
@@ -1338,7 +1394,12 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     })
                 else:
                     # Final failure (correction disabled) - store with reason
-                    if not verification_passed:
+                    if verifier_uncertain:
+                        qa_entry['failure_reason'] = (
+                            'Multihop verifier returned an uncertain result; '
+                            'correction skipped to avoid unproductive API retries'
+                        )
+                    elif not verification_passed:
                         qa_entry['failure_reason'] = 'Failed verification (correction disabled)'
                     else:
                         qa_entry['failure_reason'] = 'Failed strict multihop verification (correction disabled)'
@@ -1388,6 +1449,10 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                             domain,
                             min_supporting_chunks=QA_MIN_SUPPORTING_CHUNKS,
                             counterfactual_verification=QA_COUNTERFACTUAL_VERIFICATION,
+                            qa_pair=corrected,
+                            verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
+                            max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
+                            max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
                         )
                     corrected_evidence_graph = build_evidence_graph(
                         context_chunks,
@@ -1465,13 +1530,23 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                                 f"\nStrict multihop verifier failed: "
                                 f"{corrected_multihop_necessity.get('status', 'UNKNOWN')}"
                             )
-                        new_failures.append({
-                            'question': corrected['question'],
-                            'answer': corrected['answer'],
-                            'verification_result': corrected_feedback,
-                            'original_qa_entry': corrected_entry,
-                            'original_qa': corrected,
-                        })
+                        corrected_verifier_uncertain = str(
+                            corrected_multihop_necessity.get('status', '')
+                        ).startswith('UNKNOWN_')
+                        if corrected_verifier_uncertain:
+                            corrected_entry['failure_reason'] = (
+                                'Multihop verifier returned an uncertain result after '
+                                'correction; further retries skipped'
+                            )
+                            failed_qa.append(corrected_entry)
+                        else:
+                            new_failures.append({
+                                'question': corrected['question'],
+                                'answer': corrected['answer'],
+                                'verification_result': corrected_feedback,
+                                'original_qa_entry': corrected_entry,
+                                'original_qa': corrected,
+                            })
                 
                 current_failures = new_failures
             
@@ -1509,7 +1584,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'REJECTED'),
                 'selection_reason': qa.get('selection_reason', ''),
-                'failure_reason': 'Rejected by selection agent'
+                'failure_reason': 'Rejected during candidate selection'
             })
             
     except Exception as e:
@@ -2197,6 +2272,10 @@ def run_pipeline():
     print(f"   - Max Depth: {MAX_DEPTH}")
     print(f"   - Strict Multihop Verification: {QA_STRICT_MULTIHOP}")
     print(f"   - Min Supporting Chunks: {QA_MIN_SUPPORTING_CHUNKS}")
+    print(f"   - Model Selection Review: {QA_MODEL_SELECTION}")
+    print(f"   - Multihop Verification Mode: {QA_MULTIHOP_VERIFICATION_MODE}")
+    print(f"   - Max Verification Chunks: {QA_MAX_VERIFICATION_CHUNKS}")
+    print(f"   - Max Unknown Verdicts: {QA_MAX_UNKNOWN_VERDICTS}")
     print(f"   - Counterfactual Verification: {QA_COUNTERFACTUAL_VERIFICATION}")
     print(f"   - Run Evaluation: {RUN_EVALUATION}")
     print(f"   - Checkpointing: ENABLED")
