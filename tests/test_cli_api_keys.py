@@ -76,7 +76,6 @@ def test_setup_environment_maps_cli_key_to_routed_profile(tmp_path, monkeypatch)
 
     setup_environment(args)
 
-    assert os.environ["OPENAI_API_KEY"] == "test-key"
     assert os.environ["DEEPSEEK_API_KEY"] == "test-key"
     assert "OCEANGRAPH_COUNTERFACTUAL_VERIFICATION" not in os.environ
 
@@ -138,6 +137,6 @@ def test_run_metadata_records_four_agent_architecture(tmp_path, monkeypatch):
     metadata = json.loads(
         (output_dir / "oceangraph_run_config.json").read_text(encoding="utf-8")
     )
-    assert metadata["framework_version"] == "2.2.0"
+    assert metadata["framework_version"] == "2.2.1"
     assert metadata["agents"] == ["corpus", "evidence", "qa", "verifier"]
     assert metadata["agent_architecture"]["sequence"] == metadata["agents"]

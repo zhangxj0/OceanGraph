@@ -2,6 +2,43 @@
 
 All notable changes to OceanGraph-R1 are documented here.
 
+## [2.2.1] - 2026-07-21
+
+- Isolated Qwen/DeepSeek endpoint and model routing in `configs/llm.yaml`; API
+  keys remain environment-only.
+- Added the default `cost_efficient` validation profile: deterministic local
+  QA gates followed by at most one consolidated DeepSeek request per candidate.
+- Enforced one standalone question and one canonical short EM ground truth
+  (12 words or 16 CJK characters by default).
+- Disabled optional model selection, counterfactual verification, and automatic
+  correction in the recommended configuration to avoid repeat API charges.
+
+### Added
+- Strict downstream-training export with compact QA JSONL, an ID-aligned
+  retrieval corpus, and a manifest containing record-level rejection counts.
+- Corpus/config fingerprints and per-fingerprint checkpoint namespaces to
+  prevent stale state or artifacts from being mixed across runs.
+- A runtime-loaded canonical five-domain ocean taxonomy.
+
+### Fixed
+- Defined `hop_count` consistently as the number of distinct verified evidence
+  chunks and separated retrieval expansion into `retrieval_hop_count`.
+- Stopped evidence graphs from treating every context chunk as supporting
+  evidence or inventing bridge edges without a declared support order.
+- Changed QA correction to one-to-one candidate processing so missing or
+  reordered model outputs cannot silently drop failed records.
+- Made verified-record-preserving deduplication, runtime configuration isolation,
+  and Verifier-to-Evidence/QA feedback routing the default execution behavior.
+
+### Changed
+- Replaced the fixed `1.1 * target` seed-chunk ceiling with target-driven
+  batched generation that stops only at the accepted-QA target or true corpus
+  exhaustion.
+- Updated package, runtime Agent, configuration, runner, documentation, and CI
+  metadata to `2.2.1`.
+- Positioned generated records as inputs for downstream model training; no
+  experimental ablation workflow is required by the v2.2.1 data pipeline.
+
 ## [2.2.0] - 2026-07-17
 
 ### Added

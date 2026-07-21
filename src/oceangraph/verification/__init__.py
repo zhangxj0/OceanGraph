@@ -9,6 +9,7 @@ from oceangraph.verification.quality import (
     atomic_qa_violations,
     has_visible_self_correction,
     is_atomic_short_answer_qa,
+    standalone_question_violations,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "is_atomic_short_answer_qa",
     "parse_consolidated_multihop_response",
     "prioritize_verification_chunks",
+    "standalone_question_violations",
 ]

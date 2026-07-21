@@ -906,8 +906,12 @@ def build_complete_context(
             iter_log['explanation'] = explanation
 
         if status == "COMPLETE":
-            hop_count = len(chunks_added) - 1  # Each hop adds one link
-            print(f"\n[OK] Context is COMPLETE at depth {depth}, hop_count={hop_count}")
+            hop_count = len(current_chunks)
+            retrieval_hop_count = max(0, hop_count - 1)
+            print(
+                f"\n[OK] Context is COMPLETE at depth {depth}, "
+                f"evidence_chunks={hop_count}, retrieval_hops={retrieval_hop_count}"
+            )
             iteration_logs.append(iter_log)
             return {
                 'status': 'COMPLETE',
@@ -915,6 +919,8 @@ def build_complete_context(
                 'chunks': current_chunks,
                 'depth': depth,
                 'hop_count': hop_count,
+                'retrieval_hop_count': retrieval_hop_count,
+                'context_chunk_count': len(current_chunks),
                 'max_breadth_used': max_breadth_used,
                 'chunks_added': chunks_added,
                 'search_history': search_history,
@@ -925,7 +931,7 @@ def build_complete_context(
         # Context is incomplete
         if not search_strings:
             print(f"\n[WARN] No search strings generated despite INCOMPLETE status. Stopping.")
-            hop_count = len(chunks_added) - 1
+            hop_count = len(current_chunks)
             iteration_logs.append(iter_log)
             return {
                 'status': 'INCOMPLETE_NO_SEARCH_STRINGS',
@@ -933,6 +939,8 @@ def build_complete_context(
                 'chunks': current_chunks,
                 'depth': depth,
                 'hop_count': hop_count,
+                'retrieval_hop_count': max(0, hop_count - 1),
+                'context_chunk_count': len(current_chunks),
                 'max_breadth_used': max_breadth_used,
                 'chunks_added': chunks_added,
                 'search_history': search_history,
@@ -1060,13 +1068,15 @@ def build_complete_context(
                 print(f"\nNo relevant chunks found across all {len(search_strings)} search strings.")
                 print(f"   The corpus likely does not contain the information needed to complete this context.")
                 print(f"   Stopping multi-hop context building for this chunk.")
-                hop_count = len(chunks_added) - 1
+                hop_count = len(current_chunks)
                 return {
                     'status': 'INCOMPLETE_NO_RELEVANT_CHUNKS',
                     'context': get_combined_text(current_chunks),
                     'chunks': current_chunks,
                     'depth': depth,
                     'hop_count': hop_count,
+                    'retrieval_hop_count': max(0, hop_count - 1),
+                    'context_chunk_count': len(current_chunks),
                     'max_breadth_used': max_breadth_used,
                     'chunks_added': chunks_added,
                     'search_history': search_history,
@@ -1077,13 +1087,15 @@ def build_complete_context(
                 # Circuit breaker triggered
                 print(f"\nCircuit breaker triggered: {consecutive_no_progress} consecutive iterations with no new chunks.")
                 print(f"   Stopping to prevent runaway API calls.")
-                hop_count = len(chunks_added) - 1
+                hop_count = len(current_chunks)
                 return {
                     'status': 'INCOMPLETE_CIRCUIT_BREAKER',
                     'context': get_combined_text(current_chunks),
                     'chunks': current_chunks,
                     'depth': depth,
                     'hop_count': hop_count,
+                    'retrieval_hop_count': max(0, hop_count - 1),
+                    'context_chunk_count': len(current_chunks),
                     'max_breadth_used': max_breadth_used,
                     'chunks_added': chunks_added,
                     'search_history': search_history,
@@ -1092,13 +1104,15 @@ def build_complete_context(
                 }
             else:
                 print(f"\n[WARN] No new chunks to add (all duplicates). Consecutive no-progress: {consecutive_no_progress}/{MAX_CONSECUTIVE_NO_PROGRESS}")
-                hop_count = len(chunks_added) - 1
+                hop_count = len(current_chunks)
                 return {
                     'status': 'INCOMPLETE_ALL_DUPLICATES',
                     'context': get_combined_text(current_chunks),
                     'chunks': current_chunks,
                     'depth': depth,
                     'hop_count': hop_count,
+                    'retrieval_hop_count': max(0, hop_count - 1),
+                    'context_chunk_count': len(current_chunks),
                     'max_breadth_used': max_breadth_used,
                     'chunks_added': chunks_added,
                     'search_history': search_history,
@@ -1107,8 +1121,12 @@ def build_complete_context(
                 }
     
     # Max depth reached (only if loop completes without early termination)
-    hop_count = len(chunks_added) - 1
-    print(f"\n[WARN] Max depth {max_depth} reached. Context may still be INCOMPLETE. hop_count={hop_count}")
+    hop_count = len(current_chunks)
+    retrieval_hop_count = max(0, hop_count - 1)
+    print(
+        f"\n[WARN] Max depth {max_depth} reached. Context may still be INCOMPLETE. "
+        f"evidence_chunks={hop_count}, retrieval_hops={retrieval_hop_count}"
+    )
     
     return {
         'status': 'INCOMPLETE_MAX_DEPTH',
@@ -1116,6 +1134,8 @@ def build_complete_context(
         'chunks': current_chunks,
         'depth': depth,
         'hop_count': hop_count,
+        'retrieval_hop_count': retrieval_hop_count,
+        'context_chunk_count': len(current_chunks),
         'max_breadth_used': max_breadth_used,
         'chunks_added': chunks_added,
         'search_history': search_history,

@@ -4,16 +4,11 @@ import logging
 import sys
 import os
 from tqdm import tqdm
-from sentence_transformers import SentenceTransformer, util
 import torch
 import numpy as np
-from typing import List, Dict, Set, Tuple
+from typing import Any, List, Dict, Set, Tuple
 from collections import defaultdict
 
-# Import helper modules
-from oceangraph.embeddings.models import get_best_embedding_model
-from oceangraph.embeddings.rerankers_text import LLMReranker
-from oceangraph.core.llm import setup_logging, call_vlm_with_multiple_images
 from oceangraph.core.prompts import PROMPTS
 
 # Try to load configuration from config.yaml
@@ -39,6 +34,26 @@ except ImportError:
     ANSWER_SIMILARITY_LOW = 0.70
     MIN_COMMUNITY_SIZE = 2
     ALPHA = 0.6  # Default alpha for Eq. 10: alpha * semantic_sim + (1-alpha) * jaccard
+
+
+def refresh_deduplication_config() -> None:
+    """Reload thresholds from the active per-run configuration."""
+    global QUESTION_SIMILARITY_THRESHOLD, ANSWER_SIMILARITY_HIGH
+    global ANSWER_SIMILARITY_MEDIUM, ANSWER_SIMILARITY_LOW
+    global MIN_COMMUNITY_SIZE, ALPHA
+
+    from oceangraph.core.config import load_config
+
+    dedup = (load_config().get("deduplication") or {})
+    answer_similarity = dedup.get("answer_similarity") or {}
+    QUESTION_SIMILARITY_THRESHOLD = float(
+        dedup.get("question_similarity_threshold", 0.75)
+    )
+    ANSWER_SIMILARITY_HIGH = float(answer_similarity.get("high", 0.95))
+    ANSWER_SIMILARITY_MEDIUM = float(answer_similarity.get("medium", 0.85))
+    ANSWER_SIMILARITY_LOW = float(answer_similarity.get("low", 0.70))
+    MIN_COMMUNITY_SIZE = max(2, int(dedup.get("min_community_size", 2)))
+    ALPHA = min(1.0, max(0.0, float(dedup.get("alpha", 0.6))))
 
 # Configuration
 OUTPUT_DIR = "output"
@@ -148,6 +163,8 @@ def reorganize_qa_packs(merged_items: List[Dict], base_metadata: Dict,
     prompt = f"{formatted_prompt}\n\nInput:\nMerged Questions:\n{merged_questions}\n\nMerged Answers:\n{merged_answers}"
     
     try:
+        from oceangraph.core.llm import call_vlm_with_multiple_images
+
         response = call_vlm_with_multiple_images(prompt, [])
         reorganized = parse_reorganized_packs(response, base_metadata)
         
@@ -234,6 +251,9 @@ def hierarchical_clustering(
     
     Returns: List of clusters (each cluster is a list of indices)
     """
+    refresh_deduplication_config()
+    from sentence_transformers import util
+
     print(f"\nStage 1: Clustering questions by topic (threshold: {QUESTION_SIMILARITY_THRESHOLD})...")
     
     # Stage 1: Cluster questions to group by topic/intent
@@ -301,13 +321,20 @@ def process_cluster_by_similarity(
     cluster_items: List[Dict],
     cluster_indices: List[int],
     answer_embeddings: torch.Tensor,
-    llm_merger: LLMReranker,
+    llm_merger: Any,
     expert_persona: str,
     domain: str,
-    enable_reorganization: bool = True
+    enable_reorganization: bool = False,
+    preserve_verified_records: bool = True,
 ) -> List[Dict]:
     """
     Process a cluster with stratified handling based on answer similarity.
+
+    The default is deliberately provenance-preserving: deduplication may remove
+    records, but it must not synthesize a new question or answer after the
+    verifier has accepted the originals.  Historical LLM merging remains
+    available only as an explicit compatibility option; callers enabling it
+    must run the complete verifier again before publishing the result.
     - High similarity (>0.95): Exact duplicates -> select best
     - Medium similarity (0.85-0.95): Partial overlap -> LLM merge -> reorganize
     - Low similarity (0.70-0.85): Related -> LLM evaluate -> reorganize
@@ -325,6 +352,15 @@ def process_cluster_by_similarity(
     """
     if len(cluster_items) < 2:
         return cluster_items
+
+    if preserve_verified_records:
+        best = dict(select_best_qa(cluster_items))
+        best["dedup_method"] = "select_verified_record"
+        best["dedup_cluster_size"] = len(cluster_items)
+        best["dedup_preserved_verification"] = True
+        return [best]
+
+    from sentence_transformers import util
     
     # Compute pairwise answer similarities within cluster
     cluster_answer_embs = answer_embeddings[cluster_indices]
@@ -345,7 +381,7 @@ def process_cluster_by_similarity(
     if max_similarity >= ANSWER_SIMILARITY_HIGH:
         # Tier 1: Exact duplicates - just pick the best one (no reorganization needed)
         logging.info(f"Cluster of {len(cluster_items)} with max_sim={max_similarity:.3f}: Selecting best (exact duplicates)")
-        best = select_best_qa(cluster_items)
+        best = dict(select_best_qa(cluster_items))
         best['dedup_method'] = 'select_best'
         best['merged_from_count'] = len(cluster_items)
         return [best]
@@ -379,6 +415,10 @@ def process_cluster_by_similarity(
         return merged
 
 def deduplicate_dataset():
+    from oceangraph.core.llm import setup_logging
+    from oceangraph.embeddings.models import get_best_embedding_model
+    from sentence_transformers import SentenceTransformer
+
     setup_logging()
     
     # 1. Load Data
@@ -421,8 +461,9 @@ def deduplicate_dataset():
     for cluster in clusters:
         clustered_indices.update(cluster)
 
-    # Initialize LLM merger
-    llm_merger = LLMReranker()
+    # Safe deduplication never invokes an LLM: all output records are selected
+    # verbatim from the already verified input dataset.
+    llm_merger = None
     final_dataset = []
     
     # Statistics
@@ -461,7 +502,9 @@ def deduplicate_dataset():
         )
         
         # Track merge type
-        if merged_items and merged_items[0].get('dedup_method') == 'select_best':
+        if merged_items and merged_items[0].get('dedup_method') in {
+            'select_best', 'select_verified_record'
+        }:
             stats['exact_duplicates'] += 1
         else:
             stats['llm_merges'] += 1

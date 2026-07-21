@@ -142,13 +142,11 @@ def env_int(name: str, default: int) -> int:
 
 
 def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any]:
-    backend = args.backend.upper()
-    backend_lower = backend.lower()
     return {
         "framework": {
             "name": "OceanGraph-R1",
-            "version": "2.2.0",
-            "agent_architecture_version": "2.2.0",
+            "version": "2.2.1",
+            "agent_architecture_version": "2.2.1",
             "description": "Domain-aware multi-agent generation for ocean science multi-hop QA datasets",
             "agents": [
                 "corpus",
@@ -158,67 +156,7 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
             ],
         },
         "pipeline": {"modality": "text"},
-        "backend": {
-            "active": backend,
-            "openai": {
-                "url": args.api_url,
-                "api_key_path": "",
-                "llm_model": args.llm_model,
-                "vlm_model": args.vlm_model,
-                "timeout": 300,
-            },
-            "gemini": {
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                "api_key_path": "",
-                "llm_model": args.llm_model if backend_lower == "gemini" else "gemini-2.0-flash",
-                "vlm_model": args.vlm_model if backend_lower == "gemini" else "gemini-2.0-flash",
-                "timeout": 300,
-            },
-            "ollama": {
-                "url": args.ollama_url,
-                "llm_model": args.llm_model if backend_lower == "ollama" else "llama3.1:8b",
-                "vlm_model": args.vlm_model if backend_lower == "ollama" else "llava:13b",
-                "num_ctx": 16384,
-                "temperature": 0.0,
-                "stream": False,
-            },
-        },
-        "models": {
-            "profiles": {
-                "generator": {
-                    "backend": backend,
-                    "url": args.api_url if backend_lower == "openai" else "",
-                    "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
-                    "model": args.llm_model,
-                    "supports_vision": False,
-                    "temperature": 0.0,
-                    "structured_output": backend_lower == "openai",
-                    "timeout": 300,
-                },
-                "verifier": {
-                    "backend": backend,
-                    "url": args.api_url if backend_lower == "openai" else "",
-                    "api_key_env": "OPENAI_API_KEY" if backend_lower == "openai" else "GEMINI_API_KEY",
-                    "model": args.llm_model,
-                    "supports_vision": False,
-                    "temperature": 0.0,
-                    "structured_output": backend_lower == "openai",
-                    "timeout": 300,
-                },
-            },
-            "stages": {
-                "corpus": "generator",
-                "retrieval": "generator",
-                "generation": "generator",
-                "selection": "verifier",
-                "verification": "verifier",
-                "correction": "generator",
-            },
-        },
-        "rate_limiting": {
-            "requests_per_minute": args.requests_per_minute,
-            "burst_size": args.burst_size,
-        },
+        "llm_config_file": str(args.llm_config.resolve()),
         "paths": {
             "input_pdf_dir": str(args.input),
             "input_chunks_file": None,
@@ -253,14 +191,21 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
         "qa_generation": {
             "num_qa_pairs": args.num_qa_pairs,
             "type": args.qa_type,
-            "strict_multihop_verification": not args.relaxed,
+            "strict_multihop_verification": True,
             "min_supporting_chunks": args.min_supporting_chunks,
             "output_jsonl": True,
-            "counterfactual_verification": True,
+            "model_selection": False,
+            "verification_profile": "cost_efficient",
+            "max_answer_words": 12,
+            "max_answer_cjk_chars": 16,
+            "multihop_verification_mode": "balanced",
+            "max_verification_chunks": 4,
+            "counterfactual_verification": False,
         },
-        "qa_correction": {"enabled": True, "max_attempts": 1},
+        "qa_correction": {"enabled": False, "max_attempts": 0},
         "deduplication": {"enabled": args.deduplication},
         "evaluation": {"run_evaluation": args.evaluation, "sample_size": None},
+        "training_export": {"enabled": True, "split": "train"},
         "faiss": {
             "index_type": "IndexFlatIP",
             "normalize_l2": True,
@@ -331,10 +276,12 @@ def parse_args(default_domain: str | None = None) -> argparse.Namespace:
     parser.add_argument("--input", type=Path, help="Input document directory")
     parser.add_argument("--output", type=Path, help="OceanGraph framework output directory")
     parser.add_argument("--num-qa-pairs", type=int, default=env_int("OCEAN_NUM_QA_PAIRS", 200))
-    parser.add_argument("--backend", choices=["openai", "gemini", "ollama"], default=os.environ.get("OCEAN_BACKEND", "openai"))
-    parser.add_argument("--api-url", default=os.environ.get("OCEAN_API_URL", "https://api.deepseek.com/chat/completions"))
-    parser.add_argument("--ollama-url", default=os.environ.get("OLLAMA_API_URL", "http://127.0.0.1:11434/api/chat"))
-    parser.add_argument("--llm-model", default=os.environ.get("OCEAN_LLM_MODEL", "deepseek-chat"))
+    parser.add_argument(
+        "--llm-config",
+        type=Path,
+        default=repo_root() / "configs" / "llm.yaml",
+        help="Separate Qwen/DeepSeek routing file (default: configs/llm.yaml)",
+    )
     parser.add_argument("--embedding-model", default=os.environ.get("OCEAN_EMBEDDING_MODEL", "bge_m3"))
     parser.add_argument("--offline-models", action="store_true", help="Use only locally cached Hugging Face models")
     parser.add_argument("--reranker-model", default=os.environ.get("OCEAN_RERANKER_MODEL", "text_embedding"))
@@ -351,12 +298,9 @@ def parse_args(default_domain: str | None = None) -> argparse.Namespace:
     parser.add_argument("--chunks-per-search", type=int, default=env_int("OCEAN_CHUNKS_PER_SEARCH", 3))
     parser.add_argument("--min-supporting-chunks", type=int, default=env_int("OCEAN_MIN_SUPPORTING_CHUNKS", 2))
     parser.add_argument("--chunk-addition-mode", choices=["RELATED", "EXPLANATORY"], default=os.environ.get("OCEAN_CHUNK_ADDITION_MODE", "RELATED"))
-    parser.add_argument("--requests-per-minute", type=int, default=env_int("OCEAN_RPM", 60))
-    parser.add_argument("--burst-size", type=int, default=env_int("OCEAN_BURST", 15))
     parser.add_argument("--shuffle-seed", type=int, default=env_int("OCEAN_SHUFFLE_SEED", 42))
     parser.add_argument("--max-chunks", type=int, default=None)
     parser.add_argument("--hf-endpoint", default=os.environ.get("HF_ENDPOINT", ""))
-    parser.add_argument("--relaxed", action="store_true", help="Disable strict single-chunk shortcut verification")
     parser.add_argument("--deduplication", action="store_true")
     parser.add_argument("--evaluation", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -364,6 +308,8 @@ def parse_args(default_domain: str | None = None) -> argparse.Namespace:
     args = parser.parse_args()
     if not args.domain:
         parser.error("--domain is required when calling ocean_dataset_runner.py directly")
+    if not args.llm_config.is_file():
+        parser.error(f"LLM configuration file does not exist: {args.llm_config}")
     return args
 
 
@@ -394,7 +340,7 @@ def main(default_domain: str | None = None) -> int:
     manifest = {
         "framework": {
             "name": "OceanGraph-R1",
-            "version": "0.1.0",
+            "version": "2.2.1",
             "task": "ocean science evidence-grounded multi-hop search reasoning",
         },
         "domain": asdict(domain),
@@ -403,7 +349,9 @@ def main(default_domain: str | None = None) -> int:
         "num_input_files": file_count,
         "num_qa_pairs": args.num_qa_pairs,
         "qa_type": args.qa_type,
-        "strict_multihop": not args.relaxed,
+        "strict_multihop": True,
+        "verification_profile": "cost_efficient",
+        "llm_config_file": str(args.llm_config.resolve()),
         "offline_models": args.offline_models,
     }
     (args.output / "oceangraph_manifest.json").write_text(
@@ -415,8 +363,6 @@ def main(default_domain: str | None = None) -> int:
     env["OCEANGRAPH_CONFIG"] = str(config_path)
     env["DATASET_DOMAIN"] = domain.domain
     env["DATASET_EXPERT_PERSONA"] = domain.expert_persona
-    env["OCEANGRAPH_BACKEND"] = args.backend.upper()
-    env["LLM_BACKEND"] = args.backend.upper()
     if args.hf_endpoint:
         env["HF_ENDPOINT"] = args.hf_endpoint
     if args.offline_models:
@@ -433,10 +379,6 @@ def main(default_domain: str | None = None) -> int:
         str(args.input),
         "--output",
         str(args.output),
-        "--backend",
-        args.backend,
-        "--model",
-        args.llm_model,
         "--embedding-model",
         args.embedding_model,
         "--reranker-model",
@@ -450,8 +392,6 @@ def main(default_domain: str | None = None) -> int:
         "--min-supporting-chunks",
         str(args.min_supporting_chunks),
     ]
-    if args.relaxed:
-        framework_cmd.append("--no-strict-multihop")
     if args.offline_models:
         framework_cmd.append("--offline-models")
     if args.deduplication:

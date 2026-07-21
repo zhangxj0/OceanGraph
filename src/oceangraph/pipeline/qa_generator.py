@@ -73,13 +73,26 @@ def _coerce_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def get_structured_qa_fields(qa_pair: Dict) -> Dict:
+def get_structured_qa_fields(qa_pair: Dict, domain_hint: str = "") -> Dict:
     """Return dataset-facing structured fields from a generated QA pair."""
+    from oceangraph.pipeline.taxonomy import (
+        load_ocean_taxonomy,
+        normalize_answer_type,
+        normalize_ocean_subdomain,
+    )
+
+    taxonomy = load_ocean_taxonomy()
+    subdomain = normalize_ocean_subdomain(
+        qa_pair.get("subdomain", ""),
+        text=f"{qa_pair.get('question', '')} {qa_pair.get('answer', '')}",
+        domain_hint=domain_hint,
+    )
     return {
         "question_type": qa_pair.get("question_type", "multihop"),
-        "answer_type": qa_pair.get("answer_type", ""),
+        "answer_type": normalize_answer_type(qa_pair.get("answer_type", "")),
         "short_answers": _as_list(qa_pair.get("short_answers")),
-        "subdomain": qa_pair.get("subdomain", ""),
+        "subdomain": subdomain,
+        "taxonomy_version": taxonomy.get("schema_version", "2.2.1"),
         "declared_hop_count": qa_pair.get("hop_count", None),
         "sub_questions": _as_list(qa_pair.get("sub_questions")),
         "reasoning_path": qa_pair.get("reasoning_path", ""),
@@ -398,8 +411,12 @@ def select_qa_pairs(
     expert_persona: str,
     domain: str,
     use_model_review: bool = True,
+    max_answer_words: int = 12,
+    max_answer_cjk_chars: int = 16,
 ) -> tuple[list, list]:
     """Filter malformed pairs locally and optionally run the selection agent."""
+    from oceangraph.pipeline.taxonomy import normalize_answer_type
+
     print(f"Selecting Q&A pairs ({len(qa_pairs)} candidates)...")
     
     if not qa_pairs:
@@ -409,11 +426,18 @@ def select_qa_pairs(
     rejected_pairs = []
     for qa_pair in qa_pairs:
         qa_pair["short_answers"] = ensure_short_answers(qa_pair)
+        answer_type = normalize_answer_type(qa_pair.get("answer_type", ""))
+        if answer_type:
+            qa_pair["answer_type"] = answer_type
         violations = atomic_qa_violations(
             qa_pair.get("question", ""),
             qa_pair.get("answer", ""),
             qa_pair["short_answers"],
+            max_answer_words=max_answer_words,
+            max_answer_cjk_chars=max_answer_cjk_chars,
         )
+        if not answer_type:
+            violations.append("unsupported_answer_type")
         if violations:
             qa_pair["selection_status"] = "LOCAL_REJECTED"
             qa_pair["selection_reason"] = (
@@ -555,6 +579,168 @@ def verify_qa(chunks: List[Dict], question: str, answer: str, expert_persona: st
     )
     response = call_ai_service(prompt, chunks, stage="verification")
     return response
+
+
+def _as_verifier_bool(value: Any, *, fallback: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value or "").strip().casefold()
+    if normalized in {"true", "yes", "pass", "passed", "accept", "accepted", "1"}:
+        return True
+    if normalized in {"false", "no", "fail", "failed", "reject", "rejected", "0"}:
+        return False
+    return fallback
+
+
+def _resolve_supporting_positions(
+    values: Any,
+    selected_labels: List[str],
+) -> List[str]:
+    if not isinstance(values, list):
+        values = [] if values is None or values == "" else [values]
+    resolved: List[str] = []
+    for value in values:
+        index = None
+        if isinstance(value, int):
+            index = value - 1
+        else:
+            text = str(value or "").strip()
+            match = re.search(r"(?:chunk\s*)?(\d+)$", text, re.IGNORECASE)
+            if match:
+                index = int(match.group(1)) - 1
+            elif text in selected_labels:
+                resolved.append(text)
+        if index is not None and 0 <= index < len(selected_labels):
+            resolved.append(selected_labels[index])
+    return list(dict.fromkeys(resolved))
+
+
+def verify_qa_cost_efficient(
+    chunks: List[Dict],
+    qa_pair: Dict[str, Any],
+    expert_persona: str,
+    domain: str,
+    *,
+    min_supporting_chunks: int = 2,
+    max_verification_chunks: int = 4,
+) -> Dict[str, Any]:
+    """Validate grounding, standalone form, and multi-hop support in one call."""
+    usable_chunks: List[Dict] = []
+    chunk_labels: List[str] = []
+    seen_labels = set()
+    for raw_index, chunk in enumerate(chunks, 1):
+        if not isinstance(chunk, dict) or not str(chunk.get("content", "")).strip():
+            continue
+        label = _chunk_source_id(chunk, raw_index)
+        if label in seen_labels:
+            continue
+        seen_labels.add(label)
+        usable_chunks.append(chunk)
+        chunk_labels.append(label)
+
+    if len(usable_chunks) < min_supporting_chunks:
+        return {
+            "status": "INSUFFICIENT_CHUNKS",
+            "passes": False,
+            "basic_checks_passed": False,
+            "supporting_chunks": [],
+            "checked_chunks": chunk_labels,
+            "verification_profile": "cost_efficient",
+            "verification_api_calls": 0,
+            "raw_response": "",
+            "reason": "Fewer than the required distinct evidence chunks.",
+        }
+
+    selected_indices = prioritize_verification_chunks(
+        chunk_labels,
+        qa_pair,
+        max_chunks=max_verification_chunks,
+        min_supporting_chunks=min_supporting_chunks,
+    )
+    selected_chunks = [usable_chunks[index] for index in selected_indices]
+    selected_labels = [chunk_labels[index] for index in selected_indices]
+    prompt = PROMPTS["cost_efficient_verification"].format(
+        question=qa_pair.get("question", ""),
+        answer=qa_pair.get("answer", ""),
+        chunk_count=len(selected_chunks),
+        min_supporting_chunks=min_supporting_chunks,
+    )
+    response = call_ai_service(
+        prompt,
+        selected_chunks,
+        stage="verification",
+        response_format={"type": "json_object"},
+    )
+    payload = _extract_json_object(response)
+    if not payload:
+        return {
+            "status": "UNKNOWN_VERIFIER_RESPONSE",
+            "passes": False,
+            "basic_checks_passed": False,
+            "supporting_chunks": [],
+            "checked_chunks": selected_labels,
+            "verification_profile": "cost_efficient",
+            "verification_api_calls": 1,
+            "raw_response": response,
+            "reason": "DeepSeek returned no parseable JSON object.",
+        }
+
+    verdict_accept = str(payload.get("verdict", "")).strip().upper() == "ACCEPT"
+    standalone = _as_verifier_bool(
+        payload.get("question_standalone"), fallback=verdict_accept
+    )
+    single_target = _as_verifier_bool(
+        payload.get("single_target"), fallback=verdict_accept
+    )
+    answer_supported = _as_verifier_bool(
+        payload.get("answer_supported"), fallback=verdict_accept
+    )
+    requires_content = _as_verifier_bool(
+        payload.get("requires_content"), fallback=verdict_accept
+    )
+    supporting_chunks = _resolve_supporting_positions(
+        payload.get("supporting_chunks", []), selected_labels
+    )
+    basic_checks_passed = all(
+        (standalone, single_target, answer_supported, requires_content)
+    )
+    passes = basic_checks_passed and len(supporting_chunks) >= min_supporting_chunks
+
+    if passes:
+        status = "MULTIHOP_GROUNDED"
+    elif not standalone:
+        status = "QUESTION_NOT_STANDALONE"
+    elif not single_target:
+        status = "COMPOUND_QUESTION"
+    elif not answer_supported:
+        status = "ANSWER_UNSUPPORTED"
+    elif not requires_content:
+        status = "CONTENT_NOT_REQUIRED"
+    else:
+        status = "INSUFFICIENT_GROUNDED_EVIDENCE"
+
+    return {
+        "status": status,
+        "passes": passes,
+        "basic_checks_passed": basic_checks_passed,
+        "question_standalone": standalone,
+        "single_target": single_target,
+        "answer_supported": answer_supported,
+        "requires_content": requires_content,
+        "min_supporting_chunks": min_supporting_chunks,
+        "distinct_chunk_count": len(chunk_labels),
+        "checked_chunk_count": len(selected_labels),
+        "checked_chunks": selected_labels,
+        "supporting_chunks": supporting_chunks,
+        "necessary_chunks": [],
+        "redundant_chunks": [],
+        "verification_profile": "cost_efficient",
+        "verification_mode": "single_pass",
+        "verification_api_calls": 1,
+        "method": "single_deepseek_grounding_pass",
+        "raw_response": response,
+        "reason": str(payload.get("reason", "")).strip(),
+    }
 
 
 def batch_verify_qa(chunks: List[Dict], qa_pairs: List[Dict], expert_persona: str, domain: str) -> List[str]:
@@ -840,6 +1026,7 @@ def verify_multihop_necessity(
         "min_supporting_chunks": min_supporting_chunks,
         "distinct_chunk_count": len(chunk_labels),
         "shortcut_chunks": gate["shortcut_chunks"],
+        "supporting_chunks": gate["partial_chunks"],
         "single_chunk_checks": checks,
         "counterfactual_verification": counterfactual_verification,
         "counterfactual_checks": counterfactual_checks,

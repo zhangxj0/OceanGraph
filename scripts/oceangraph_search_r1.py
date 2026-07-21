@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -212,28 +213,22 @@ def build_context(item: dict[str, Any]) -> list[list[Any]]:
 
 
 def supporting_chunk_ids(item: dict[str, Any]) -> list[str]:
-    ids: list[str] = []
-    for chunk in item.get("context_chunks", []) or []:
-        if not isinstance(chunk, dict):
-            continue
-        file_name = str(chunk.get("file_name") or "chunk")
-        chunk_id = str(chunk.get("chunk_id") or "")
-        ids.append(f"{file_name}:{chunk_id}" if chunk_id else file_name)
-    return uniq(ids)
+    graph = item.get("evidence_graph") or {}
+    return uniq([str(value) for value in graph.get("supporting_chunk_ids", []) or []])
 
 
 def convert_corpus(chunks_file: Path | None) -> list[dict[str, str]]:
     if not chunks_file:
         return []
+    from oceangraph.pipeline.evidence_graph import stable_chunk_id
+
     chunks = load_records(chunks_file)
     corpus: list[dict[str, str]] = []
     seen: set[str] = set()
     for idx, chunk in enumerate(chunks):
-        raw_id = chunk.get("global_chunk_id") or chunk.get("chunk_id") or idx
-        doc_id = str(raw_id)
+        doc_id = stable_chunk_id(chunk, idx + 1)
         if doc_id in seen:
-            file_name = str(chunk.get("file_name") or "doc")
-            doc_id = f"{file_name}:{doc_id}"
+            continue
         seen.add(doc_id)
         content = normalize_space(str(chunk.get("content", "")))
         if content:
@@ -251,6 +246,8 @@ def to_search_r1_row(
     prompt_template: str,
 ) -> dict[str, Any]:
     question = normalize_space(str(item.get("question", "")))
+    from oceangraph.training import stable_qa_id
+
     return {
         "data_source": data_source,
         "prompt": [{"role": "user", "content": prompt_template.format(question=question)}],
@@ -259,6 +256,7 @@ def to_search_r1_row(
         "extra_info": {
             "split": split,
             "index": idx,
+            "qa_id": stable_qa_id(item),
             "question": question,
             "short_answers": short_answers,
             "long_answer": normalize_space(str(item.get("answer", ""))),
@@ -271,6 +269,9 @@ def to_search_r1_row(
             "search_history": item.get("search_history", []),
             "supporting_chunk_ids": supporting_chunk_ids(item),
             "source_chunk_id": item.get("chunk_id"),
+            "hop_count": item.get("hop_count", 0),
+            "agent_trace": item.get("agent_trace", []),
+            "coordination_trace": item.get("coordination_trace", {}),
         },
     }
 
@@ -340,6 +341,8 @@ def main() -> int:
     search_rows: list[dict[str, Any]] = []
     wiki_rows: list[dict[str, Any]] = []
     skipped = 0
+    skipped_without_short_answer = 0
+    rejected_reasons: Counter[str] = Counter()
 
     for idx, item in enumerate(qa_items):
         if args.short_answer_mode == "llm":
@@ -357,9 +360,17 @@ def main() -> int:
 
         if not short_answers:
             skipped += 1
+            skipped_without_short_answer += 1
             continue
 
         enriched_item = {**item, "short_answers": short_answers}
+        from oceangraph.training import validate_training_record
+
+        validation_reasons = validate_training_record(enriched_item)
+        if validation_reasons:
+            skipped += 1
+            rejected_reasons.update(validation_reasons)
+            continue
         search_rows.append(
             to_search_r1_row(
                 enriched_item,
@@ -387,7 +398,9 @@ def main() -> int:
     summary = {
         "input_qa": len(qa_items),
         "converted": len(search_rows),
-        "skipped_without_short_answer": skipped,
+        "skipped_records": skipped,
+        "skipped_without_short_answer": skipped_without_short_answer,
+        "rejection_reasons": dict(sorted(rejected_reasons.items())),
         "corpus_docs": len(corpus),
         "parquet_written": parquet_written,
         "data_source": args.data_source,

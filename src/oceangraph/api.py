@@ -80,6 +80,56 @@ from typing import Optional, List, Dict, Any, Union
 logger = logging.getLogger(__name__)
 
 
+# Environment variables temporarily owned by one high-level API run.  They are
+# restored afterwards so notebooks and test processes can safely run two
+# differently configured OceanGraph instances in sequence.
+_MANAGED_RUNTIME_ENV = (
+    "OCEANGRAPH_BACKEND",
+    "LLM_BACKEND",
+    "OCEANGRAPH_MODEL",
+    "OCEANGRAPH_EMBEDDING_MODEL",
+    "OCEANGRAPH_RERANKER_MODEL",
+    "OCEANGRAPH_INPUT_DIR",
+    "OCEANGRAPH_OUTPUT_DIR",
+    "OCEANGRAPH_NUM_QA_PAIRS",
+    "OCEANGRAPH_MAX_WORKERS",
+    "OCEANGRAPH_MAX_DEPTH",
+    "OCEANGRAPH_STRICT_MULTIHOP",
+    "OCEANGRAPH_MIN_SUPPORTING_CHUNKS",
+    "OCEANGRAPH_OUTPUT_JSONL",
+    "OCEANGRAPH_MODEL_SELECTION",
+    "OCEANGRAPH_VERIFICATION_PROFILE",
+    "OCEANGRAPH_MAX_ANSWER_WORDS",
+    "OCEANGRAPH_MAX_ANSWER_CJK_CHARS",
+    "OCEANGRAPH_MULTIHOP_VERIFICATION_MODE",
+    "OCEANGRAPH_MAX_VERIFICATION_CHUNKS",
+    "OCEANGRAPH_MAX_UNKNOWN_VERDICTS",
+    "OCEANGRAPH_COUNTERFACTUAL_VERIFICATION",
+    "OCEANGRAPH_SKIP_PDF_PROCESSING",
+    "OCEANGRAPH_SKIP_CHUNKING",
+    "OCEANGRAPH_RUN_DEDUPLICATION",
+    "OCEANGRAPH_RUN_EVALUATION",
+    "OCEANGRAPH_ENABLE_CHECKPOINTING",
+    "OCEANGRAPH_CONFIG",
+    "CUDA_VISIBLE_DEVICES",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "OPENAI_API_KEY",
+)
+
+
+def _snapshot_runtime_environment() -> Dict[str, Optional[str]]:
+    return {name: os.environ.get(name) for name in _MANAGED_RUNTIME_ENV}
+
+
+def _restore_runtime_environment(snapshot: Dict[str, Optional[str]]) -> None:
+    for name, value in snapshot.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -160,6 +210,30 @@ class OceanGraphConfig:
 
     output_jsonl: bool = True
     """Also write JSONL copies of generated QA outputs."""
+
+    model_selection: bool = False
+    """Enable model-based candidate selection before verification."""
+
+    verification_profile: str = "cost_efficient"
+    """``cost_efficient`` uses one DeepSeek call per locally valid candidate."""
+
+    max_answer_words: int = 12
+    """Maximum whitespace-token count for the canonical EM answer."""
+
+    max_answer_cjk_chars: int = 16
+    """Maximum CJK-character count for the canonical EM answer."""
+
+    multihop_verification_mode: str = "balanced"
+    """Multi-hop verifier mode: ``balanced`` or ``strict``."""
+
+    max_verification_chunks: int = 4
+    """Maximum chunks checked by the balanced verifier."""
+
+    max_unknown_verdicts: int = 1
+    """Allowed unparseable chunk verdicts in balanced mode."""
+
+    counterfactual_verification: bool = False
+    """Enable leave-one-out evidence checks in strict mode."""
     
     # =========================================================================
     # Document Processing (PDF/HTML -> Markdown)
@@ -258,6 +332,12 @@ class OceanGraphConfig:
     
     enable_checkpointing: bool = True
     """Enable checkpoint/resume for long-running pipelines."""
+
+    export_training_data: bool = True
+    """Write compact verified QA and corpus JSONL files for downstream training."""
+
+    training_split: str = "train"
+    """Split label stored in the automatic training export."""
     
     max_pages: Optional[int] = None
     """Maximum number of pages to process. None = no limit."""
@@ -267,14 +347,26 @@ class OceanGraphConfig:
     
     sort_by_size: bool = True
     """Sort documents by file size (smallest first) for processing."""
+
+    max_chunks: Optional[int] = None
+    """Maximum chunks used for QA generation. None processes all chunks."""
+
+    shuffle: bool = True
+    """Shuffle seed chunks before generation."""
+
+    shuffle_seed: int = 42
+    """Deterministic seed used when shuffling chunks."""
+
+    text_only_mode: bool = True
+    """Exclude visual inputs and metadata from model calls and exports."""
     
     # =========================================================================
     # QA Correction
     # =========================================================================
-    qa_correction_enabled: bool = True
+    qa_correction_enabled: bool = False
     """Enable automatic QA correction pass."""
     
-    qa_correction_max_attempts: int = 1
+    qa_correction_max_attempts: int = 0
     """Maximum correction attempts per QA pair."""
     
     # =========================================================================
@@ -296,6 +388,123 @@ class OceanGraphConfig:
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return {k: v for k, v in self.__dict__.items()}
+
+    def to_runtime_config(self) -> Dict[str, Any]:
+        """Build the complete nested configuration consumed by one run.
+
+        If this object originated from YAML, model routing profiles and other
+        extension keys are retained while explicitly configured public fields
+        override their file-backed values.
+        """
+        base: Dict[str, Any] = {}
+        if self.config_file and Path(self.config_file).is_file():
+            from oceangraph.core.config import load_config
+
+            loaded = load_config(self.config_file)
+            if isinstance(loaded, dict):
+                base = loaded
+
+        overlay = {
+            "backend": {
+                "active": self.backend.upper(),
+                self.backend.lower(): {
+                    key: value
+                    for key, value in {
+                        "llm_model": self.llm_model,
+                        "vlm_model": self.vlm_model,
+                    }.items()
+                    if value is not None
+                },
+            },
+            "pipeline": {"modality": "text" if self.text_only_mode else "multimodal"},
+            "paths": {
+                "input_pdf_dir": self.input_dir,
+                "output_dir": self.output_dir,
+            },
+            "processing": {
+                "max_pdfs": self.max_pdfs,
+                "sort_by_size": self.sort_by_size,
+                "max_chunks": self.max_chunks,
+            },
+            "chunking": {
+                "window_size": self.chunk_window_size,
+                "overlap_size": self.chunk_overlap_size,
+            },
+            "shuffling": {"enabled": self.shuffle, "seed": self.shuffle_seed},
+            "qa_generation": {
+                "num_qa_pairs": self.num_qa_pairs,
+                "type": self.qa_type,
+                "strict_multihop_verification": self.strict_multihop_verification,
+                "min_supporting_chunks": self.min_supporting_chunks,
+                "output_jsonl": self.output_jsonl,
+                "model_selection": self.model_selection,
+                "verification_profile": self.verification_profile,
+                "max_answer_words": self.max_answer_words,
+                "max_answer_cjk_chars": self.max_answer_cjk_chars,
+                "multihop_verification_mode": self.multihop_verification_mode,
+                "max_verification_chunks": self.max_verification_chunks,
+                "max_unknown_verdicts": self.max_unknown_verdicts,
+                "counterfactual_verification": self.counterfactual_verification,
+            },
+            "retrieval": {
+                "multihop": {
+                    "max_depth": self.max_depth,
+                    "max_breadth": self.max_breadth,
+                    "chunks_per_search": self.chunks_per_search,
+                    "chunk_addition_mode": self.chunk_addition_mode,
+                }
+            },
+            "embedding": {
+                "model": self.embedding_model,
+                "batch_size": self.embed_batch_size,
+                "cache_embeddings": self.cache_embeddings,
+                "gpus": self.embedding_gpus,
+            },
+            "parallel": {
+                "num_workers": self.num_cpu_workers,
+                "qa_max_workers": self.max_workers,
+                "dedup_max_workers": self.dedup_max_workers,
+            },
+            "rate_limiting": {
+                "requests_per_minute": self.requests_per_minute,
+                "burst_size": self.burst_size,
+            },
+            "faiss": {"use_gpu": self.faiss_use_gpu, "gpu_id": self.faiss_gpu_id},
+            "deduplication": {
+                "enabled": self.run_deduplication,
+                "alpha": self.dedup_alpha,
+                "question_similarity_threshold": self.dedup_question_similarity_threshold,
+                "preserve_verified_records": True,
+            },
+            "qa_correction": {
+                "enabled": self.qa_correction_enabled,
+                "max_attempts": self.qa_correction_max_attempts,
+            },
+            "evaluation": {"run_evaluation": self.run_evaluation},
+            "checkpointing": {"enabled": self.enable_checkpointing},
+            "training_export": {
+                "enabled": self.export_training_data,
+                "split": self.training_split,
+            },
+            "pdf_processing": {
+                "ocr_engine": self.ocr_engine,
+                "image_resolution_scale": self.image_resolution_scale,
+                "do_ocr": self.do_ocr,
+                "do_table_structure": self.do_table_structure,
+                "do_code_enrichment": self.do_code_enrichment,
+                "do_formula_enrichment": self.do_formula_enrichment,
+            },
+        }
+
+        def merge(target: Dict[str, Any], updates: Dict[str, Any]) -> None:
+            for key, value in updates.items():
+                if isinstance(value, dict) and isinstance(target.get(key), dict):
+                    merge(target[key], value)
+                else:
+                    target[key] = value
+
+        merge(base, overlay)
+        return base
     
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "OceanGraphConfig":
@@ -321,9 +530,9 @@ class OceanGraphConfig:
         Returns:
             OceanGraphConfig instance.
         """
-        import yaml
-        with open(path, 'r') as f:
-            data = yaml.safe_load(f) or {}
+        from oceangraph.core.config import load_config
+
+        data = load_config(path)
         
         # Map YAML structure to flat config
         backend_cfg = data.get('backend', {})
@@ -339,6 +548,7 @@ class OceanGraphConfig:
         pdf = data.get('pdf_processing', {})
         dedup = data.get('deduplication', {})
         qa_corr = data.get('qa_correction', {})
+        chunking = data.get('chunking', {})
         faiss_cfg = data.get('faiss', {})
         eval_cfg = data.get('evaluation', {})
         
@@ -361,6 +571,20 @@ class OceanGraphConfig:
             strict_multihop_verification=qa_gen.get('strict_multihop_verification', True),
             min_supporting_chunks=qa_gen.get('min_supporting_chunks', 2),
             output_jsonl=qa_gen.get('output_jsonl', True),
+            model_selection=qa_gen.get('model_selection', False),
+            verification_profile=qa_gen.get(
+                'verification_profile', 'cost_efficient'
+            ),
+            max_answer_words=qa_gen.get('max_answer_words', 12),
+            max_answer_cjk_chars=qa_gen.get('max_answer_cjk_chars', 16),
+            multihop_verification_mode=qa_gen.get(
+                'multihop_verification_mode', 'balanced'
+            ),
+            max_verification_chunks=qa_gen.get('max_verification_chunks', 4),
+            max_unknown_verdicts=qa_gen.get('max_unknown_verdicts', 1),
+            counterfactual_verification=qa_gen.get(
+                'counterfactual_verification', False
+            ),
             # Processing
             max_workers=parallel.get('qa_max_workers', 4),
             num_cpu_workers=parallel.get('num_workers', 3),
@@ -369,6 +593,13 @@ class OceanGraphConfig:
             embedding_gpus=embedding.get('gpus'),
             max_pdfs=processing.get('max_pdfs'),
             sort_by_size=processing.get('sort_by_size', True),
+            max_chunks=processing.get('max_chunks'),
+            chunk_window_size=chunking.get('window_size', 20000),
+            chunk_overlap_size=chunking.get('overlap_size', 2000),
+            shuffle=(data.get('shuffling') or {}).get('enabled', True),
+            shuffle_seed=(data.get('shuffling') or {}).get('seed', 42),
+            text_only_mode=str((data.get('pipeline') or {}).get('modality', 'text')).lower()
+            == 'text',
             # PDF processing
             image_resolution_scale=pdf.get('image_resolution_scale', 2.0),
             # Rate limiting
@@ -382,10 +613,13 @@ class OceanGraphConfig:
             dedup_question_similarity_threshold=dedup.get('question_similarity_threshold', 0.75),
             run_deduplication=dedup.get('enabled', False),
             # QA correction
-            qa_correction_enabled=qa_corr.get('enabled', True),
-            qa_correction_max_attempts=qa_corr.get('max_attempts', 1),
+            qa_correction_enabled=qa_corr.get('enabled', False),
+            qa_correction_max_attempts=qa_corr.get('max_attempts', 0),
             # Eval
             run_evaluation=eval_cfg.get('run_evaluation', False),
+            enable_checkpointing=(data.get('checkpointing') or {}).get('enabled', True),
+            export_training_data=(data.get('training_export') or {}).get('enabled', True),
+            training_split=(data.get('training_export') or {}).get('split', 'train'),
             # File reference
             config_file=path,
         )
@@ -399,61 +633,14 @@ class OceanGraphConfig:
         """
         import yaml
         
-        # Build nested YAML structure from flat config
-        data = {
-            'backend': {
-                'active': self.backend.upper(),
-                self.backend.lower(): {
-                    k: v for k, v in {
-                        'llm_model': self.llm_model,
-                        'vlm_model': self.vlm_model,
-                    }.items() if v is not None
-                },
-            },
-            'paths': {
-                'input_pdf_dir': self.input_dir,
-                'output_dir': self.output_dir,
-            },
-            'qa_generation': {
-                'num_qa_pairs': self.num_qa_pairs,
-                'type': self.qa_type,
-                'strict_multihop_verification': self.strict_multihop_verification,
-                'min_supporting_chunks': self.min_supporting_chunks,
-                'output_jsonl': self.output_jsonl,
-            },
-            'retrieval': {
-                'multihop': {
-                    'max_depth': self.max_depth,
-                    'max_breadth': self.max_breadth,
-                    'chunks_per_search': self.chunks_per_search,
-                    'chunk_addition_mode': self.chunk_addition_mode,
-                }
-            },
-            'embedding': {
-                'model': self.embedding_model,
-                'batch_size': self.embed_batch_size,
-                'cache_embeddings': self.cache_embeddings,
-            },
-            'parallel': {
-                'num_workers': self.num_cpu_workers,
-                'qa_max_workers': self.max_workers,
-                'dedup_max_workers': self.dedup_max_workers,
-            },
-            'rate_limiting': {
-                'requests_per_minute': self.requests_per_minute,
-                'burst_size': self.burst_size,
-            },
-            'pdf_processing': {
-                'image_resolution_scale': self.image_resolution_scale,
-            },
-        }
-        
-        if self.embedding_gpus:
-            data['embedding']['gpus'] = self.embedding_gpus
+        data = self.to_runtime_config()
+        if data.get("llm_config_file"):
+            for section in ("backend", "models", "rate_limiting"):
+                data.pop(section, None)
         
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'w') as f:
-            yaml.dump(data, f, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
 
 # =============================================================================
@@ -586,6 +773,23 @@ class OceanGraphResults:
             'num_qa_pairs': len(self.qa_pairs),
             'num_chunks': len(self.chunks),
         }
+
+    def export_training(
+        self,
+        path: Optional[str] = None,
+        *,
+        split: str = "train",
+    ) -> Dict[str, Any]:
+        """Export only fully verified multi-agent records for model training."""
+        from oceangraph.training import export_training_dataset
+
+        output_path = path or os.path.join(self.output_dir or ".", "training")
+        return export_training_dataset(
+            self.qa_pairs,
+            self.chunks,
+            output_path,
+            split=split,
+        )
     
     def filter(self, **kwargs) -> "OceanGraphResults":
         """
@@ -820,6 +1024,7 @@ class OceanGraph:
         
         # Backend and API key
         os.environ["OCEANGRAPH_BACKEND"] = cfg.backend.upper()
+        os.environ["LLM_BACKEND"] = cfg.backend.upper()
         if cfg.api_key:
             if cfg.backend.lower() == "gemini":
                 os.environ["GEMINI_API_KEY"] = cfg.api_key
@@ -830,10 +1035,16 @@ class OceanGraph:
         # Models
         if cfg.llm_model:
             os.environ["OCEANGRAPH_MODEL"] = cfg.llm_model
+        else:
+            os.environ.pop("OCEANGRAPH_MODEL", None)
         if cfg.embedding_model and cfg.embedding_model != "auto":
             os.environ["OCEANGRAPH_EMBEDDING_MODEL"] = cfg.embedding_model
+        else:
+            os.environ.pop("OCEANGRAPH_EMBEDDING_MODEL", None)
         if cfg.reranker_model:
             os.environ["OCEANGRAPH_RERANKER_MODEL"] = cfg.reranker_model
+        else:
+            os.environ.pop("OCEANGRAPH_RERANKER_MODEL", None)
         
         # Paths
         os.environ["OCEANGRAPH_INPUT_DIR"] = str(cfg.input_dir)
@@ -846,16 +1057,27 @@ class OceanGraph:
         os.environ["OCEANGRAPH_STRICT_MULTIHOP"] = "1" if cfg.strict_multihop_verification else "0"
         os.environ["OCEANGRAPH_MIN_SUPPORTING_CHUNKS"] = str(cfg.min_supporting_chunks)
         os.environ["OCEANGRAPH_OUTPUT_JSONL"] = "1" if cfg.output_jsonl else "0"
+        os.environ["OCEANGRAPH_MODEL_SELECTION"] = "1" if cfg.model_selection else "0"
+        os.environ["OCEANGRAPH_VERIFICATION_PROFILE"] = cfg.verification_profile
+        os.environ["OCEANGRAPH_MAX_ANSWER_WORDS"] = str(cfg.max_answer_words)
+        os.environ["OCEANGRAPH_MAX_ANSWER_CJK_CHARS"] = str(
+            cfg.max_answer_cjk_chars
+        )
+        os.environ["OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"] = cfg.multihop_verification_mode
+        os.environ["OCEANGRAPH_MAX_VERIFICATION_CHUNKS"] = str(cfg.max_verification_chunks)
+        os.environ["OCEANGRAPH_MAX_UNKNOWN_VERDICTS"] = str(cfg.max_unknown_verdicts)
+        os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] = (
+            "1" if cfg.counterfactual_verification else "0"
+        )
         
         # Pipeline flags
-        if cfg.skip_pdf_processing:
-            os.environ["OCEANGRAPH_SKIP_PDF_PROCESSING"] = "1"
-        if cfg.skip_chunking:
-            os.environ["OCEANGRAPH_SKIP_CHUNKING"] = "1"
-        if cfg.run_deduplication:
-            os.environ["OCEANGRAPH_RUN_DEDUPLICATION"] = "1"
-        if cfg.run_evaluation:
-            os.environ["OCEANGRAPH_RUN_EVALUATION"] = "1"
+        os.environ["OCEANGRAPH_SKIP_PDF_PROCESSING"] = "1" if cfg.skip_pdf_processing else "0"
+        os.environ["OCEANGRAPH_SKIP_CHUNKING"] = "1" if cfg.skip_chunking else "0"
+        os.environ["OCEANGRAPH_RUN_DEDUPLICATION"] = "1" if cfg.run_deduplication else "0"
+        os.environ["OCEANGRAPH_RUN_EVALUATION"] = "1" if cfg.run_evaluation else "0"
+        os.environ["OCEANGRAPH_ENABLE_CHECKPOINTING"] = (
+            "1" if cfg.enable_checkpointing else "0"
+        )
         
         # Device
         if cfg.device == "cpu":
@@ -864,6 +1086,14 @@ class OceanGraph:
         # Config file
         if cfg.config_file and os.path.exists(cfg.config_file):
             os.environ["OCEANGRAPH_CONFIG"] = cfg.config_file
+        else:
+            os.environ.pop("OCEANGRAPH_CONFIG", None)
+
+        from oceangraph.core.config import set_runtime_config
+        from oceangraph.core.llm import reset_llm_runtime
+
+        set_runtime_config(cfg.to_runtime_config())
+        reset_llm_runtime(reset_tokens=True)
         
         self._is_configured = True
     
@@ -894,18 +1124,23 @@ class OceanGraph:
             else:
                 print("Fix configuration issues first")
         """
-        self._setup_environment()
-        
+        environment_snapshot = _snapshot_runtime_environment()
         original_cwd = os.getcwd()
-        project_root = self._get_project_root()
-        os.chdir(project_root)
-        
         try:
+            self._setup_environment()
+            project_root = self._get_project_root()
+            os.chdir(project_root)
             from oceangraph.utils.preflight import run_preflight_checks
             all_passed, _ = run_preflight_checks()
             return all_passed
         finally:
             os.chdir(original_cwd)
+            from oceangraph.core.config import clear_runtime_config
+            from oceangraph.core.llm import reset_llm_runtime
+
+            clear_runtime_config()
+            reset_llm_runtime(reset_tokens=True)
+            _restore_runtime_environment(environment_snapshot)
     
     def run(self) -> OceanGraphResults:
         """
@@ -928,24 +1163,28 @@ class OceanGraph:
             print(f"Generated {len(results)} QA pairs")
             results.save("dataset.json")
         """
-        if not self._is_configured:
-            self._setup_environment()
-        
         cfg = self.config
         Path(cfg.output_dir).mkdir(parents=True, exist_ok=True)
-        
+        environment_snapshot = _snapshot_runtime_environment()
         original_cwd = os.getcwd()
-        project_root = self._get_project_root()
-        os.chdir(project_root)
-        
         try:
+            # Always configure: ``configure()`` is not the only way external
+            # code may mutate the dataclass between repeated runs.
+            self._setup_environment()
+            project_root = self._get_project_root()
+            os.chdir(project_root)
             from oceangraph.engine import run_pipeline
-            
-            run_pipeline()
-            
+            run_pipeline(cfg)
             return self._collect_results()
         finally:
             os.chdir(original_cwd)
+            from oceangraph.core.config import clear_runtime_config
+            from oceangraph.core.llm import reset_llm_runtime
+
+            clear_runtime_config()
+            reset_llm_runtime(reset_tokens=True)
+            _restore_runtime_environment(environment_snapshot)
+            self._is_configured = False
     
     def _collect_results(self) -> OceanGraphResults:
         """Collect results from the output directory after pipeline execution."""
@@ -954,7 +1193,12 @@ class OceanGraph:
         
         # Load QA pairs
         qa_pairs = []
-        for qa_file in ["qa_multihop_pass.json", "qa_deduplicated.json"]:
+        qa_candidates = (
+            ["qa_deduplicated.json", "qa_multihop_pass.json"]
+            if cfg.run_deduplication
+            else ["qa_multihop_pass.json"]
+        )
+        for qa_file in qa_candidates:
             p = out / qa_file
             if p.exists():
                 with open(p, 'r') as f:

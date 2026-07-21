@@ -6,6 +6,7 @@
 # Copy this file to config.yaml and fill in your values:
 #   cp configs/oceangraph.yaml.example config.yaml
 #
+# Model names and endpoints are intentionally isolated in configs/llm.yaml.
 # Keep API keys in environment variables:
 #   export PARATERA_API_KEY="your-key-here"
 #   export DEEPSEEK_API_KEY="your-key-here"
@@ -13,89 +14,20 @@
 
 framework:
   name: OceanGraph-R1
-  version: 2.2.0
+  version: 2.2.1
   agent_architecture: four_agent
   agents: [corpus, evidence, qa, verifier]
 
 # -----------------------------------------------------------------------------
-# Backend Configuration
+# Model configuration
 # -----------------------------------------------------------------------------
-backend:
-  # Choose your LLM/VLM provider: "GEMINI", "OPENAI", or "OLLAMA"
-  active: OPENAI
-  
-  # Ollama (local models)
-  ollama:
-    url: http://127.0.0.1:11434/api/chat
-    llm_model: llama3.1:8b           # Text model
-    vlm_model: llava:13b             # Vision model
-    num_ctx: 16384
-    temperature: 0.0
-    stream: false
-  
-  # Google Gemini
-  gemini:
-    url: https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
-    # Option 1: File path to API key
-    api_key_path: ~/.config/gemini/api_key.txt
-    # Option 2: Environment variable (set GEMINI_API_KEY)
-    llm_model: gemini-2.0-flash
-    vlm_model: gemini-2.0-flash
-    timeout: 300
-    embedding_model: gemini-embedding-001
-  
-  # OpenAI
-  openai:
-    url: https://api.openai.com/v1/chat/completions
-    # Option 1: File path to API key
-    api_key_path: ~/.config/openai/api_key.txt
-    # Option 2: Environment variable (set OPENAI_API_KEY)
-    llm_model: gpt-4o-mini
-    vlm_model: gpt-4o
-    timeout: 300
+llm_config_file: configs/llm.yaml
 
 # -----------------------------------------------------------------------------
 # Text-only pipeline and stage-specific model routing
 # -----------------------------------------------------------------------------
 pipeline:
   modality: text
-
-models:
-  profiles:
-    generator:
-      backend: OPENAI
-      url: https://llmapi.paratera.com/v1/chat/completions
-      api_key_env: PARATERA_API_KEY
-      model: Qwen3.7-Plus
-      supports_vision: false
-      temperature: 0.0
-      thinking: false
-      structured_output: true
-      timeout: 300
-    verifier:
-      backend: OPENAI
-      url: https://api.deepseek.com/chat/completions
-      api_key_env: DEEPSEEK_API_KEY
-      model: deepseek-v4-pro
-      supports_vision: false
-      temperature: 0.0
-      structured_output: true
-      timeout: 300
-  stages:
-    default: generator
-    corpus: generator
-    retrieval: generator
-    generation: generator
-    selection: verifier
-    verification: verifier
-    correction: generator
-
-# -----------------------------------------------------------------------------
-# Rate Limiting (adjust based on your API tier)
-# -----------------------------------------------------------------------------
-rate_limiting:
-  requests_per_minute: 60
-  burst_size: 15
 
 # -----------------------------------------------------------------------------
 # Input/Output Paths
@@ -122,11 +54,14 @@ processing:
 qa_generation:
   num_qa_pairs: 1000       # Target number of QA pairs (null = unlimited)
   type: multihop           # Options: 'multihop', 'multimodal', 'text', 'mix'
-  strict_multihop_verification: true  # Reject questions answerable from any single chunk
+  strict_multihop_verification: true  # Still require at least two grounded chunks
   min_supporting_chunks: 2             # Minimum distinct chunks required for accepted QA
   output_jsonl: true                   # Also save qa_multihop_pass.jsonl for dataset release
   model_selection: false               # Use deterministic prefilter; avoids one verifier call per candidate
-  multihop_verification_mode: balanced # One consolidated verifier call; use strict for exhaustive audits
+  verification_profile: cost_efficient # One DeepSeek call checks grounding + standalone + multi-hop
+  max_answer_words: 12                 # Covers multi-word scientific names while remaining EM-friendly
+  max_answer_cjk_chars: 16             # Chinese answer length limit
+  multihop_verification_mode: balanced # Used only when verification_profile is legacy
   max_verification_chunks: 4           # Prioritize declared evidence and cap review context/cost
   max_unknown_verdicts: 1              # Tolerate one missing/uncertain per-chunk verdict in balanced mode
   counterfactual_verification: false   # Enable only with strict mode for leave-one-out ablation audits
@@ -170,8 +105,8 @@ reranker:
 # QA Correction (auto-fix failed QA pairs)
 # -----------------------------------------------------------------------------
 qa_correction:
-  enabled: true
-  max_attempts: 1
+  enabled: false              # Reject once; do not spend extra Qwen calls rewriting failures
+  max_attempts: 0
 
 # -----------------------------------------------------------------------------
 # Context Retrieval
@@ -269,6 +204,13 @@ bertopic:
     diversity: 0.5
   calculate_probabilities: false
   verbose: true
+
+# -----------------------------------------------------------------------------
+# Downstream training export
+# -----------------------------------------------------------------------------
+training_export:
+  enabled: true
+  split: train
 
 # -----------------------------------------------------------------------------
 # Evaluation

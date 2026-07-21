@@ -61,6 +61,16 @@ def reset_token_stats():
             'total_calls': 0,
         }
 
+
+def reset_llm_runtime(*, reset_tokens: bool = True) -> None:
+    """Reset cached routing and rate-limit state between pipeline runs."""
+    global _config_initialized, _MODEL_ROUTER, _rate_limiter
+    _config_initialized = False
+    _MODEL_ROUTER = None
+    _rate_limiter = None
+    if reset_tokens:
+        reset_token_stats()
+
 def print_token_stats():
     """Print token usage summary."""
     stats = get_token_stats()

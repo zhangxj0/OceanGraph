@@ -1,16 +1,110 @@
+schema_version: "2.2.1"
 domain: Ocean Science and Marine Engineering
 expert_persona: Ocean Science Multi-Hop QA Curator
 
-subdomains:
-  - physical_oceanography
-  - marine_chemistry
-  - marine_ecology
-  - marine_geology
-  - ocean_engineering
-  - climate_ocean
-  - remote_sensing
-  - observing_systems
-  - mixed
+domains:
+  - id: physical_ocean_climate
+    title: Physical Oceanography and Climate Dynamics
+    aliases:
+      - physical_oceanography
+      - climate_ocean
+      - marine_geology
+      - physical oceanography
+      - climate-ocean dynamics
+    keywords:
+      - circulation
+      - current
+      - overturning
+      - stratification
+      - mixed layer
+      - eddy
+      - sea level
+      - ocean heat
+      - enso
+      - marine heatwave
+      - monsoon
+      - geology
+
+  - id: carbon_biogeochemistry
+    title: Ocean Carbon Cycle and Marine Biogeochemistry
+    aliases:
+      - marine_chemistry
+      - ocean biogeochemistry
+      - ocean carbon cycle
+      - carbon-biogeochemistry
+    keywords:
+      - carbon
+      - biological pump
+      - solubility pump
+      - acidification
+      - alkalinity
+      - carbonate
+      - nutrient
+      - oxygen
+      - hypoxia
+      - remineralization
+
+  - id: remote_sensing_observing
+    title: Ocean Remote Sensing and Observing Systems
+    aliases:
+      - remote_sensing
+      - observing_systems
+      - ocean_engineering
+      - remote observing
+      - ocean observing systems
+    keywords:
+      - remote sensing
+      - satellite
+      - ocean color
+      - sea surface temperature
+      - altimetry
+      - argo
+      - buoy
+      - drifter
+      - glider
+      - sensor
+      - instrument
+      - observing system
+
+  - id: marine_ecology_fisheries
+    title: Marine Ecology, Ecosystems, and Fisheries
+    aliases:
+      - marine_ecology
+      - fisheries oceanography
+      - marine ecosystem
+      - ecology-fisheries
+    keywords:
+      - ecology
+      - ecosystem
+      - fishery
+      - fisheries
+      - plankton
+      - phytoplankton
+      - bloom
+      - coral
+      - food web
+      - habitat
+      - primary productivity
+
+  - id: coastal_hazards_human
+    title: Coastal Hazards and Human Impacts
+    aliases:
+      - coastal hazards
+      - human impacts
+      - coastal-hazards
+      - coastal ocean hazards
+    keywords:
+      - coastal
+      - storm surge
+      - flooding
+      - shoreline
+      - erosion
+      - pollution
+      - marine debris
+      - eutrophication
+      - resilience
+      - management
+      - human impact
 
 question_types:
   - bridge
@@ -22,10 +116,10 @@ question_types:
 
 answer_types:
   - entity
-  - description
   - numeric
-  - list
+  - date
   - yes_no
+  - short_text
 
 quality_rules:
   min_supporting_chunks: 2
@@ -33,4 +127,3 @@ quality_rules:
   require_sub_questions: true
   require_supporting_facts: true
   require_evidence_spans: true
-

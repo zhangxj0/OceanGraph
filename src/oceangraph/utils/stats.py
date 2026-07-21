@@ -497,10 +497,9 @@ def compute_qa_category_stats(qa_data: List[Dict]) -> Dict[str, Any]:
     relevance_scores = []
     
     for qa in qa_data:
-        # Multihop: hop_count > 1 or multiple chunks added
+        # v2.2.1: multi-hop means at least two verifier-grounded evidence chunks.
         hop_count = qa.get('hop_count', 0)
-        chunks_added = qa.get('chunks_added', [])
-        is_multihop = hop_count > 1 or (isinstance(chunks_added, list) and len(chunks_added) > 1)
+        is_multihop = hop_count >= 2
         
         # Multimodal: has image_path in context chunks OR markdown images in content
         # Match logic from metrics_optimized.py for consistency

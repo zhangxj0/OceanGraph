@@ -3,6 +3,7 @@ include README.md
 include LICENSE
 include requirements.txt
 recursive-include configs *.yaml.example
+include configs/llm.yaml
 include pyproject.toml
 include run_oceangraph.py
 

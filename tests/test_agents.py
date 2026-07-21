@@ -3,19 +3,20 @@ import types
 
 from oceangraph import (
     AGENT_ARCHITECTURE_VERSION,
+    AgentCoordinator,
     FRAMEWORK_VERSION,
     CorpusAgent,
     VerifierAgent,
     get_agent_manifest,
 )
-from oceangraph.agents import make_agent_event
+from oceangraph.agents import VerificationDecision, make_agent_event
 
 
 def test_v22_exposes_ordered_four_agent_manifest():
     manifest = get_agent_manifest()
 
-    assert FRAMEWORK_VERSION == "2.2.0"
-    assert AGENT_ARCHITECTURE_VERSION == "2.2.0"
+    assert FRAMEWORK_VERSION == "2.2.1"
+    assert AGENT_ARCHITECTURE_VERSION == "2.2.1"
     assert [agent["agent_id"] for agent in manifest] == [
         "corpus",
         "evidence",
@@ -70,6 +71,7 @@ def test_verifier_agent_owns_the_independent_acceptance_decision(monkeypatch):
         "status": "PASS",
         "necessary_chunks": ["c1", "c2"],
     }
+    qa_generator.verify_qa_cost_efficient = lambda *args, **kwargs: {}
     qa_generator.is_verification_successful = lambda *args, **kwargs: True
     qa_generator.is_multihop_necessity_successful = (
         lambda result: result["status"] == "PASS"
@@ -85,7 +87,9 @@ def test_verifier_agent_owns_the_independent_acceptance_decision(monkeypatch):
     monkeypatch.setitem(
         sys.modules, "oceangraph.pipeline.evidence_graph", evidence_graph
     )
-    monkeypatch.setattr(quality, "atomic_qa_violations", lambda *args: [])
+    monkeypatch.setattr(
+        quality, "atomic_qa_violations", lambda *args, **kwargs: []
+    )
 
     verifier = VerifierAgent(
         strict_multihop=True,
@@ -116,3 +120,72 @@ def test_verifier_agent_owns_the_independent_acceptance_decision(monkeypatch):
         "quality_violations": [],
         "multihop_status": "PASS",
     }
+
+
+def _decision(*, accepted=False, status="SHORTCUT_FOUND", uncertain=False):
+    return VerificationDecision(
+        verification_result="verification",
+        multihop_necessity_result={"status": status, "passes": accepted},
+        evidence_graph={"nodes": [{"id": "c1"}], "edges": []},
+        quality_violations=[] if accepted else ["not_atomic"],
+        verification_passed=accepted,
+        multihop_passed=accepted,
+        verifier_uncertain=uncertain,
+    )
+
+
+def test_coordinator_records_stateful_verifier_to_qa_feedback():
+    coordinator = AgentCoordinator(max_qa_revisions=1, max_evidence_retries=1)
+    state = coordinator.start_candidate(
+        seed_chunk_id="c1",
+        candidate_id="qa-1",
+        base_events=[make_agent_event("corpus", status="completed")],
+    )
+    coordinator.record_qa(state, make_agent_event("qa", status="completed"))
+
+    route = coordinator.review(state, _decision())
+
+    assert route.target == "qa"
+    assert route.action == "revise_candidate"
+    assert state.qa_revision_count == 1
+    assert state.status == "awaiting_qa_revision"
+    assert state.messages == [
+        {
+            "sequence": 1,
+            "source": "verifier",
+            "target": "qa",
+            "type": "verification_feedback",
+            "reason": "SHORTCUT_FOUND",
+            "payload": {
+                "multihop_status": "SHORTCUT_FOUND",
+                "quality_violations": ["not_atomic"],
+            },
+        }
+    ]
+    assert state.agent_trace[-1]["outputs"]["feedback_target"] == "qa"
+
+
+def test_coordinator_routes_insufficient_context_back_to_evidence_agent():
+    coordinator = AgentCoordinator(max_qa_revisions=1, max_evidence_retries=1)
+    state = coordinator.start_candidate(seed_chunk_id="c1", candidate_id="qa-1")
+
+    route = coordinator.review(
+        state,
+        _decision(status="INSUFFICIENT_CHUNKS"),
+    )
+
+    assert route.target == "evidence"
+    assert route.action == "expand_evidence"
+    assert state.evidence_retry_count == 1
+    assert state.messages[0]["target"] == "evidence"
+
+
+def test_coordinator_stops_when_revision_budget_is_exhausted():
+    coordinator = AgentCoordinator(max_qa_revisions=0, max_evidence_retries=0)
+    state = coordinator.start_candidate(seed_chunk_id="c1", candidate_id="qa-1")
+
+    route = coordinator.review(state, _decision())
+
+    assert route.target == "final"
+    assert route.action == "reject"
+    assert state.status == "rejected"

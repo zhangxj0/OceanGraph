@@ -21,9 +21,17 @@ the visible question.
 | QA Agent | Generates atomic questions, minimal answers, hidden sub-questions, reasoning paths, supporting facts, and evidence spans. |
 | Verifier Agent | Independently checks atomicity, evidence grounding, and multi-hop necessity, then emits the final acceptance decision and evidence graph. |
 
-The v2.2 runtime writes an ordered `agent_trace` to every QA record. The trace
-distinguishes generation from verification without changing the validated v2.1
-retrieval, prompting, or acceptance semantics.
+The v2.2.1 runtime writes an ordered `agent_trace` and explicit coordination
+state to every QA record. The trace
+distinguishes generation from verification while the v2.2.1 data contract
+enforces standalone questions, canonical short answers, and grounded evidence.
+
+Generation and validation are model-separated through `configs/llm.yaml`.
+Corpus, evidence-retrieval, and QA stages route to Qwen; the Verifier Agent
+routes to DeepSeek. Under the default `cost_efficient` profile, deterministic
+checks reject non-standalone, compound, or non-canonical short-answer records
+before any verifier request. One DeepSeek request then jointly checks grounding
+and multi-chunk support. Failed records are not automatically regenerated.
 
 ## Main Commands
 
@@ -64,10 +72,30 @@ Accepted QA samples include:
 - `search_history` and `search_trajectory`
 - `multihop_necessity_result`
 - `agent_trace`
+- `coordination_trace`
+
+`hop_count` is the number of distinct verifier-grounded evidence chunks. It is
+not the number of retrieval iterations; that process label is exported as
+`retrieval_hop_count`. Evidence graphs remain unresolved instead of promoting
+all context chunks when explicit or verifier-grounded support is unavailable.
+
+## Downstream Training Export
+
+Each successful run produces `training/train.jsonl`, `training/corpus.jsonl`,
+and `training/manifest.json`. Training rows contain compact SFT messages,
+canonical and short answers, reasoning annotations, evidence supervision,
+retrieval trajectories, and the four-Agent provenance. Full context text is
+kept in the aligned corpus rather than duplicated in every QA row.
+
+The training `answer` is the single canonical EM ground truth, rather than a
+rationale or explanatory paragraph. Multi-step reasoning remains in separate
+reasoning and evidence fields. Its `answer_type` is restricted to `entity`,
+`numeric`, `date`, `yes_no`, or length-bounded `short_text`; open-ended
+descriptions and multi-value lists are not training targets.
 
 ## Paper-Facing Contribution Summary
 
 OceanGraph-R1 contributes a unified four-agent data construction structure for
 ocean science search reasoning: domain-aware corpus modeling, recursive evidence
-completion, atomic QA synthesis, independent cost-bounded verification, optional
-exhaustive counterfactual auditing, and evidence-graph supervision.
+completion, atomic QA synthesis, independent cost-bounded verification, and
+training-ready evidence and Agent-trajectory supervision.

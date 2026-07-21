@@ -4,6 +4,7 @@ Loads settings from config.yaml and provides easy access to all modules.
 """
 
 import os
+from copy import deepcopy
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -11,6 +12,76 @@ from typing import Dict, Any, Optional
 # Find config.yaml relative to this file
 _CONFIG_PATH = Path(__file__).parent / "config.yaml"
 _config_cache: Optional[Dict[str, Any]] = None
+_runtime_config_override: Optional[Dict[str, Any]] = None
+
+
+_EXTERNAL_LLM_SECTIONS = ("backend", "models", "rate_limiting")
+
+
+def _resolve_external_llm_config(
+    config: Dict[str, Any],
+    *,
+    primary_config_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Overlay model-only settings from the separately editable LLM YAML.
+
+    API keys are deliberately not read from YAML.  The external file stores
+    only endpoint/model metadata and the names of environment variables.
+    """
+    configured_path = (
+        os.environ.get("OCEANGRAPH_LLM_CONFIG", "").strip()
+        or str(config.get("llm_config_file", "")).strip()
+    )
+    if not configured_path:
+        return config
+
+    raw_path = Path(configured_path).expanduser()
+    candidates = [raw_path] if raw_path.is_absolute() else [Path.cwd() / raw_path]
+    if primary_config_path is not None and not raw_path.is_absolute():
+        candidates.append(primary_config_path.parent / raw_path)
+        candidates.append(primary_config_path.parent.parent / raw_path)
+
+    llm_path = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if llm_path is None:
+        searched = ", ".join(str(candidate) for candidate in candidates)
+        raise FileNotFoundError(
+            f"LLM configuration file {configured_path!r} was not found; searched: {searched}"
+        )
+
+    with llm_path.open("r", encoding="utf-8") as handle:
+        llm_config = yaml.safe_load(handle) or {}
+    if not isinstance(llm_config, dict):
+        raise ValueError(f"LLM configuration must be a YAML mapping: {llm_path}")
+
+    merged = deepcopy(config)
+    for section in _EXTERNAL_LLM_SECTIONS:
+        if section in llm_config:
+            if not isinstance(llm_config[section], dict):
+                raise ValueError(
+                    f"LLM configuration section {section!r} must be a mapping"
+                )
+            merged[section] = deepcopy(llm_config[section])
+    return merged
+
+
+def set_runtime_config(config: Dict[str, Any]) -> None:
+    """Install an explicit per-run configuration for in-process API usage."""
+    global _runtime_config_override, _config_cache
+    _runtime_config_override = deepcopy(config)
+    _config_cache = None
+
+
+def clear_runtime_config() -> None:
+    """Remove the per-run override so a later run cannot inherit it."""
+    global _runtime_config_override, _config_cache
+    _runtime_config_override = None
+    _config_cache = None
+
+
+def reset_config_cache() -> None:
+    """Force the next file-backed configuration read to reload from disk."""
+    global _config_cache
+    _config_cache = None
 
 
 def _apply_runtime_environment(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -50,6 +121,17 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
     """
     global _config_cache
     
+    if _runtime_config_override is not None and config_path is None:
+        runtime_config = _resolve_external_llm_config(
+            deepcopy(_runtime_config_override),
+            primary_config_path=(
+                Path(os.environ["OCEANGRAPH_CONFIG"])
+                if os.environ.get("OCEANGRAPH_CONFIG")
+                else None
+            ),
+        )
+        return _apply_runtime_environment(runtime_config)
+
     if _config_cache is not None and config_path is None:
         return _apply_runtime_environment(_config_cache)
     
@@ -66,8 +148,11 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
             # Return default configuration - allows import without config file
             return _apply_runtime_environment(_get_default_config())
     
-    with open(path, 'r') as f:
-        config = yaml.safe_load(f)
+    with open(path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f) or {}
+    if not isinstance(config, dict):
+        raise ValueError(f"Configuration must be a YAML mapping: {path}")
+    config = _resolve_external_llm_config(config, primary_config_path=path)
     
     if config_path is None:
         _config_cache = config
@@ -83,18 +168,20 @@ def _get_default_config() -> Dict[str, Any]:
     """
     return {
         'backend': {
-            'active': os.environ.get('LLM_BACKEND', 'GEMINI'),
+            'active': os.environ.get(
+                'OCEANGRAPH_BACKEND', os.environ.get('LLM_BACKEND', 'GEMINI')
+            ),
             'gemini': {
-                'llm_model': 'gemini-2.0-flash',
+                'llm_model': os.environ.get('OCEANGRAPH_MODEL', 'gemini-2.0-flash'),
                 'vlm_model': 'gemini-2.0-flash',
             },
             'openai': {
-                'llm_model': 'gpt-4o-mini',
+                'llm_model': os.environ.get('OCEANGRAPH_MODEL', 'gpt-4o-mini'),
                 'vlm_model': 'gpt-4o',
             },
             'ollama': {
                 'base_url': 'http://localhost:11434',
-                'llm_model': 'llama3',
+                'llm_model': os.environ.get('OCEANGRAPH_MODEL', 'llama3'),
                 'vlm_model': 'llava',
             }
         },
@@ -124,11 +211,18 @@ def _get_default_config() -> Dict[str, Any]:
             'min_supporting_chunks': 2,
             'output_jsonl': True,
             'model_selection': False,
+            'verification_profile': 'cost_efficient',
+            'max_answer_words': 12,
+            'max_answer_cjk_chars': 16,
             'multihop_verification_mode': 'balanced',
             'max_verification_chunks': 4,
             'max_unknown_verdicts': 1,
             'counterfactual_verification': False,
-        }
+        },
+        'qa_correction': {
+            'enabled': False,
+            'max_attempts': 0,
+        },
     }
 
 
@@ -249,8 +343,8 @@ def get_qa_correction_config() -> Dict[str, Any]:
     """
     config = load_config()
     return config.get('qa_correction', {
-        'enabled': True,
-        'max_attempts': 1
+        'enabled': False,
+        'max_attempts': 0
     })
 
 
@@ -270,6 +364,9 @@ def get_qa_generation_config() -> Dict[str, Any]:
         'min_supporting_chunks': 2,
         'output_jsonl': True,
         'model_selection': False,
+        'verification_profile': 'cost_efficient',
+        'max_answer_words': 12,
+        'max_answer_cjk_chars': 16,
         'multihop_verification_mode': 'balanced',
         'max_verification_chunks': 4,
         'max_unknown_verdicts': 1,

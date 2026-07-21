@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/mirage-benchmark
+      url: https://pypi.org/p/oceangraph-r1
     permissions:
       id-token: write
     

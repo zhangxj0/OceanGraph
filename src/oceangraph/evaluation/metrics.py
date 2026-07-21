@@ -1439,7 +1439,7 @@ YOUR VERDICT:"""
         
         # Determine is_multihop and is_multimodal
         hop_count = metadata.get('hop_count', 0)
-        is_multihop = hop_count > 0
+        is_multihop = hop_count >= 2
         
         # Check for multimodal (has images in context)
         is_multimodal = False
@@ -1978,8 +1978,7 @@ def run_pipeline_evaluation(
     
     for item in raw_data:
         hop_count = item.get('hop_count', 0)
-        chunks_added = item.get('chunks_added', [])
-        is_multihop = hop_count > 0 or (isinstance(chunks_added, list) and len(chunks_added) > 1)
+        is_multihop = hop_count >= 2
         
         is_multimodal = any(
             has_image_in_chunk(c) for c in item.get('context_chunks', [])
@@ -2046,7 +2045,7 @@ def run_pipeline_evaluation(
     # ==========================================
     # 4. MULTIHOP REASONING (on multihop subset)
     # ==========================================
-    multihop_items = [qa for qa in raw_data if qa.get('hop_count', 0) > 0]
+    multihop_items = [qa for qa in raw_data if qa.get('hop_count', 0) >= 2]
     if multihop_items:
         print("\n" + "=" * 60)
         print(f"MULTIHOP REASONING ({len(multihop_items)} items)")

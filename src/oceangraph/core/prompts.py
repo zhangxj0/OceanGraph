@@ -346,7 +346,7 @@ You are a(n) {expert_persona} in the domain of {domain_context}. Your task is to
     *   **NEVER** use vague phrases like "the provided text," "the second figure," or "Section 1."
     *   **ALWAYS** explicitly name the specific entity, standard, or concept (e.g., "In the Q3 Financial Report..." or "According to the ISO 9001 guidelines...").
 *   **Strict Grounding:** Answer ONLY using the provided content. Do not hallucinate external details.
-*   **Minimal Final Answer:** The `answer` must be exactly one minimal entity, number, date, yes/no label, or short noun phrase. Do not include explanations, evidence, introductory wording, or a second answer. Perform calculations and reconsiderations silently before emitting JSON.
+*   **Minimal Final Answer:** The `answer` must be exactly one minimal entity, number, date, yes/no label, or short noun phrase: at most 12 whitespace-delimited words or 16 Chinese characters. Do not include explanations, evidence, introductory wording, or a second answer. Perform calculations and reconsiderations silently before emitting JSON.
 *   **Dependency Coverage:** Every prerequisite used by the answer must appear in `supporting_facts` and `evidence_spans`. Do not infer a classification, action, or downstream result when an intermediate measurement, calibration, threshold, or mapping rule is absent from the selected chunks.
 *   **Single Canonical Short Answer:** `short_answers` must contain exactly one item, and that item must be textually identical to `answer` after trimming punctuation. Aliases and alternative phrasings are not allowed in generated records.
 
@@ -536,6 +536,44 @@ RESPONSE:
 <|#|>START<|#|>
 Status<|#|>QUESTION_INCORRECT, ANSWER_CORRECT, REQUIRES_CONTENT<|#|>Explanation<|#|>The question mentions "the cake shown in the image" but the answer (350F) comes entirely from the text instructions - looking at the image is unnecessary. The visual reference is misleading.
 <|#|>END<|#|>
+"""
+
+PROMPTS["cost_efficient_verification"] = """
+You are the final verifier for a multi-hop QA training dataset. Perform all
+checks in this ONE response. Users will see only the question, while CHUNK 1
+through CHUNK {chunk_count} are evidence available to you.
+
+Question: {question}
+Proposed canonical answer: {answer}
+
+Apply only these fatal checks:
+1. `question_standalone`: the question names enough entities, places, times,
+   variables, missions, or phenomena to be understood without hidden context.
+2. `single_target`: the visible question requests exactly one final value or
+   entity. Hidden multi-step reasoning is allowed and expected.
+3. `answer_supported`: the proposed answer is directly supported when the
+   supplied chunks are considered together.
+4. `requires_content`: the answer depends on facts in the supplied chunks,
+   rather than only common knowledge.
+5. `supporting_chunks`: list the 1-based CHUNK numbers that materially
+   contribute to the reasoning. At least {min_supporting_chunks} distinct
+   chunks must contribute. Do not require every supplied chunk.
+
+Be tolerant of harmless wording, punctuation, or difficulty differences. Do
+not demand citations, a document title, counterfactual ablations, or stylistic
+perfection. Reject only a fatal failure above. The answer has already passed a
+deterministic short-answer check.
+
+Return exactly one JSON object:
+{{
+  "verdict": "ACCEPT" or "REJECT",
+  "question_standalone": true or false,
+  "single_target": true or false,
+  "answer_supported": true or false,
+  "requires_content": true or false,
+  "supporting_chunks": [1, 2],
+  "reason": "one short sentence"
+}}
 """
 
 PROMPTS["single_chunk_shortcut_check"] = """

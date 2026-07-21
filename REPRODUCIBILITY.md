@@ -29,7 +29,7 @@
 ```bash
 git clone https://github.com/zhangxj0/OceanGraph.git
 cd OceanGraph
-git checkout v2.2.0
+git checkout v2.2.1
 ```
 
 在已包含指定 NVIDIA Torch 构建的 Paratera 镜像中安装：

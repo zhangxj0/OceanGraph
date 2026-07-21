@@ -17,6 +17,28 @@ def test_evidence_graph_uses_counterfactually_necessary_chunks():
 
     assert graph["construction"] == "counterfactual_minimal_evidence_graph"
     assert graph["supporting_chunk_ids"] == ["physical:1", "biology:2"]
+    assert graph["hop_count"] == 2
+    assert graph["evidence_resolved"] is True
+    bridge_edges = [edge for edge in graph["edges"] if edge["type"] == "multi_hop_bridge"]
+    assert bridge_edges == []
+
+
+def test_evidence_graph_only_adds_bridge_for_declared_support_order():
+    chunks = [
+        {"file_name": "physical", "chunk_id": "1", "content": "Cold water sinks carbon."},
+        {"file_name": "biology", "chunk_id": "2", "content": "Particles export carbon."},
+    ]
+    graph = build_evidence_graph(
+        chunks,
+        qa_item={
+            "supporting_facts": [
+                {"chunk": "Chunk 1", "fact": "Cold water sinks carbon."},
+                {"chunk": "Chunk 2", "fact": "Particles export carbon."},
+            ]
+        },
+        necessity_result={"supporting_chunks": ["physical:1", "biology:2"]},
+    )
+
     bridge_edges = [edge for edge in graph["edges"] if edge["type"] == "multi_hop_bridge"]
     assert bridge_edges == [
         {
@@ -24,8 +46,19 @@ def test_evidence_graph_uses_counterfactually_necessary_chunks():
             "target": "biology:2",
             "type": "multi_hop_bridge",
             "weight": 1.0,
+            "basis": "declared_support_order",
         }
     ]
+
+
+def test_evidence_graph_does_not_promote_all_context_chunks_to_support():
+    graph = build_evidence_graph(
+        [{"file_name": "background", "chunk_id": "1", "content": "Ocean text."}]
+    )
+
+    assert graph["supporting_chunk_ids"] == []
+    assert graph["hop_count"] == 0
+    assert graph["construction"] == "unresolved_evidence_graph"
 
 
 def test_search_trajectory_preserves_rank_action_and_termination():

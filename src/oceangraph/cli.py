@@ -17,8 +17,6 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-import yaml
-
 from oceangraph import (
     AGENT_ARCHITECTURE_VERSION,
     FRAMEWORK_NAME,
@@ -33,22 +31,26 @@ def configured_api_key_envs(config_path: Optional[str], backend: str) -> list[st
         "gemini": "GEMINI_API_KEY",
         "openai": "OPENAI_API_KEY",
     }.get(backend.lower())
-    env_names = [default_env] if default_env else []
+    env_names = []
+    config = {}
     path = Path(config_path) if config_path else None
     if path and path.is_file():
         try:
-            config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        except (OSError, yaml.YAMLError):
+            from oceangraph.core.config import load_config
+
+            config = load_config(str(path))
+        except (OSError, ValueError):
             config = {}
-        models = config.get("models") or {}
-        profiles = models.get("profiles", {}) if isinstance(models, dict) else {}
-        for profile in profiles.values():
-            if not isinstance(profile, dict):
-                continue
-            profile_backend = str(profile.get("backend", backend)).lower()
-            api_key_env = profile.get("api_key_env")
-            if profile_backend == backend.lower() and api_key_env:
-                env_names.append(str(api_key_env))
+    models = config.get("models") or {}
+    profiles = models.get("profiles", {}) if isinstance(models, dict) else {}
+    for profile in profiles.values():
+        if not isinstance(profile, dict):
+            continue
+        api_key_env = profile.get("api_key_env")
+        if api_key_env:
+            env_names.append(str(api_key_env))
+    if not env_names and default_env:
+        env_names.append(default_env)
     return list(dict.fromkeys(env_names))
 
 
@@ -138,8 +140,9 @@ def setup_environment(args: argparse.Namespace) -> None:
         os.environ["OCEANGRAPH_CONFIG"] = args.config
 
     if args.api_key:
-        for env_name in configured_api_key_envs(args.config, args.backend):
-            os.environ[env_name] = args.api_key
+        env_names = configured_api_key_envs(args.config, args.backend)
+        if len(env_names) == 1:
+            os.environ[env_names[0]] = args.api_key
 
     backend = args.backend.upper()
     os.environ["OCEANGRAPH_BACKEND"] = backend
@@ -210,13 +213,18 @@ def validate_args(args: argparse.Namespace) -> list[str]:
 
     if not args.preflight and args.backend != "ollama":
         env_names = configured_api_key_envs(args.config, args.backend)
-        api_key = args.api_key or next(
-            (os.environ.get(env_name) for env_name in env_names if os.environ.get(env_name)),
-            None,
-        )
-        if not api_key:
-            env_hint = " or ".join(env_names)
-            errors.append(f"API key required for {args.backend}. Use --api-key or set {env_hint}.")
+        missing = [name for name in env_names if not os.environ.get(name)]
+        if args.api_key and len(env_names) == 1:
+            missing = []
+        if missing:
+            errors.append(
+                "Missing API key environment variable(s): " + ", ".join(missing)
+            )
+        if args.api_key and len(env_names) > 1:
+            errors.append(
+                "--api-key cannot configure multiple model profiles; set each named "
+                "environment variable separately."
+            )
     return errors
 
 
@@ -251,6 +259,10 @@ def write_run_metadata(args: argparse.Namespace) -> None:
         verification_mode = "balanced"
     if verification_mode != "strict":
         counterfactual = False
+    verification_profile = str(os.environ.get(
+        "OCEANGRAPH_VERIFICATION_PROFILE",
+        qa_config.get("verification_profile", "cost_efficient"),
+    ) or "cost_efficient").strip().lower()
 
     metadata = {
         "framework": FRAMEWORK_NAME,
@@ -267,6 +279,15 @@ def write_run_metadata(args: argparse.Namespace) -> None:
         "qa_verification": {
             "strict_multihop_verification": strict_multihop,
             "model_selection": model_selection,
+            "verification_profile": verification_profile,
+            "max_answer_words": int(os.environ.get(
+                "OCEANGRAPH_MAX_ANSWER_WORDS",
+                qa_config.get("max_answer_words", 12),
+            )),
+            "max_answer_cjk_chars": int(os.environ.get(
+                "OCEANGRAPH_MAX_ANSWER_CJK_CHARS",
+                qa_config.get("max_answer_cjk_chars", 16),
+            )),
             "multihop_verification_mode": verification_mode,
             "max_verification_chunks": int(os.environ.get(
                 "OCEANGRAPH_MAX_VERIFICATION_CHUNKS",

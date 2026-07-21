@@ -72,23 +72,78 @@ def _chunk_index_from_label(label: Any) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _supporting_chunk_ids(qa_item: Dict[str, Any], chunks: List[Dict[str, Any]]) -> List[str]:
+def _resolve_chunk_reference(reference: Any, chunks: List[Dict[str, Any]]) -> str | None:
+    reference_text = normalize_space(reference)
+    chunk_index = _chunk_index_from_label(reference_text)
+    if chunk_index is not None and 1 <= chunk_index <= len(chunks):
+        return stable_chunk_id(chunks[chunk_index - 1], chunk_index)
+    reference_key = reference_text.casefold()
+    for index, chunk in enumerate(chunks, 1):
+        chunk_id = stable_chunk_id(chunk, index)
+        if reference_key and reference_key == chunk_id.casefold():
+            return chunk_id
+    return None
+
+
+def supporting_chunk_ids_from_record(
+    qa_item: Dict[str, Any], chunks: List[Dict[str, Any]]
+) -> List[str]:
+    """Resolve only explicitly annotated supporting chunks.
+
+    Deliberately returns an empty list when annotations are absent.  Treating
+    every context chunk as supporting evidence creates false supervision.
+    """
     ids: List[str] = []
     for fact in qa_item.get("supporting_facts", []) or []:
         if not isinstance(fact, dict):
             continue
-        chunk_index = _chunk_index_from_label(fact.get("chunk"))
-        if chunk_index is not None and 1 <= chunk_index <= len(chunks):
-            ids.append(stable_chunk_id(chunks[chunk_index - 1], chunk_index))
+        resolved = _resolve_chunk_reference(fact.get("chunk"), chunks)
+        if resolved:
+            ids.append(resolved)
     for span in qa_item.get("evidence_spans", []) or []:
         if not isinstance(span, dict):
             continue
-        chunk_index = _chunk_index_from_label(span.get("chunk"))
-        if chunk_index is not None and 1 <= chunk_index <= len(chunks):
-            ids.append(stable_chunk_id(chunks[chunk_index - 1], chunk_index))
-    if not ids:
-        ids = [stable_chunk_id(chunk, idx) for idx, chunk in enumerate(chunks, 1)]
+        resolved = _resolve_chunk_reference(span.get("chunk"), chunks)
+        if resolved:
+            ids.append(resolved)
     return list(dict.fromkeys(ids))
+
+
+def verified_supporting_chunk_ids(
+    chunks: List[Dict[str, Any]],
+    qa_item: Dict[str, Any],
+    necessity_result: Dict[str, Any],
+) -> tuple[List[str], str]:
+    """Choose the strongest available evidence labels and record their source."""
+    available = {
+        stable_chunk_id(chunk, index)
+        for index, chunk in enumerate(chunks or [], 1)
+    }
+    necessary = [
+        str(chunk_id)
+        for chunk_id in necessity_result.get("necessary_chunks", []) or []
+        if str(chunk_id) in available
+    ]
+    if necessary:
+        return list(dict.fromkeys(necessary)), "counterfactual_verifier"
+
+    partial = [
+        str(chunk_id)
+        for chunk_id in necessity_result.get("supporting_chunks", []) or []
+        if str(chunk_id) in available
+    ]
+    if partial:
+        return list(dict.fromkeys(partial)), "single_chunk_verifier"
+
+    explicit = supporting_chunk_ids_from_record(qa_item, chunks)
+    if explicit:
+        return explicit, "qa_evidence_annotations"
+    return [], "unresolved"
+
+
+def derive_hop_count(evidence_graph: Dict[str, Any]) -> int:
+    """Return the canonical hop count: distinct required evidence chunks."""
+    return len(list(dict.fromkeys(evidence_graph.get("supporting_chunk_ids", []) or [])))
 
 
 def build_evidence_graph(
@@ -108,6 +163,11 @@ def build_evidence_graph(
     necessity_result = necessity_result or {}
     necessary_ids = set(necessity_result.get("necessary_chunks", []) or [])
     redundant_ids = set(necessity_result.get("redundant_chunks", []) or [])
+    supporting_ids, evidence_source = verified_supporting_chunk_ids(
+        chunks or [], qa_item, necessity_result
+    )
+    supporting_id_set = set(supporting_ids)
+    explicit_support_order = supporting_chunk_ids_from_record(qa_item, chunks or [])
     nodes: List[Dict[str, Any]] = []
     edges: List[Dict[str, Any]] = []
     chunk_ids: List[str] = []
@@ -128,6 +188,8 @@ def build_evidence_graph(
             necessity = "necessary"
         elif chunk_id in redundant_ids:
             necessity = "redundant"
+        elif chunk_id in supporting_id_set:
+            necessity = "supporting"
         else:
             necessity = "unverified"
 
@@ -151,11 +213,16 @@ def build_evidence_graph(
                 "weight": 1.0,
             })
 
-    supporting_ids = _supporting_chunk_ids(qa_item, chunks or [])
-    if necessary_ids:
-        supporting_ids = [chunk_id for chunk_id in chunk_ids if chunk_id in necessary_ids]
-    for left, right in zip(supporting_ids, supporting_ids[1:]):
-        edges.append({"source": left, "target": right, "type": "multi_hop_bridge", "weight": 1.0})
+    if len(explicit_support_order) >= 2:
+        for left, right in zip(explicit_support_order, explicit_support_order[1:]):
+            if left in supporting_ids and right in supporting_ids:
+                edges.append({
+                    "source": left,
+                    "target": right,
+                    "type": "multi_hop_bridge",
+                    "weight": 1.0,
+                    "basis": "declared_support_order",
+                })
 
     for fact in qa_item.get("supporting_facts", []) or []:
         if not isinstance(fact, dict):
@@ -189,13 +256,20 @@ def build_evidence_graph(
         "nodes": deduped_nodes,
         "edges": edges,
         "supporting_chunk_ids": supporting_ids,
-        "path_length": max(0, len(supporting_ids) - 1),
+        "hop_count": len(supporting_ids),
+        "path_length": max(0, len(explicit_support_order) - 1),
+        "evidence_source": evidence_source,
+        "evidence_resolved": len(supporting_ids) >= 2,
         "necessary_chunk_ids": list(necessary_ids),
         "redundant_chunk_ids": list(redundant_ids),
         "construction": (
             "counterfactual_minimal_evidence_graph"
-            if necessary_ids
-            else "lexical_concepts_with_supporting_fact_edges"
+            if evidence_source == "counterfactual_verifier"
+            else "verified_partial_evidence_graph"
+            if evidence_source == "single_chunk_verifier"
+            else "annotated_evidence_graph"
+            if evidence_source == "qa_evidence_annotations"
+            else "unresolved_evidence_graph"
         ),
     }
 
@@ -252,8 +326,8 @@ def build_search_trajectory(context_result: Dict[str, Any]) -> List[Dict[str, An
     return trajectory
 
 
-def ensure_short_answers(qa_item: Dict[str, Any], max_words: int = 12) -> List[str]:
-    """Create minimal answer aliases when the generator did not emit short_answers."""
+def ensure_short_answers(qa_item: Dict[str, Any], max_words: int = 8) -> List[str]:
+    """Return one canonical EM answer without inventing aliases or rewrites."""
     existing = qa_item.get("short_answers") or qa_item.get("answer_aliases") or qa_item.get("aliases")
     if isinstance(existing, str):
         existing = [existing]
@@ -261,38 +335,7 @@ def ensure_short_answers(qa_item: Dict[str, Any], max_words: int = 12) -> List[s
         return _unique_answers([str(item) for item in existing])
 
     answer = normalize_space(qa_item.get("answer"))
-    answer_type = normalize_space(qa_item.get("answer_type")).lower()
-    candidates: List[str] = []
-
-    if answer_type in {"yes_no", "boolean"}:
-        if answer.lower().startswith("yes"):
-            candidates.append("yes")
-        elif answer.lower().startswith("no"):
-            candidates.append("no")
-
-    if answer_type == "numeric":
-        match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?(?:\s*%|\s*[A-Za-z/]+)?", answer)
-        if match:
-            candidates.append(match.group(0))
-
-    first = re.split(r"(?<=[.!?])\s+", answer, maxsplit=1)[0]
-    first = re.sub(r"^the\s+(?:two|three|four|five)\s+[^.]{0,80}?\s+are\s+", "", first, flags=re.I)
-    first = re.sub(r"^the\s+[^.]{0,80}?\s+(?:is|are)\s+", "", first, flags=re.I)
-    if len(first.split()) > max_words:
-        first = re.split(
-            r"\s+(?:because|by|through|when|while|which|that|, reducing|, isolating)\s+",
-            first,
-            maxsplit=1,
-            flags=re.I,
-        )[0]
-    candidates.append(first)
-
-    cleaned = _unique_answers(candidates)
-    if cleaned and " and " in cleaned[0].lower() and "," not in cleaned[0]:
-        parts = re.split(r"\s+and\s+", cleaned[0], maxsplit=1, flags=re.I)
-        if len(parts) == 2:
-            cleaned.append(f"{parts[1].strip(' .;,')} and {parts[0].strip(' .;,')}")
-    return _unique_answers(cleaned)
+    return _unique_answers([answer]) if answer else []
 
 
 def _unique_answers(items: List[str]) -> List[str]:

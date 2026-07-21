@@ -1,10 +1,11 @@
-from oceangraph import OceanGraph, OceanGraphConfig, OceanGraphResults
+from oceangraph import OceanGraph, OceanGraphConfig, OceanGraphResults, __version__
 
 
 def test_public_api_uses_oceangraph_names():
     assert OceanGraph.__module__ == "oceangraph.api"
     assert OceanGraphConfig.__module__ == "oceangraph.api"
     assert OceanGraphResults.__module__ == "oceangraph.api"
+    assert __version__ == "2.2.1"
 
 
 def test_default_config_is_text_pipeline_ready():

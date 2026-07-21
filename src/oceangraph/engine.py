@@ -22,7 +22,11 @@ import multiprocessing as mp
 from oceangraph.core.llm import setup_logging, BACKEND, LLM_MODEL_NAME, VLM_MODEL_NAME, GEMINI_RPM, GEMINI_BURST, print_token_stats
 from oceangraph.utils.stats import compute_dataset_stats, print_dataset_stats, compute_qa_category_stats, print_qa_category_stats
 from oceangraph.utils.preflight import run_preflight_checks
-from oceangraph.utils.checkpoint import CheckpointManager
+from oceangraph.utils.checkpoint import (
+    CheckpointManager,
+    build_run_fingerprint,
+    validate_output_fingerprint,
+)
 from oceangraph.utils.llm_cache import init_llm_cache, get_llm_cache
 
 # Global checkpoint manager (initialized in run_pipeline)
@@ -98,8 +102,8 @@ try:
     EVAL_SAMPLE_SIZE = _eval.get('sample_size', None)
     
     # QA Correction
-    QA_CORRECTION_ENABLED = _qa_correction.get('enabled', True)
-    QA_CORRECTION_MAX_ATTEMPTS = _qa_correction.get('max_attempts', 1)
+    QA_CORRECTION_ENABLED = _qa_correction.get('enabled', False)
+    QA_CORRECTION_MAX_ATTEMPTS = _qa_correction.get('max_attempts', 0)
     
     # QA Generation Control
     QA_NUM_PAIRS = _qa_gen.get('num_qa_pairs', 1000)  # Target number of QA pairs
@@ -108,6 +112,13 @@ try:
     QA_MIN_SUPPORTING_CHUNKS = _qa_gen.get('min_supporting_chunks', 2)
     QA_OUTPUT_JSONL = _qa_gen.get('output_jsonl', True)
     QA_MODEL_SELECTION = _qa_gen.get('model_selection', False)
+    QA_VERIFICATION_PROFILE = str(
+        _qa_gen.get('verification_profile', 'cost_efficient')
+    ).strip().lower()
+    QA_MAX_ANSWER_WORDS = max(1, int(_qa_gen.get('max_answer_words', 12) or 12))
+    QA_MAX_ANSWER_CJK_CHARS = max(
+        1, int(_qa_gen.get('max_answer_cjk_chars', 16) or 16)
+    )
     QA_MULTIHOP_VERIFICATION_MODE = _qa_gen.get(
         'multihop_verification_mode', 'balanced'
     )
@@ -169,8 +180,8 @@ except (ImportError, Exception):
     RUN_DEDUPLICATION = False
     
     # QA Correction defaults
-    QA_CORRECTION_ENABLED = True
-    QA_CORRECTION_MAX_ATTEMPTS = 1
+    QA_CORRECTION_ENABLED = False
+    QA_CORRECTION_MAX_ATTEMPTS = 0
     
     # QA Generation Control defaults
     QA_NUM_PAIRS = 1000  # Default: 1000 QA pairs
@@ -179,6 +190,9 @@ except (ImportError, Exception):
     QA_MIN_SUPPORTING_CHUNKS = 2
     QA_OUTPUT_JSONL = True
     QA_MODEL_SELECTION = False
+    QA_VERIFICATION_PROFILE = "cost_efficient"
+    QA_MAX_ANSWER_WORDS = 8
+    QA_MAX_ANSWER_CJK_CHARS = 16
     QA_MULTIHOP_VERIFICATION_MODE = "balanced"
     QA_MAX_VERIFICATION_CHUNKS = 4
     QA_MAX_UNKNOWN_VERDICTS = 1
@@ -226,6 +240,14 @@ if os.environ.get("OCEANGRAPH_OUTPUT_JSONL") is not None:
     QA_OUTPUT_JSONL = os.environ.get("OCEANGRAPH_OUTPUT_JSONL") == "1"
 if os.environ.get("OCEANGRAPH_MODEL_SELECTION") is not None:
     QA_MODEL_SELECTION = os.environ.get("OCEANGRAPH_MODEL_SELECTION") == "1"
+if os.environ.get("OCEANGRAPH_VERIFICATION_PROFILE"):
+    QA_VERIFICATION_PROFILE = os.environ["OCEANGRAPH_VERIFICATION_PROFILE"].strip().lower()
+if os.environ.get("OCEANGRAPH_MAX_ANSWER_WORDS"):
+    QA_MAX_ANSWER_WORDS = max(1, int(os.environ["OCEANGRAPH_MAX_ANSWER_WORDS"]))
+if os.environ.get("OCEANGRAPH_MAX_ANSWER_CJK_CHARS"):
+    QA_MAX_ANSWER_CJK_CHARS = max(
+        1, int(os.environ["OCEANGRAPH_MAX_ANSWER_CJK_CHARS"])
+    )
 if os.environ.get("OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"):
     QA_MULTIHOP_VERIFICATION_MODE = os.environ.get(
         "OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"
@@ -251,11 +273,234 @@ if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
         QA_MULTIHOP_VERIFICATION_MODE,
     )
     QA_MULTIHOP_VERIFICATION_MODE = "balanced"
+if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
+    logging.warning(
+        "Unknown verification profile %r; using cost_efficient",
+        QA_VERIFICATION_PROFILE,
+    )
+    QA_VERIFICATION_PROFILE = "cost_efficient"
 if QA_MULTIHOP_VERIFICATION_MODE != "strict":
     QA_COUNTERFACTUAL_VERIFICATION = False
 QA_MAX_VERIFICATION_CHUNKS = max(
     QA_MIN_SUPPORTING_CHUNKS, QA_MAX_VERIFICATION_CHUNKS
 )
+ENABLE_CHECKPOINTING = True
+EXPORT_TRAINING_DATA = True
+TRAINING_SPLIT = "train"
+_RUNTIME_CONFIG_FINGERPRINT = None
+
+
+def apply_runtime_config(runtime_config=None) -> dict:
+    """Refresh all engine settings for one isolated pipeline run.
+
+    ``runtime_config`` may be an ``OceanGraphConfig`` instance or a nested
+    mapping.  The function deliberately runs at execution time, not import
+    time, so two API runs in the same process cannot reuse stale settings.
+    """
+    global INPUT_PDF_DIR, INPUT_CHUNKS_FILE, OUTPUT_DIR
+    global MAX_PDFS, SORT_BY_SIZE, MAX_CHUNKS, SHUFFLE, SHUFFLE_SEED
+    global EMBEDDING_MODEL, CACHE_EMBEDDINGS, EMBED_BATCH_SIZE, EMBEDDING_GPUS
+    global NUM_WORKERS, AVAILABLE_GPUS, QA_MAX_WORKERS, DEDUP_MAX_WORKERS
+    global MAX_DEPTH, MAX_BREADTH, CHUNKS_PER_SEARCH, CHUNK_ADDITION_MODE
+    global RUN_EVALUATION, EVAL_SAMPLE_SIZE, RUN_DEDUPLICATION
+    global QA_CORRECTION_ENABLED, QA_CORRECTION_MAX_ATTEMPTS
+    global QA_NUM_PAIRS, QA_TYPE, QA_STRICT_MULTIHOP, QA_MIN_SUPPORTING_CHUNKS
+    global QA_OUTPUT_JSONL, QA_MODEL_SELECTION, QA_MULTIHOP_VERIFICATION_MODE
+    global QA_VERIFICATION_PROFILE, QA_MAX_ANSWER_WORDS, QA_MAX_ANSWER_CJK_CHARS
+    global QA_MAX_VERIFICATION_CHUNKS, QA_MAX_UNKNOWN_VERDICTS
+    global QA_COUNTERFACTUAL_VERIFICATION, TEXT_ONLY_MODE
+    global FAISS_USE_GPU, FAISS_GPU_ID, ENABLE_CHECKPOINTING
+    global EXPORT_TRAINING_DATA, TRAINING_SPLIT
+    global _RUNTIME_CONFIG_FINGERPRINT
+
+    from oceangraph.core.config import load_config
+
+    if runtime_config is None:
+        config = load_config()
+    elif hasattr(runtime_config, "to_runtime_config"):
+        config = runtime_config.to_runtime_config()
+    elif isinstance(runtime_config, dict):
+        config = runtime_config
+    else:
+        raise TypeError("runtime_config must be OceanGraphConfig, dict, or None")
+
+    paths = config.get("paths", {}) or {}
+    processing = config.get("processing", {}) or {}
+    shuffling = config.get("shuffling", {}) or {}
+    embedding = config.get("embedding", {}) or {}
+    parallel = config.get("parallel", {}) or {}
+    retrieval = (config.get("retrieval", {}) or {}).get("multihop", {}) or {}
+    evaluation = config.get("evaluation", {}) or {}
+    correction = config.get("qa_correction", {}) or {}
+    qa_generation = config.get("qa_generation", {}) or {}
+    deduplication = config.get("deduplication", {}) or {}
+    faiss_config = config.get("faiss", {}) or {}
+    pipeline_config = config.get("pipeline", {}) or {}
+    checkpointing = config.get("checkpointing", {}) or {}
+    training_export = config.get("training_export", {}) or {}
+
+    INPUT_PDF_DIR = paths.get("input_pdf_dir", "data/documents")
+    INPUT_CHUNKS_FILE = paths.get("input_chunks_file")
+    OUTPUT_DIR = paths.get("output_dir", "output/results")
+    MAX_PDFS = processing.get("max_pdfs", 5)
+    SORT_BY_SIZE = bool(processing.get("sort_by_size", True))
+    MAX_CHUNKS = processing.get("max_chunks")
+    SHUFFLE = bool(shuffling.get("enabled", True))
+    SHUFFLE_SEED = int(shuffling.get("seed", 42))
+    EMBEDDING_MODEL = embedding.get("model", "bge_m3")
+    CACHE_EMBEDDINGS = bool(embedding.get("cache_embeddings", True))
+    EMBED_BATCH_SIZE = int(embedding.get("batch_size", 16))
+    EMBEDDING_GPUS = embedding.get("gpus")
+    NUM_WORKERS = int(parallel.get("num_workers", 3))
+    AVAILABLE_GPUS = parallel.get("available_gpus", [0])
+    QA_MAX_WORKERS = int(parallel.get("qa_max_workers", 6))
+    DEDUP_MAX_WORKERS = int(parallel.get("dedup_max_workers", 4))
+    MAX_DEPTH = min(int(retrieval.get("max_depth") or 2), 20)
+    MAX_BREADTH = min(int(retrieval.get("max_breadth") or 5), 10)
+    CHUNKS_PER_SEARCH = int(retrieval.get("chunks_per_search", 2))
+    CHUNK_ADDITION_MODE = str(retrieval.get("chunk_addition_mode", "RELATED"))
+    RUN_EVALUATION = bool(evaluation.get("run_evaluation", False))
+    EVAL_SAMPLE_SIZE = evaluation.get("sample_size")
+    QA_CORRECTION_ENABLED = bool(correction.get("enabled", False))
+    QA_CORRECTION_MAX_ATTEMPTS = max(0, int(correction.get("max_attempts", 0)))
+    QA_NUM_PAIRS = qa_generation.get("num_qa_pairs", 1000)
+    QA_TYPE = str(qa_generation.get("type", "multihop"))
+    QA_STRICT_MULTIHOP = bool(
+        qa_generation.get("strict_multihop_verification", True)
+    )
+    QA_MIN_SUPPORTING_CHUNKS = max(
+        1, int(qa_generation.get("min_supporting_chunks", 2))
+    )
+    QA_OUTPUT_JSONL = bool(qa_generation.get("output_jsonl", True))
+    QA_MODEL_SELECTION = bool(qa_generation.get("model_selection", False))
+    QA_VERIFICATION_PROFILE = str(
+        qa_generation.get("verification_profile", "cost_efficient")
+        or "cost_efficient"
+    ).strip().lower()
+    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
+        raise ValueError(
+            "qa_generation.verification_profile must be cost_efficient or legacy"
+        )
+    QA_MAX_ANSWER_WORDS = max(
+        1, int(qa_generation.get("max_answer_words", 12) or 12)
+    )
+    QA_MAX_ANSWER_CJK_CHARS = max(
+        1, int(qa_generation.get("max_answer_cjk_chars", 16) or 16)
+    )
+    QA_MULTIHOP_VERIFICATION_MODE = str(
+        qa_generation.get("multihop_verification_mode", "balanced") or "balanced"
+    ).strip().lower()
+    if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
+        raise ValueError(
+            "qa_generation.multihop_verification_mode must be balanced or strict"
+        )
+    QA_MAX_VERIFICATION_CHUNKS = max(
+        QA_MIN_SUPPORTING_CHUNKS,
+        int(qa_generation.get("max_verification_chunks", 4) or 4),
+    )
+    QA_MAX_UNKNOWN_VERDICTS = max(
+        0, int(qa_generation.get("max_unknown_verdicts", 1) or 0)
+    )
+    QA_COUNTERFACTUAL_VERIFICATION = bool(
+        qa_generation.get("counterfactual_verification", False)
+    )
+    if QA_MULTIHOP_VERIFICATION_MODE != "strict":
+        QA_COUNTERFACTUAL_VERIFICATION = False
+    RUN_DEDUPLICATION = bool(deduplication.get("enabled", False))
+    FAISS_USE_GPU = bool(faiss_config.get("use_gpu", False))
+    FAISS_GPU_ID = int(faiss_config.get("gpu_id", 0))
+    TEXT_ONLY_MODE = str(pipeline_config.get("modality", "text")).lower() == "text"
+    ENABLE_CHECKPOINTING = bool(checkpointing.get("enabled", True))
+    EXPORT_TRAINING_DATA = bool(training_export.get("enabled", True))
+    TRAINING_SPLIT = str(training_export.get("split", "train") or "train")
+
+    # Explicit CLI environment overrides remain supported.
+    INPUT_PDF_DIR = os.environ.get("OCEANGRAPH_INPUT_DIR", INPUT_PDF_DIR)
+    OUTPUT_DIR = os.environ.get("OCEANGRAPH_OUTPUT_DIR", OUTPUT_DIR)
+    if os.environ.get("OCEANGRAPH_NUM_QA_PAIRS") is not None:
+        QA_NUM_PAIRS = int(os.environ["OCEANGRAPH_NUM_QA_PAIRS"])
+    if os.environ.get("OCEANGRAPH_MAX_WORKERS") is not None:
+        QA_MAX_WORKERS = int(os.environ["OCEANGRAPH_MAX_WORKERS"])
+    if os.environ.get("OCEANGRAPH_EMBEDDING_MODEL"):
+        EMBEDDING_MODEL = os.environ["OCEANGRAPH_EMBEDDING_MODEL"]
+    if os.environ.get("OCEANGRAPH_RERANKER_MODEL"):
+        globals()["RERANKER_MODEL"] = os.environ["OCEANGRAPH_RERANKER_MODEL"]
+    if os.environ.get("OCEANGRAPH_MAX_DEPTH") is not None:
+        MAX_DEPTH = min(int(os.environ["OCEANGRAPH_MAX_DEPTH"]), 20)
+    if os.environ.get("OCEANGRAPH_RUN_DEDUPLICATION") is not None:
+        RUN_DEDUPLICATION = os.environ["OCEANGRAPH_RUN_DEDUPLICATION"] == "1"
+    if os.environ.get("OCEANGRAPH_RUN_EVALUATION") is not None:
+        RUN_EVALUATION = os.environ["OCEANGRAPH_RUN_EVALUATION"] == "1"
+    if os.environ.get("OCEANGRAPH_STRICT_MULTIHOP") is not None:
+        QA_STRICT_MULTIHOP = os.environ["OCEANGRAPH_STRICT_MULTIHOP"] == "1"
+    if os.environ.get("OCEANGRAPH_MIN_SUPPORTING_CHUNKS") is not None:
+        QA_MIN_SUPPORTING_CHUNKS = max(
+            1, int(os.environ["OCEANGRAPH_MIN_SUPPORTING_CHUNKS"])
+        )
+    if os.environ.get("OCEANGRAPH_OUTPUT_JSONL") is not None:
+        QA_OUTPUT_JSONL = os.environ["OCEANGRAPH_OUTPUT_JSONL"] == "1"
+    if os.environ.get("OCEANGRAPH_MODEL_SELECTION") is not None:
+        QA_MODEL_SELECTION = os.environ["OCEANGRAPH_MODEL_SELECTION"] == "1"
+    if os.environ.get("OCEANGRAPH_VERIFICATION_PROFILE"):
+        QA_VERIFICATION_PROFILE = os.environ[
+            "OCEANGRAPH_VERIFICATION_PROFILE"
+        ].strip().lower()
+    if os.environ.get("OCEANGRAPH_MAX_ANSWER_WORDS") is not None:
+        QA_MAX_ANSWER_WORDS = max(
+            1, int(os.environ["OCEANGRAPH_MAX_ANSWER_WORDS"])
+        )
+    if os.environ.get("OCEANGRAPH_MAX_ANSWER_CJK_CHARS") is not None:
+        QA_MAX_ANSWER_CJK_CHARS = max(
+            1, int(os.environ["OCEANGRAPH_MAX_ANSWER_CJK_CHARS"])
+        )
+    if os.environ.get("OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"):
+        QA_MULTIHOP_VERIFICATION_MODE = os.environ[
+            "OCEANGRAPH_MULTIHOP_VERIFICATION_MODE"
+        ].strip().lower()
+    if os.environ.get("OCEANGRAPH_MAX_VERIFICATION_CHUNKS") is not None:
+        QA_MAX_VERIFICATION_CHUNKS = int(
+            os.environ["OCEANGRAPH_MAX_VERIFICATION_CHUNKS"]
+        )
+    if os.environ.get("OCEANGRAPH_MAX_UNKNOWN_VERDICTS") is not None:
+        QA_MAX_UNKNOWN_VERDICTS = int(
+            os.environ["OCEANGRAPH_MAX_UNKNOWN_VERDICTS"]
+        )
+    if os.environ.get("OCEANGRAPH_COUNTERFACTUAL_VERIFICATION") is not None:
+        QA_COUNTERFACTUAL_VERIFICATION = (
+            os.environ["OCEANGRAPH_COUNTERFACTUAL_VERIFICATION"] == "1"
+        )
+    if os.environ.get("OCEANGRAPH_ENABLE_CHECKPOINTING") is not None:
+        ENABLE_CHECKPOINTING = os.environ["OCEANGRAPH_ENABLE_CHECKPOINTING"] == "1"
+
+    if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
+        raise ValueError("multihop verification mode must be balanced or strict")
+    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
+        raise ValueError("verification profile must be cost_efficient or legacy")
+    if QA_MULTIHOP_VERIFICATION_MODE != "strict":
+        QA_COUNTERFACTUAL_VERIFICATION = False
+    QA_MAX_VERIFICATION_CHUNKS = max(
+        QA_MIN_SUPPORTING_CHUNKS, QA_MAX_VERIFICATION_CHUNKS
+    )
+
+    fingerprint = json.dumps(
+        {
+            "config": config,
+            "resolved_models": {
+                "embedding": EMBEDDING_MODEL,
+                "reranker": globals().get("RERANKER_MODEL"),
+                "embedding_gpus": EMBEDDING_GPUS,
+            },
+        },
+        sort_keys=True,
+        default=str,
+    )
+    if _RUNTIME_CONFIG_FINGERPRINT not in {None, fingerprint}:
+        _MODEL_CACHE.clear()
+        for key in list(_EMBEDDING_CACHE):
+            _EMBEDDING_CACHE[key] = None
+    _RUNTIME_CONFIG_FINGERPRINT = fingerprint
+    _update_output_paths()
+    return config
 
 # Helper function to recompute all derived output paths
 def _update_output_paths():
@@ -1212,13 +1457,15 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
     i, chunk = chunk_data
     from oceangraph.agents import (
         CorpusAgent,
+        AgentCoordinator,
         EvidenceAgent,
         QAAgent,
         VerifierAgent,
         make_agent_event,
     )
     from oceangraph.pipeline.qa_generator import get_structured_qa_fields
-    from oceangraph.pipeline.evidence_graph import build_search_trajectory
+    from oceangraph.pipeline.evidence_graph import build_search_trajectory, derive_hop_count
+    from oceangraph.training import stable_qa_id
     from oceangraph.verification.quality import (
         has_visible_self_correction,
     )
@@ -1233,6 +1480,13 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         verification_mode=QA_MULTIHOP_VERIFICATION_MODE,
         max_verification_chunks=QA_MAX_VERIFICATION_CHUNKS,
         max_unknown_chunks=QA_MAX_UNKNOWN_VERDICTS,
+        verification_profile=QA_VERIFICATION_PROFILE,
+        max_answer_words=QA_MAX_ANSWER_WORDS,
+        max_answer_cjk_chars=QA_MAX_ANSWER_CJK_CHARS,
+    )
+    coordinator = AgentCoordinator(
+        max_qa_revisions=QA_CORRECTION_MAX_ATTEMPTS if QA_CORRECTION_ENABLED else 0,
+        max_evidence_retries=1 if QA_CORRECTION_ENABLED else 0,
     )
     
     successful_qa = []
@@ -1279,6 +1533,10 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             'context_status': context_result['status'],
             'depth_reached': context_result['depth'],
             'hop_count': context_result.get('hop_count', 0),
+            'retrieval_hop_count': context_result.get('retrieval_hop_count', 0),
+            'context_chunk_count': context_result.get(
+                'context_chunk_count', len(context_chunks)
+            ),
             'max_breadth_used': context_result.get('max_breadth_used', 0),
             'chunks_added': context_result['chunks_added'],
             'context_chunks': context_chunks,
@@ -1301,14 +1559,25 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             expert_persona,
             domain,
             use_model_review=QA_MODEL_SELECTION,
+            max_answer_words=QA_MAX_ANSWER_WORDS,
+            max_answer_cjk_chars=QA_MAX_ANSWER_CJK_CHARS,
         )
         
         # 4.4 Verifier Agent: independently verify selected pairs
         pairs_to_verify = selected.copy()
         pairs_for_correction = []  # Collect failed pairs for correction
         
-        for qa in pairs_to_verify:
+        for candidate_index, qa in enumerate(pairs_to_verify, 1):
             qa_agent.prepare_candidate(qa)
+            agent_state = coordinator.start_candidate(
+                seed_chunk_id=initial_chunk_dict['chunk_id'],
+                candidate_id=f"{i}:{candidate_index}",
+                base_events=base_agent_trace,
+            )
+            coordinator.record_qa(
+                agent_state,
+                qa_agent.trace_candidate(qa, status="completed"),
+            )
             decision = verifier_agent.verify(
                 context_chunks,
                 qa,
@@ -1316,20 +1585,23 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 expert_persona,
                 domain,
             )
-            agent_trace = [
-                *base_agent_trace,
-                qa_agent.trace_candidate(qa, status="completed"),
-                decision.trace_event(),
-            ]
+            feedback_route = coordinator.review(agent_state, decision)
+            agent_trace = list(agent_state.agent_trace)
+            canonical_hop_count = derive_hop_count(decision.evidence_graph)
             
             qa_entry = {
+                'schema_version': 'oceangraph.qa.v2.2.1',
                 'chunk_id': i,
                 'original_chunk': chunk_content,
                 'final_context': context_result['context'],
                 'context_chunks': context_chunks,  # Include full chunks with image_path for metrics
                 'context_status': context_result['status'],
                 'depth_reached': context_result['depth'],
-                'hop_count': context_result.get('hop_count', 0),
+                'hop_count': canonical_hop_count,
+                'retrieval_hop_count': context_result.get('retrieval_hop_count', 0),
+                'context_chunk_count': context_result.get(
+                    'context_chunk_count', len(context_chunks)
+                ),
                 'max_breadth_used': context_result.get('max_breadth_used', 0),
                 'chunks_added': context_result['chunks_added'],
                 'search_history': context_result.get('search_history', []),
@@ -1339,25 +1611,33 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'related_keywords': qa_metadata.get('related_keywords', ''),
                 'evidence_graph': decision.evidence_graph,
                 'agent_trace': agent_trace,
+                'coordination_trace': agent_state.to_dict(),
                 'expert_persona': expert_persona,
                 'domain': domain,
                 'question': qa['question'],
                 'answer': qa['answer'],
-                **get_structured_qa_fields(qa),
+                **get_structured_qa_fields(qa, domain),
                 'relevance_score': qa.get('relevance_score', '0'),
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'SELECTED'),
                 'selection_reason': qa.get('selection_reason', ''),
                 'verification_result': decision.verification_result,
+                'verification_profile': QA_VERIFICATION_PROFILE,
+                'verification_api_calls': int(
+                    decision.multihop_necessity_result.get(
+                        'verification_api_calls', 0
+                    ) or 0
+                ),
                 'strict_multihop_verification': QA_STRICT_MULTIHOP,
                 'multihop_necessity_result': decision.multihop_necessity_result,
             }
+            qa_entry['qa_id'] = stable_qa_id(qa_entry)
 
-            if decision.accepted:
+            if feedback_route.action == "accept":
                 successful_qa.append(qa_entry)
             else:
                 # Collect for correction attempt if enabled
-                if QA_CORRECTION_ENABLED and not decision.verifier_uncertain:
+                if QA_CORRECTION_ENABLED and feedback_route.target in {"qa", "evidence"}:
                     correction_feedback = decision.verification_result
                     if has_visible_self_correction(qa['answer']):
                         correction_feedback += (
@@ -1381,6 +1661,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         'verification_result': correction_feedback,
                         'original_qa_entry': qa_entry,
                         'original_qa': qa,
+                        'agent_state': agent_state,
+                        'feedback_target': feedback_route.target,
                     })
                 else:
                     # Final failure (correction disabled) - store with reason
@@ -1404,27 +1686,95 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             while correction_attempt < QA_CORRECTION_MAX_ATTEMPTS and current_failures:
                 correction_attempt += 1
                 print(f"  Correction attempt {correction_attempt}/{QA_CORRECTION_MAX_ATTEMPTS} for {len(current_failures)} failed pair(s)")
+
+                # A verifier can route insufficient-context failures back to the
+                # Evidence Agent before the QA Agent revises the candidate.
+                for failure in current_failures:
+                    if failure.get('feedback_target') != 'evidence':
+                        continue
+                    try:
+                        context_result = evidence_agent.expand_context_from_feedback(
+                            context_result,
+                            query=failure['question'],
+                            top_k=CHUNKS_PER_SEARCH,
+                        )
+                        context_chunks = context_result.get('chunks', context_chunks)
+                        failure['agent_state'].record_event(
+                            evidence_agent.trace_context(context_result)
+                        )
+                        failure['agent_state'].record_message(
+                            source='evidence',
+                            target='qa',
+                            message_type='evidence_ready',
+                            reason='verifier_requested_context_expansion',
+                            payload={
+                                'chunks_added': context_result.get(
+                                    'feedback_chunks_added', 0
+                                )
+                            },
+                        )
+                        failure['agent_state'].qa_revision_count += 1
+                        failure['agent_state'].status = 'awaiting_qa_revision'
+                    except Exception as exc:
+                        logging.warning(
+                            "Evidence feedback expansion failed for chunk %s: %s",
+                            i,
+                            exc,
+                        )
+                        failure['agent_state'].record_message(
+                            source='evidence',
+                            target='qa',
+                            message_type='evidence_expansion_failed',
+                            reason=str(exc),
+                        )
+                    failure['feedback_target'] = 'qa'
+
+                search_trajectory = build_search_trajectory(context_result)
                 
-                # Build failed_qa_pairs list for correction
-                failed_for_correction = [
-                    {
-                        'question': f['question'],
-                        'answer': f['answer'],
-                        'verification_result': f['verification_result'],
-                        **get_structured_qa_fields(f.get('original_qa', {})),
-                    }
-                    for f in current_failures
-                ]
-                
-                # Call correction function
-                corrected_pairs = qa_agent.correct(
-                    context_chunks, failed_for_correction, expert_persona, domain
-                )
-                
-                # Verifier Agent independently rechecks corrected candidates
+                # Correct candidates one at a time. Batch correction previously
+                # relied on response order and could silently drop a candidate
+                # when the model returned fewer items than requested.
+                correction_results = []
                 new_failures = []
-                for corrected in corrected_pairs:
+                for source_failure in current_failures:
+                    failed_for_correction = [{
+                        'question': source_failure['question'],
+                        'answer': source_failure['answer'],
+                        'verification_result': source_failure['verification_result'],
+                        **get_structured_qa_fields(
+                            source_failure.get('original_qa', {}), domain
+                        ),
+                    }]
+                    candidates = qa_agent.correct(
+                        context_chunks,
+                        failed_for_correction,
+                        expert_persona,
+                        domain,
+                    )
+                    if not candidates:
+                        source_failure['verification_result'] += (
+                            "\nCorrection model returned no parseable candidate."
+                        )
+                        new_failures.append(source_failure)
+                        continue
+                    if len(candidates) > 1:
+                        logging.warning(
+                            "Correction returned %s candidates for one source; "
+                            "only the first is retained for deterministic alignment",
+                            len(candidates),
+                        )
+                    correction_results.append((source_failure, candidates[0]))
+
+                corrected_pairs = [item for _, item in correction_results]
+
+                # Verifier Agent independently rechecks each exactly matched candidate.
+                for source_failure, corrected in correction_results:
+                    agent_state = source_failure['agent_state']
                     qa_agent.prepare_candidate(corrected)
+                    coordinator.record_qa(
+                        agent_state,
+                        qa_agent.trace_candidate(corrected, status="corrected"),
+                    )
                     corrected_decision = verifier_agent.verify(
                         context_chunks,
                         corrected,
@@ -1432,20 +1782,27 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         expert_persona,
                         domain,
                     )
-                    corrected_agent_trace = [
-                        *base_agent_trace,
-                        qa_agent.trace_candidate(corrected, status="corrected"),
-                        corrected_decision.trace_event(),
-                    ]
+                    corrected_route = coordinator.review(agent_state, corrected_decision)
+                    corrected_agent_trace = list(agent_state.agent_trace)
+                    corrected_hop_count = derive_hop_count(
+                        corrected_decision.evidence_graph
+                    )
                     
                     corrected_entry = {
+                        'schema_version': 'oceangraph.qa.v2.2.1',
                         'chunk_id': i,
                         'original_chunk': chunk_content,
                         'final_context': context_result['context'],
                         'context_chunks': context_chunks,
                         'context_status': context_result['status'],
                         'depth_reached': context_result['depth'],
-                        'hop_count': context_result.get('hop_count', 0),
+                        'hop_count': corrected_hop_count,
+                        'retrieval_hop_count': context_result.get(
+                            'retrieval_hop_count', 0
+                        ),
+                        'context_chunk_count': context_result.get(
+                            'context_chunk_count', len(context_chunks)
+                        ),
                         'max_breadth_used': context_result.get('max_breadth_used', 0),
                         'chunks_added': context_result['chunks_added'],
                         'search_history': context_result.get('search_history', []),
@@ -1455,22 +1812,30 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                         'related_keywords': qa_metadata.get('related_keywords', ''),
                         'evidence_graph': corrected_decision.evidence_graph,
                         'agent_trace': corrected_agent_trace,
+                        'coordination_trace': agent_state.to_dict(),
                         'expert_persona': expert_persona,
                         'domain': domain,
                         'question': corrected['question'],
                         'answer': corrected['answer'],
-                        **get_structured_qa_fields(corrected),
+                        **get_structured_qa_fields(corrected, domain),
                         'relevance_score': corrected.get('relevance_score', '0'),
                         'difficulty_score': corrected.get('difficulty_score', '0'),
                         'selection_status': 'CORRECTED',
                         'selection_reason': f'Corrected on attempt {correction_attempt}',
                         'verification_result': corrected_decision.verification_result,
+                        'verification_profile': QA_VERIFICATION_PROFILE,
+                        'verification_api_calls': int(
+                            corrected_decision.multihop_necessity_result.get(
+                                'verification_api_calls', 0
+                            ) or 0
+                        ),
                         'strict_multihop_verification': QA_STRICT_MULTIHOP,
                         'multihop_necessity_result': corrected_decision.multihop_necessity_result,
                         'correction_attempt': correction_attempt
                     }
+                    corrected_entry['qa_id'] = stable_qa_id(corrected_entry)
 
-                    if corrected_decision.accepted:
+                    if corrected_route.action == "accept":
                         print(f"    Corrected pair passed verification")
                         successful_qa.append(corrected_entry)
                     else:
@@ -1491,10 +1856,9 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                                 f"\nStrict multihop verifier failed: "
                                 f"{corrected_decision.multihop_necessity_result.get('status', 'UNKNOWN')}"
                             )
-                        if corrected_decision.verifier_uncertain:
+                        if corrected_route.target == 'final':
                             corrected_entry['failure_reason'] = (
-                                'Multihop verifier returned an uncertain result after '
-                                'correction; further retries skipped'
+                                f'Coordinator stopped after correction: {corrected_route.reason}'
                             )
                             failed_qa.append(corrected_entry)
                         else:
@@ -1504,6 +1868,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                                 'verification_result': corrected_feedback,
                                 'original_qa_entry': corrected_entry,
                                 'original_qa': corrected,
+                                'agent_state': agent_state,
+                                'feedback_target': corrected_route.target,
                             })
                 
                 current_failures = new_failures
@@ -1511,33 +1877,45 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             # Add remaining failures to failed_qa after all correction attempts
             for failure in current_failures:
                 qa_entry = failure['original_qa_entry']
+                agent_state = failure.get('agent_state')
+                if agent_state is not None:
+                    agent_state.status = 'rejected'
+                    qa_entry['agent_trace'] = list(agent_state.agent_trace)
+                    qa_entry['coordination_trace'] = agent_state.to_dict()
                 qa_entry['failure_reason'] = f'Failed verification after {correction_attempt} correction attempt(s)'
                 failed_qa.append(qa_entry)
-            
-            # Also add original failed pairs that weren't corrected
-            if not corrected_pairs and pairs_for_correction:
-                for failure in pairs_for_correction:
-                    qa_entry = failure['original_qa_entry']
-                    qa_entry['failure_reason'] = 'Correction produced no valid pairs'
-                    failed_qa.append(qa_entry)
         
-        for qa in rejected:
-            rejected_agent_trace = [
-                *base_agent_trace,
-                qa_agent.trace_candidate(qa, status="rejected"),
+        for rejected_index, qa in enumerate(rejected, 1):
+            rejected_state = coordinator.start_candidate(
+                seed_chunk_id=initial_chunk_dict['chunk_id'],
+                candidate_id=f"{i}:rejected:{rejected_index}",
+                base_events=base_agent_trace,
+            )
+            rejected_state.record_event(
+                qa_agent.trace_candidate(qa, status="rejected")
+            )
+            rejected_state.record_event(
                 make_agent_event(
                     "verifier",
                     status="not_run",
                     outputs={"reason": "rejected_by_qa_agent"},
-                ),
-            ]
+                )
+            )
+            rejected_state.status = "rejected_by_qa"
+            rejected_agent_trace = list(rejected_state.agent_trace)
             failed_qa.append({
+                'schema_version': 'oceangraph.qa.v2.2.1',
                 'chunk_id': i,
                 'original_chunk': chunk_content,
                 'final_context': context_result['context'],
                 'context_status': context_result['status'],
                 'depth_reached': context_result['depth'],
-                'hop_count': context_result.get('hop_count', 0),
+                # Candidate selection failures have no verifier-grounded hop label.
+                'hop_count': 0,
+                'retrieval_hop_count': context_result.get('retrieval_hop_count', 0),
+                'context_chunk_count': context_result.get(
+                    'context_chunk_count', len(context_chunks)
+                ),
                 'max_breadth_used': context_result.get('max_breadth_used', 0),
                 'chunks_added': context_result['chunks_added'],
                 'search_history': context_result.get('search_history', []),
@@ -1545,14 +1923,31 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                 'keywords_per_chunk': qa_metadata.get('keywords_per_chunk', {}),
                 'related_keywords': qa_metadata.get('related_keywords', ''),
                 'agent_trace': rejected_agent_trace,
+                'coordination_trace': rejected_state.to_dict(),
                 'question': qa['question'],
                 'answer': qa['answer'],
-                **get_structured_qa_fields(qa),
+                **get_structured_qa_fields(qa, domain),
                 'relevance_score': qa.get('relevance_score', '0'),
                 'difficulty_score': qa.get('difficulty_score', '0'),
                 'selection_status': qa.get('selection_status', 'REJECTED'),
                 'selection_reason': qa.get('selection_reason', ''),
                 'failure_reason': 'Rejected during candidate selection'
+            })
+
+        if chunk_with_context is not None:
+            chunk_with_context.update({
+                'complete_context': context_result.get('context', ''),
+                'context_status': context_result.get('status', ''),
+                'depth_reached': context_result.get('depth', 0),
+                'hop_count': context_result.get('hop_count', 0),
+                'retrieval_hop_count': context_result.get('retrieval_hop_count', 0),
+                'context_chunk_count': context_result.get(
+                    'context_chunk_count', len(context_chunks)
+                ),
+                'chunks_added': context_result.get('chunks_added', []),
+                'context_chunks': context_result.get('chunks', []),
+                'search_history': context_result.get('search_history', []),
+                'iteration_logs': context_result.get('iteration_logs', []),
             })
             
     except Exception as e:
@@ -1701,14 +2096,10 @@ def generate_qa_dataset_parallel(chunks: list, domain: str, expert_persona: str,
     # Target QA count (None = no limit)
     target_qa_count = QA_NUM_PAIRS
     
-    # Optimize: Limit chunks to process based on target (avoid processing all chunks for small targets)
-    # Process ceiling(1.1 * num_qa_pairs) chunks to account for failures and ensure we reach target
-    if target_qa_count:
-        import math
-        max_chunks_to_process = math.ceil(1.1 * target_qa_count)
-        if len(pending_chunk_data) > max_chunks_to_process:
-            print(f"[WARN] Target is {target_qa_count} QA pairs. Limiting processing to first {max_chunks_to_process} chunks (out of {len(pending_chunk_data)} total)")
-            pending_chunk_data = pending_chunk_data[:max_chunks_to_process]
+    # Keep every available seed chunk eligible. The batched loop below stops as
+    # soon as the accepted-QA target is reached; otherwise it continues until
+    # the actual configured corpus is exhausted. This avoids assuming a fixed
+    # generation/verification acceptance rate.
     
     print(f"\nUsing {QA_MAX_WORKERS} parallel workers for QA generation")
     print(f"Target: {target_qa_count if target_qa_count else 'unlimited'} '{QA_TYPE}' QA pairs")
@@ -1969,7 +2360,10 @@ def _process_single_cluster(args: Tuple) -> List[Dict]:
     # Convert list back to tensor
     answer_embeddings = torch.tensor(answer_embeddings_list)
 
-    llm_merger = LLMReranker(expert_persona=expert_persona, domain=domain)
+    # Deduplication is selection-only by default.  Keeping this argument for
+    # compatibility avoids changing the worker signature while preventing an
+    # unverified LLM rewrite after acceptance.
+    llm_merger = None
 
     try:
         merged_items = process_cluster_by_similarity(
@@ -1979,7 +2373,8 @@ def _process_single_cluster(args: Tuple) -> List[Dict]:
             llm_merger,
             expert_persona,
             domain,
-            enable_reorganization
+            False,
+            True,
         )
         return merged_items
     except Exception as e:
@@ -2058,8 +2453,10 @@ def deduplicate_qa_dataset_parallel(input_file: str, output_file: str,
     print(f"Added {stats['singletons']} unique (singleton) items.")
     print(f"Processing {len(clusters)} clusters with {DEDUP_MAX_WORKERS} parallel workers...")
     
-    # Process clusters in parallel
-    llm_merger = LLMReranker(expert_persona=expert_persona, domain=domain)
+    # Process clusters in parallel.  The merger is intentionally disabled:
+    # deduplication selects an existing verified record and never creates a new
+    # unverified question/answer pair.
+    llm_merger = None
 
     with ThreadPoolExecutor(max_workers=DEDUP_MAX_WORKERS) as executor:
         futures = {}
@@ -2073,7 +2470,8 @@ def deduplicate_qa_dataset_parallel(input_file: str, output_file: str,
                 llm_merger,
                 expert_persona,
                 domain,
-                True  # enable_reorganization
+                False,  # enable_reorganization
+                True,   # preserve_verified_records
             )
             futures[future] = cluster
         
@@ -2083,7 +2481,9 @@ def deduplicate_qa_dataset_parallel(input_file: str, output_file: str,
                 stats['clusters_processed'] += 1
                 stats['items_in_clusters'] += len(futures[future])
                 
-                if merged_items and merged_items[0].get('dedup_method') == 'select_best':
+                if merged_items and merged_items[0].get('dedup_method') in {
+                    'select_best', 'select_verified_record'
+                }:
                     stats['exact_duplicates'] += 1
                 else:
                     stats['llm_merges'] += 1
@@ -2153,7 +2553,7 @@ def run_evaluation(qa_file: str, chunks_file: str, output_dir: str) -> dict:
 # ============================================================================
 # MAIN PIPELINE
 # ============================================================================
-def run_pipeline():
+def run_pipeline(runtime_config=None):
     """Run the complete QA dataset generation pipeline.
     
     Note: Preflight checks are MANDATORY and always run.
@@ -2167,6 +2567,16 @@ def run_pipeline():
     global OUTPUT_DIR, OUTPUT_CHUNKS, OUTPUT_EMBEDDINGS_DIR, OUTPUT_QA_SUCCESSFUL
     global OUTPUT_QA_FAILED, OUTPUT_MALFORMED_CHUNKS, OUTPUT_QA_DEDUPLICATED
     global OUTPUT_CHUNKS_WITH_CONTEXT, OUTPUT_EVAL_REPORT
+
+    # Reload execution-time settings before preflight or model initialization.
+    # This is essential for sequential in-process API runs with different
+    # backends, output paths, or verifier policies.
+    from oceangraph.core.config import reset_config_cache
+    from oceangraph.core.llm import reset_llm_runtime
+
+    reset_config_cache()
+    active_config = apply_runtime_config(runtime_config)
+    reset_llm_runtime(reset_tokens=True)
     
     # Update OUTPUT_DIR from environment variable (set by run_oceangraph.py)
     # This ensures the --output argument is properly used
@@ -2208,8 +2618,25 @@ def run_pipeline():
     # =========================================================================
     # INITIALIZE CHECKPOINT MANAGER AND LLM CACHE
     # =========================================================================
-    _CHECKPOINT_MANAGER = CheckpointManager(OUTPUT_DIR)
-    _CHECKPOINT_MANAGER.print_status()
+    from oceangraph import FRAMEWORK_VERSION
+
+    run_fingerprint, run_metadata = build_run_fingerprint(
+        active_config,
+        INPUT_PDF_DIR,
+        INPUT_CHUNKS_FILE,
+        framework_version=FRAMEWORK_VERSION,
+    )
+    validate_output_fingerprint(OUTPUT_DIR, run_fingerprint, run_metadata)
+    if ENABLE_CHECKPOINTING:
+        _CHECKPOINT_MANAGER = CheckpointManager(
+            OUTPUT_DIR,
+            run_fingerprint=run_fingerprint,
+            run_metadata=run_metadata,
+        )
+        _CHECKPOINT_MANAGER.print_status()
+    else:
+        _CHECKPOINT_MANAGER = None
+        print("Checkpointing disabled for this run")
     
     # Initialize LLM response cache (saves after every call for crash resilience)
     llm_cache = init_llm_cache(os.path.join(OUTPUT_DIR, ".cache"), enabled=True)
@@ -2219,7 +2646,8 @@ def run_pipeline():
             print(f"LLM Cache: {stats['cache_size']} cached responses, {stats['hit_rate']} hit rate")
     
     print("=" * 70)
-    print("QA DATASET GENERATION PIPELINE (WITH CHECKPOINTING)")
+    checkpoint_label = "WITH CHECKPOINTING" if ENABLE_CHECKPOINTING else "NO CHECKPOINTING"
+    print(f"QA DATASET GENERATION PIPELINE ({checkpoint_label})")
     print("=" * 70)
     from oceangraph.core import llm as llm_module
     llm_module._initialize_config()
@@ -2228,11 +2656,22 @@ def run_pipeline():
     vlm_model_display = llm_module.VLM_MODEL_NAME or VLM_MODEL_NAME
     rpm_display = llm_module.GEMINI_RPM or GEMINI_RPM
     burst_display = llm_module.GEMINI_BURST or GEMINI_BURST
+    generation_route = llm_module.get_model_route_info("generation")
+    verification_route = llm_module.get_model_route_info("verification")
 
     print(f"Configuration:")
     print(f"   - Backend: {backend_display}")
     print(f"   - LLM Model: {llm_model_display}")
     print(f"   - VLM Model: {vlm_model_display}")
+    print(
+        "   - Generation Route: "
+        f"{generation_route['profile']} / {generation_route['model']}"
+    )
+    print(
+        "   - Verification Route: "
+        f"{verification_route['profile']} / {verification_route['model']}"
+    )
+    print(f"   - Verification Profile: {QA_VERIFICATION_PROFILE}")
     print(f"   - API Rate Limit: {rpm_display} RPM, burst={burst_display}")
     print(f"   - CPU Workers: {NUM_WORKERS}")
     print(f"   - QA Workers: {QA_MAX_WORKERS}")
@@ -2249,7 +2688,7 @@ def run_pipeline():
     print(f"   - Max Unknown Verdicts: {QA_MAX_UNKNOWN_VERDICTS}")
     print(f"   - Counterfactual Verification: {QA_COUNTERFACTUAL_VERIFICATION}")
     print(f"   - Run Evaluation: {RUN_EVALUATION}")
-    print(f"   - Checkpointing: ENABLED")
+    print(f"   - Checkpointing: {'ENABLED' if ENABLE_CHECKPOINTING else 'DISABLED'}")
     print("=" * 70)
     
     # =========================================================================
@@ -2374,9 +2813,30 @@ def run_pipeline():
         print("=" * 70)
         print("[NOTE] To enable deduplication, set 'deduplication.enabled: true' in config.yaml")
     
-    # Step 6: Generate Visualization for first multihop QA
+    # Step 6: Export compact, verified records for downstream training
+    if EXPORT_TRAINING_DATA and os.path.exists(qa_file_for_eval):
+        print("\n" + "=" * 70)
+        print("STEP 6: EXPORTING TRAINING DATA")
+        print("=" * 70)
+        from oceangraph.training import export_training_dataset
+
+        with open(qa_file_for_eval, 'r', encoding='utf-8') as f:
+            qa_data_for_training = json.load(f)
+        training_manifest = export_training_dataset(
+            qa_data_for_training,
+            chunks,
+            os.path.join(OUTPUT_DIR, "training"),
+            split=TRAINING_SPLIT,
+        )
+        print(
+            f"   Exported {training_manifest['exported_records']}/"
+            f"{training_manifest['input_records']} verified records to "
+            f"{os.path.join(OUTPUT_DIR, 'training')}"
+        )
+
+    # Step 7: Generate Visualization for first multihop QA
     print("\n" + "=" * 70)
-    print("STEP 6: GENERATING MULTIHOP QA VISUALIZATION")
+    print("STEP 7: GENERATING MULTIHOP QA VISUALIZATION")
     print("=" * 70)
     if os.path.exists(qa_file_for_eval):
         try:
@@ -2396,9 +2856,9 @@ def run_pipeline():
     else:
         print("   No QA file found to visualize")
     
-    # Step 7: Compute dataset statistics
+    # Step 8: Compute dataset statistics
     print("\n" + "=" * 70)
-    print("STEP 7: COMPUTING DATASET STATISTICS")
+    print("STEP 8: COMPUTING DATASET STATISTICS")
     print("=" * 70)
     dataset_stats = compute_dataset_stats(
         output_dir=OUTPUT_DIR,
@@ -2407,11 +2867,11 @@ def run_pipeline():
     )
     print_dataset_stats(dataset_stats)
     
-    # Step 8: Evaluate (if enabled)
+    # Step 9: Evaluate (if enabled)
     eval_results = None
     if RUN_EVALUATION and os.path.exists(qa_file_for_eval):
         print("\n" + "=" * 70)
-        print("STEP 8: COMPREHENSIVE EVALUATION")
+        print("STEP 9: COMPREHENSIVE EVALUATION")
         print("=" * 70)
         eval_results = run_evaluation(qa_file_for_eval, chunks_file, OUTPUT_DIR)
         

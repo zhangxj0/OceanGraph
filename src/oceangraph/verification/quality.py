@@ -1,7 +1,19 @@
-"""Deterministic QA quality gates that do not require model calls."""
+"""Deterministic, zero-API quality gates for training QA records."""
 
 import re
 from typing import Iterable, List, Optional
+
+
+_VAGUE_CONTEXT_PATTERNS = (
+    r"\b(?:the\s+)?(?:provided|given|above|below|aforementioned)\s+"
+    r"(?:text|context|document|study|report|figure|table|section|data)\b",
+    r"\b(?:this|that|the)\s+(?:figure|table|section|document|study|report)\b",
+    r"\b(?:as|like)\s+(?:shown|described|mentioned|reported)\s+"
+    r"(?:above|below|in\s+the\s+(?:text|document))\b",
+    r"\baccording\s+to\s+(?:the|this)\s+(?:text|document|study|report)\b",
+    r"(?:上述|下述|以上|以下|前述|后文|本文|本研究|该研究|该文|文中|"
+    r"图中|表中|如图|如下|所述|这项研究|该数据|这些数据)",
+)
 
 
 def has_visible_self_correction(answer: str) -> bool:
@@ -17,26 +29,44 @@ def has_visible_self_correction(answer: str) -> bool:
     return any(re.search(pattern, answer, re.IGNORECASE) for pattern in patterns)
 
 
+def standalone_question_violations(question: str) -> List[str]:
+    """Detect explicit references that make a question depend on hidden context."""
+    normalized = _normalize_text(question)
+    if not normalized:
+        return ["question_not_standalone"]
+    if any(
+        re.search(pattern, normalized, re.IGNORECASE)
+        for pattern in _VAGUE_CONTEXT_PATTERNS
+    ):
+        return ["question_not_standalone"]
+    return []
+
+
 def atomic_qa_violations(
     question: str,
     answer: str,
     short_answers: Optional[Iterable[str]] = None,
     *,
     max_answer_words: int = 12,
-    max_answer_cjk_chars: int = 32,
+    max_answer_cjk_chars: int = 16,
 ) -> List[str]:
-    """Return reasons why a QA pair is not atomic and short-answer friendly."""
+    """Return hard failures for one standalone question and one short EM answer."""
     violations: List[str] = []
     normalized_question = _normalize_text(question)
     normalized_answer = _normalize_answer(answer)
+
+    if not normalized_question:
+        violations.append("missing_question")
+    if not normalized_answer:
+        violations.append("missing_answer")
+    violations.extend(standalone_question_violations(normalized_question))
 
     if normalized_question.count("?") + normalized_question.count("？") > 1:
         violations.append("multiple_question_marks")
 
     chinese_targets = re.findall(
-        r"哪(?:个|些|一|家|笔|项|位|座|条|组|支|种|类|家公司)?|"
-        r"多少|几(?:个|家|笔|项|位|座|条|组|种|类)?|谁|什么|何时|何处|哪里|"
-        r"为何|为什么|如何|是否",
+        r"哪(?:一|个|些|种|项)?|什么|何时|哪里|何处|为何|为什么|如何|是否|"
+        r"多少|几(?:个|种|项|次)?|谁",
         normalized_question,
     )
     if len(chinese_targets) > 1:
@@ -55,7 +85,7 @@ def atomic_qa_violations(
     if re.search(r"[;；]", normalized_answer):
         violations.append("multi_clause_answer")
     elif re.search(
-        r"，\s*(?:并|以及|同时|另外|而且)|,\s+(?:and|while|whereas)\s+",
+        r"，\s*(?:并且|以及|同时|另外|而且)|,\s+(?:and|while|whereas)\s+",
         normalized_answer,
         re.IGNORECASE,
     ):

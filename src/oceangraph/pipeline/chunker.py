@@ -143,8 +143,16 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
     Returns:
         tuple: (list of chunks, dict of window queries and responses)
     """
+    from oceangraph.core.config import load_config
+
+    chunking_config = (load_config().get("chunking") or {})
+    window_size = max(100, int(chunking_config.get("window_size", WINDOW_SIZE)))
+    overlap_size = max(0, int(chunking_config.get("overlap_size", OVERLAP_SIZE)))
+    if overlap_size >= window_size:
+        raise ValueError("chunking.overlap_size must be smaller than chunking.window_size")
+
     print(f"Document size: {len(markdown_text):,} characters")
-    print(f"Window: {WINDOW_SIZE:,} chars, Overlap: {OVERLAP_SIZE:,} chars")
+    print(f"Window: {window_size:,} chars, Overlap: {overlap_size:,} chars")
     
     all_chunks = []
     position = 0
@@ -158,7 +166,7 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
         window_num += 1
         
         # Calculate window boundaries with overlap
-        window_end = min(position + WINDOW_SIZE, len(markdown_text))
+        window_end = min(position + window_size, len(markdown_text))
         window_text = markdown_text[position:window_end]
         
         # If we have an incomplete chunk from previous window, merge it
@@ -169,10 +177,12 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
             
             # Find overlap between incomplete chunk and current window
             # The new window should start with OVERLAP_SIZE chars from previous window
-            overlap_end = find_overlap(incomplete_chunk['content'], window_text)
+            overlap_end = find_overlap(
+                incomplete_chunk['content'], window_text, max_search=overlap_size * 2
+            )
             
             if overlap_end > 0:
-                print(f"   [OK] Found overlap at position {overlap_end} (expected around 0-{OVERLAP_SIZE*2})")
+                print(f"   [OK] Found overlap at position {overlap_end} (expected around 0-{overlap_size*2})")
                 
                 # Debug: Show what's being merged
                 overlap_text = window_text[:overlap_end]
@@ -187,7 +197,7 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
                 window_text = incomplete_chunk['content'] + window_text[overlap_end:]
                 print(f"   Merged text length: {len(window_text):,} chars (incomplete: {len(incomplete_chunk['content'])}, continuation: {len(continuation)})")
             else:
-                print(f"   [WARN] No overlap found (searched first {OVERLAP_SIZE*2} chars)")
+                print(f"   [WARN] No overlap found (searched first {overlap_size*2} chars)")
                 print(f"   Debug: Last 100 chars of incomplete: ...{incomplete_chunk['content'][-100:]}")
                 print(f"   Debug: First 100 chars of new window: {window_text[:100]}")
                 # No overlap, just prepend
@@ -219,7 +229,7 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
                 # Move to next window
                 if window_end >= len(markdown_text):
                     break
-                position = window_end - OVERLAP_SIZE
+                position = window_end - overlap_size
                 continue
             
             # Parse chunks from response
@@ -253,7 +263,7 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
                 all_chunks.append(incomplete_chunk)
             break
         
-        position = window_end - OVERLAP_SIZE
+        position = window_end - overlap_size
     
     print(f"\n[OK] Total chunks from all windows: {len(all_chunks)}")
     return all_chunks, queries_responses

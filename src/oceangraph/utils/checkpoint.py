@@ -13,24 +13,171 @@ Enables resume from any checkpoint after interruption.
 
 import json
 import os
+import hashlib
 from pathlib import Path
 from typing import Dict, List, Set, Optional, Any, Tuple
 from datetime import datetime
 import logging
 
 
+RUN_MANIFEST_NAME = "oceangraph_run_manifest.json"
+MATERIAL_OUTPUTS = {
+    "chunks.json",
+    "qa_multihop_pass.json",
+    "qa_multihop_fail.json",
+    "qa_deduplicated.json",
+}
+INPUT_SUFFIXES = {".pdf", ".html", ".htm", ".txt", ".md", ".markdown", ".json"}
+
+
+def _safe_config(value: Any, key: str = "") -> Any:
+    """Return a deterministic config copy with any credential fields redacted."""
+    if isinstance(value, dict):
+        return {str(k): _safe_config(v, str(k)) for k, v in sorted(value.items())}
+    if isinstance(value, list):
+        return [_safe_config(item, key) for item in value]
+    lowered = key.casefold()
+    if any(token in lowered for token in ("api_key", "token", "password", "secret")):
+        return "<redacted>"
+    return value
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def build_run_fingerprint(
+    config: Dict[str, Any],
+    input_dir: str | None,
+    input_chunks_file: str | None = None,
+    *,
+    framework_version: str = "2.2.1",
+) -> Tuple[str, Dict[str, Any]]:
+    """Hash configuration and corpus contents used by a resumable run."""
+    source_files: List[Path] = []
+    if input_chunks_file and Path(input_chunks_file).is_file():
+        source_files = [Path(input_chunks_file).resolve()]
+        source_root = source_files[0].parent
+    elif input_dir and Path(input_dir).is_dir():
+        source_root = Path(input_dir).resolve()
+        source_files = sorted(
+            path.resolve()
+            for path in source_root.rglob("*")
+            if path.is_file()
+            and path.suffix.casefold() in INPUT_SUFFIXES
+            and path.name not in {"README.md", ".gitkeep"}
+        )
+    else:
+        source_root = Path(input_dir or ".").resolve()
+
+    sources = []
+    for path in source_files:
+        try:
+            relative = path.relative_to(source_root).as_posix()
+        except ValueError:
+            relative = path.name
+        sources.append(
+            {
+                "path": relative,
+                "size": path.stat().st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+
+    payload = {
+        "framework_version": framework_version,
+        "config": _safe_config(config),
+        "sources": sources,
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest(), payload
+
+
+def validate_output_fingerprint(
+    output_dir: str,
+    fingerprint: str,
+    metadata: Dict[str, Any],
+) -> Path:
+    """Refuse to mix artifacts produced from a different config or corpus."""
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    manifest_path = output_path / RUN_MANIFEST_NAME
+    existing = None
+    if manifest_path.exists():
+        try:
+            existing = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise RuntimeError(f"Cannot read existing run manifest: {manifest_path}") from exc
+
+    if existing and existing.get("fingerprint") != fingerprint:
+        raise RuntimeError(
+            "Output directory belongs to a different OceanGraph corpus/configuration. "
+            f"Use a new output directory instead of mixing artifacts: {output_path}"
+        )
+    if existing is None and any((output_path / name).exists() for name in MATERIAL_OUTPUTS):
+        raise RuntimeError(
+            "Existing OceanGraph artifacts have no v2.2.1 fingerprint manifest. "
+            f"Use a new output directory or migrate the old run explicitly: {output_path}"
+        )
+
+    manifest = {
+        "fingerprint": fingerprint,
+        "framework_version": metadata.get("framework_version", "2.2.1"),
+        "source_count": len(metadata.get("sources", [])),
+        "config": metadata.get("config", {}),
+        "sources": metadata.get("sources", []),
+    }
+    temp_path = manifest_path.with_suffix(".tmp")
+    temp_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+    temp_path.replace(manifest_path)
+    return manifest_path
+
+
 class CheckpointManager:
     """Manages checkpoints for pipeline resume capability."""
     
-    def __init__(self, output_dir: str):
+    def __init__(
+        self,
+        output_dir: str,
+        run_fingerprint: str | None = None,
+        run_metadata: Dict[str, Any] | None = None,
+    ):
         """Initialize checkpoint manager.
         
         Args:
             output_dir: Base output directory for checkpoints
         """
         self.output_dir = Path(output_dir)
-        self.checkpoint_dir = self.output_dir / ".checkpoints"
+        checkpoint_root = self.output_dir / ".checkpoints"
+        self.run_fingerprint = run_fingerprint
+        self.checkpoint_dir = (
+            checkpoint_root / run_fingerprint[:16]
+            if run_fingerprint
+            else checkpoint_root
+        )
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        if run_fingerprint:
+            (self.checkpoint_dir / "run_manifest.json").write_text(
+                json.dumps(
+                    {
+                        "fingerprint": run_fingerprint,
+                        "metadata": run_metadata or {},
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                    default=str,
+                ),
+                encoding="utf-8",
+            )
         
         # Checkpoint file paths
         self.markdown_checkpoint = self.checkpoint_dir / "markdown_progress.json"

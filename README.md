@@ -5,17 +5,17 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0-005F73.svg" alt="Version 2.2.0">
+  <img src="https://img.shields.io/badge/version-2.2.1-005F73.svg" alt="Version 2.2.1">
   <img src="https://img.shields.io/badge/python-3.12-blue.svg" alt="Python 3.12">
   <img src="https://img.shields.io/badge/license-Apache--2.0-green.svg" alt="Apache-2.0 license">
   <img src="https://img.shields.io/badge/domain-ocean%20science-0077B6.svg" alt="Ocean science">
 </p>
 
-**Current release:** `v2.2.0` ·
-**Last updated:** `2026-07-17`
+**Current release:** `v2.2.1` ·
+**Last updated:** `2026-07-21`
 
 OceanGraph-R1 turns ocean-science corpora into structured, verifiable multi-hop
-question-answer datasets for retrieval and reasoning evaluation. It accepts
+question-answer datasets for downstream retrieval and reasoning training. It accepts
 PDF, HTML, TXT, and Markdown sources, plans domain-specific reasoning paths,
 and verifies that each accepted question requires evidence from multiple chunks.
 
@@ -87,20 +87,33 @@ export OPENAI_API_KEY="YOUR_OPENAI_KEY"
 ```
 
 For the recommended stage-routed setup, keep credentials in environment
-variables and copy the `models` section from `configs/oceangraph.yaml.example`:
+variables. Model endpoints and names now live only in `configs/llm.yaml`:
 
 ```powershell
 Copy-Item configs/oceangraph.yaml.example config.yaml
+# Edit configs/llm.yaml when either model or endpoint changes.
 $env:PARATERA_API_KEY = "YOUR_PARATERA_KEY"
 $env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
 ```
 
-This routes corpus analysis, retrieval, generation, and correction to
+This routes corpus analysis, retrieval, and QA generation to
 `Qwen3.7-Plus` through Paratera, while final text-only verification uses
-`deepseek-v4-pro`. Optional model selection is routed to DeepSeek but disabled
-by default because the deterministic atomic-QA gate already removes malformed
-candidates. The default `pipeline.modality: text` setting strips image artifacts
-before retrieval, generation, verification, and dataset export.
+`deepseek-v4-pro`. The default `cost_efficient` policy first rejects obvious
+compound questions, hidden-context references, and long answers locally. Each
+remaining candidate uses one DeepSeek call that jointly checks standalone form,
+answer grounding, content dependence, and support from at least two chunks.
+Model selection, counterfactual audits, and automatic correction are disabled
+by default, so a failed candidate is skipped instead of triggering repeat API
+calls.
+
+Accepted records contain exactly one visible question and one canonical ground
+truth. `answer` and `short_answers[0]` must match after punctuation trimming and
+are limited by default to 12 whitespace-delimited words or 16 Chinese characters,
+making exact-match reward computation deterministic. Canonical `answer_type`
+values are `entity`, `numeric`, `date`, `yes_no`, and `short_text`; open-ended
+`description` and multi-value `list` targets are excluded. The default
+`pipeline.modality: text` setting strips image artifacts before retrieval,
+generation, verification, and dataset export.
 
 Run an OceanGraph pipeline over an input directory:
 
@@ -153,9 +166,10 @@ OceanGraph-R1 coordinates four explicit runtime agents:
 4. **Verifier Agent** independently checks atomicity, evidence grounding, and
    multi-hop necessity before accepting an item.
 
-The agents reuse the validated v2.1 generation functions through explicit v2.2
+The agents reuse the validated v2.1 generation functions through explicit v2.2.1
 runtime boundaries. Every generated or rejected record contains an
-`agent_trace` showing which role ran, its status, and its principal outputs.
+`agent_trace` and `coordination_trace` showing which role ran, the feedback
+route, and the final state of each candidate.
 
 The default `balanced` verifier keeps the single-chunk shortcut guard but checks
 up to four evidence-prioritized chunks in one consolidated DeepSeek request. It
@@ -184,10 +198,25 @@ A completed run writes the following key artifacts to the output directory:
 | `chunks.json` | Source chunks used by the pipeline |
 | `chunks_with_complete_context.json` | Context-expanded chunks |
 | `oceangraph_run_config.json` | Run metadata and selected configuration |
+| `oceangraph_run_manifest.json` | Corpus/config fingerprint preventing mixed-run reuse |
+| `training/train.jsonl` | Compact, fully verified multi-agent records for training |
+| `training/corpus.jsonl` | Retrieval corpus with IDs aligned to the evidence graph |
+| `training/manifest.json` | Export counts and rejected-record reasons |
 
 Each accepted record includes fields such as `question_type`, `answer_type`,
-`subdomain`, `declared_hop_count`, `sub_questions`, `reasoning_path`,
+`subdomain`, `hop_count`, `declared_hop_count`, `retrieval_hop_count`,
+`sub_questions`, `reasoning_path`,
 `supporting_facts`, `evidence_spans`, and the four-stage `agent_trace`.
+
+In v2.2.1, `hop_count` has one dataset-level meaning: the number of distinct
+verified evidence chunks required to answer the question. Retrieval expansion
+steps are stored separately as `retrieval_hop_count`.
+
+The automatic training export is strict: records are excluded if multi-hop
+verification did not pass, fewer than two supporting chunks were grounded,
+the hop label disagrees with the evidence graph, or any of the four Agent
+events is missing. The same export is available through
+`results.export_training("path/to/training")`.
 
 ## Ocean taxonomy
 
