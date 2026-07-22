@@ -1,4 +1,4 @@
-"""Runtime roles for the four-agent OceanGraph v2.2 architecture.
+"""Runtime roles for the four-agent OceanGraph v3.0 architecture.
 
 The agents in this module are deliberately thin orchestration boundaries.  They
 reuse the validated v2.1 implementation while making ownership explicit:
@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Tuple
 
 
-AGENT_ARCHITECTURE_VERSION = "2.2.1"
+AGENT_ARCHITECTURE_VERSION = "3.0.0"
 
 
 @dataclass(frozen=True)

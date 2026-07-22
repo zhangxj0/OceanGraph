@@ -28,6 +28,7 @@ from oceangraph.utils.checkpoint import (
     validate_output_fingerprint,
 )
 from oceangraph.utils.llm_cache import init_llm_cache, get_llm_cache
+from oceangraph.utils.sources import discover_source_documents
 
 # Global checkpoint manager (initialized in run_pipeline)
 _CHECKPOINT_MANAGER = None
@@ -68,7 +69,7 @@ try:
     OUTPUT_DIR = _paths.get('output_dir', "output/results")
     
     # Processing limits
-    MAX_PDFS = _proc.get('max_pdfs', 5)
+    MAX_PDFS = _proc.get('max_pdfs')
     SORT_BY_SIZE = _proc.get('sort_by_size', True)
     MAX_CHUNKS = _proc.get('max_chunks', None)
     
@@ -156,7 +157,7 @@ except (ImportError, Exception):
     CHUNKS_PER_SEARCH = 2
     CHUNK_ADDITION_MODE = "RELATED"  # EXPLANATORY or RELATED
     
-    MAX_PDFS = 5
+    MAX_PDFS = None
     SORT_BY_SIZE = True
     MAX_CHUNKS = None
     
@@ -286,7 +287,9 @@ QA_MAX_VERIFICATION_CHUNKS = max(
 )
 ENABLE_CHECKPOINTING = True
 EXPORT_TRAINING_DATA = True
-TRAINING_SPLIT = "train"
+TRAINING_SPLIT = None
+TRAINING_SPLIT_RATIOS = {"train": 0.8, "dev": 0.1, "test": 0.1}
+TRAINING_SPLIT_SEED = 42
 _RUNTIME_CONFIG_FINGERPRINT = None
 
 
@@ -310,7 +313,8 @@ def apply_runtime_config(runtime_config=None) -> dict:
     global QA_MAX_VERIFICATION_CHUNKS, QA_MAX_UNKNOWN_VERDICTS
     global QA_COUNTERFACTUAL_VERIFICATION, TEXT_ONLY_MODE
     global FAISS_USE_GPU, FAISS_GPU_ID, ENABLE_CHECKPOINTING
-    global EXPORT_TRAINING_DATA, TRAINING_SPLIT
+    global EXPORT_TRAINING_DATA, TRAINING_SPLIT, TRAINING_SPLIT_RATIOS
+    global TRAINING_SPLIT_SEED
     global _RUNTIME_CONFIG_FINGERPRINT
 
     from oceangraph.core.config import load_config
@@ -342,7 +346,7 @@ def apply_runtime_config(runtime_config=None) -> dict:
     INPUT_PDF_DIR = paths.get("input_pdf_dir", "data/documents")
     INPUT_CHUNKS_FILE = paths.get("input_chunks_file")
     OUTPUT_DIR = paths.get("output_dir", "output/results")
-    MAX_PDFS = processing.get("max_pdfs", 5)
+    MAX_PDFS = processing.get("max_pdfs")
     SORT_BY_SIZE = bool(processing.get("sort_by_size", True))
     MAX_CHUNKS = processing.get("max_chunks")
     SHUFFLE = bool(shuffling.get("enabled", True))
@@ -412,7 +416,14 @@ def apply_runtime_config(runtime_config=None) -> dict:
     TEXT_ONLY_MODE = str(pipeline_config.get("modality", "text")).lower() == "text"
     ENABLE_CHECKPOINTING = bool(checkpointing.get("enabled", True))
     EXPORT_TRAINING_DATA = bool(training_export.get("enabled", True))
-    TRAINING_SPLIT = str(training_export.get("split", "train") or "train")
+    configured_split = training_export.get("split")
+    TRAINING_SPLIT = str(configured_split).strip() if configured_split else None
+    TRAINING_SPLIT_RATIOS = dict(
+        training_export.get(
+            "split_ratios", {"train": 0.8, "dev": 0.1, "test": 0.1}
+        )
+    )
+    TRAINING_SPLIT_SEED = int(training_export.get("seed", 42))
 
     # Explicit CLI environment overrides remain supported.
     INPUT_PDF_DIR = os.environ.get("OCEANGRAPH_INPUT_DIR", INPUT_PDF_DIR)
@@ -501,6 +512,77 @@ def apply_runtime_config(runtime_config=None) -> dict:
     _RUNTIME_CONFIG_FINGERPRINT = fingerprint
     _update_output_paths()
     return config
+
+
+def _effective_runtime_settings() -> dict:
+    """Return the non-secret settings that actually govern this run.
+
+    ``apply_runtime_config`` supports CLI/environment overrides after loading
+    YAML.  Persisting these resolved values in the run fingerprint prevents a
+    resumed output directory from mixing records generated under different
+    retrieval, verification, or concurrency policies.
+    """
+
+    return {
+        "paths": {
+            "input_dir": INPUT_PDF_DIR,
+            "input_chunks_file": INPUT_CHUNKS_FILE,
+            "output_dir": OUTPUT_DIR,
+        },
+        "processing": {
+            "max_files": MAX_PDFS,
+            "max_chunks": MAX_CHUNKS,
+            "sort_by_size": SORT_BY_SIZE,
+        },
+        "shuffling": {"enabled": SHUFFLE, "seed": SHUFFLE_SEED},
+        "embedding": {
+            "model": EMBEDDING_MODEL,
+            "reranker": globals().get("RERANKER_MODEL"),
+            "batch_size": EMBED_BATCH_SIZE,
+            "gpus": EMBEDDING_GPUS,
+            "cache": CACHE_EMBEDDINGS,
+        },
+        "parallel": {
+            "document_workers": NUM_WORKERS,
+            "qa_workers": QA_MAX_WORKERS,
+            "dedup_workers": DEDUP_MAX_WORKERS,
+        },
+        "retrieval": {
+            "max_depth": MAX_DEPTH,
+            "max_breadth": MAX_BREADTH,
+            "chunks_per_search": CHUNKS_PER_SEARCH,
+            "chunk_addition_mode": CHUNK_ADDITION_MODE,
+        },
+        "qa_generation": {
+            "target": QA_NUM_PAIRS,
+            "type": QA_TYPE,
+            "strict_multihop": QA_STRICT_MULTIHOP,
+            "min_supporting_chunks": QA_MIN_SUPPORTING_CHUNKS,
+            "model_selection": QA_MODEL_SELECTION,
+            "verification_profile": QA_VERIFICATION_PROFILE,
+            "max_answer_words": QA_MAX_ANSWER_WORDS,
+            "max_answer_cjk_chars": QA_MAX_ANSWER_CJK_CHARS,
+            "multihop_verification_mode": QA_MULTIHOP_VERIFICATION_MODE,
+            "max_verification_chunks": QA_MAX_VERIFICATION_CHUNKS,
+            "max_unknown_verdicts": QA_MAX_UNKNOWN_VERDICTS,
+            "counterfactual_verification": QA_COUNTERFACTUAL_VERIFICATION,
+            "correction_enabled": QA_CORRECTION_ENABLED,
+            "correction_max_attempts": QA_CORRECTION_MAX_ATTEMPTS,
+        },
+        "outputs": {
+            "jsonl": QA_OUTPUT_JSONL,
+            "deduplication": RUN_DEDUPLICATION,
+            "evaluation": RUN_EVALUATION,
+            "evaluation_sample_size": EVAL_SAMPLE_SIZE,
+            "checkpointing": ENABLE_CHECKPOINTING,
+            "training_export": EXPORT_TRAINING_DATA,
+            "training_split": TRAINING_SPLIT,
+            "training_split_ratios": TRAINING_SPLIT_RATIOS,
+            "training_split_seed": TRAINING_SPLIT_SEED,
+        },
+        "pipeline": {"text_only": TEXT_ONLY_MODE},
+        "faiss": {"use_gpu": FAISS_USE_GPU, "gpu_id": FAISS_GPU_ID},
+    }
 
 # Helper function to recompute all derived output paths
 def _update_output_paths():
@@ -874,15 +956,6 @@ def _prepare_plain_text_document(doc_file: Path, markdown_dir: Path) -> Tuple[st
         return (doc_file.name, None, str(e))
 
 
-def _is_source_document(path: Path, supported_extensions: set[str]) -> bool:
-    """Return True for user-provided source documents, excluding templates."""
-    return (
-        path.is_file()
-        and path.name not in IGNORED_SOURCE_FILENAMES
-        and path.suffix.lower() in supported_extensions
-    )
-
-
 def _chunk_single_markdown(args: Tuple[str, str]) -> Tuple[str, List[dict], str]:
     """Worker function to chunk a single markdown file (for parallel processing)
     
@@ -957,12 +1030,12 @@ def convert_documents_to_chunks_parallel(doc_dir: str, output_chunks_file: str,
     
     # Collect all document files
     supported_extensions = SUPPORTED_DOCUMENT_EXTENSIONS
-    doc_files = []
-    for ext in supported_extensions:
-        doc_files.extend(
-            f for f in doc_dir.glob(f"*{ext}")
-            if _is_source_document(f, supported_extensions)
-        )
+    doc_files = discover_source_documents(
+        doc_dir,
+        supported_suffixes=supported_extensions,
+        ignored_filenames=IGNORED_SOURCE_FILENAMES,
+        require_unique_stems=True,
+    )
     
     if not doc_files and not existing_md_files:
         print(f"No document files found in {doc_dir}")
@@ -1590,7 +1663,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             canonical_hop_count = derive_hop_count(decision.evidence_graph)
             
             qa_entry = {
-                'schema_version': 'oceangraph.qa.v2.2.1',
+                'schema_version': 'oceangraph.qa.v3.0.0',
                 'chunk_id': i,
                 'original_chunk': chunk_content,
                 'final_context': context_result['context'],
@@ -1789,7 +1862,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
                     )
                     
                     corrected_entry = {
-                        'schema_version': 'oceangraph.qa.v2.2.1',
+                        'schema_version': 'oceangraph.qa.v3.0.0',
                         'chunk_id': i,
                         'original_chunk': chunk_content,
                         'final_context': context_result['context'],
@@ -1904,7 +1977,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             rejected_state.status = "rejected_by_qa"
             rejected_agent_trace = list(rejected_state.agent_trace)
             failed_qa.append({
-                'schema_version': 'oceangraph.qa.v2.2.1',
+                'schema_version': 'oceangraph.qa.v3.0.0',
                 'chunk_id': i,
                 'original_chunk': chunk_content,
                 'final_context': context_result['context'],
@@ -2150,16 +2223,31 @@ def generate_qa_dataset_parallel(chunks: list, domain: str, expert_persona: str,
         generation_stats['corpus_exhausted'] = True
         return successful_qa, failed_qa, chunks_with_context, generation_stats
     
-    # Process chunks in batches to enable proper early stopping
-    # Batch size = 2x workers to keep workers busy while checking results
-    batch_size = max(QA_MAX_WORKERS * 2, 10)
+    # Submit no more paid seed-chunk tasks than the remaining accepted-QA
+    # deficit.  At most one worker-width batch is in flight, which bounds the
+    # unavoidable overshoot while preserving parallel throughput.
+    from oceangraph.utils.scheduling import bounded_submission_size
+
     chunk_idx_offset = 0
     
     with ThreadPoolExecutor(max_workers=QA_MAX_WORKERS) as executor:
         pbar = tqdm(total=len(pending_chunk_data), desc="Generating QA")
         
-        while chunk_idx_offset < len(pending_chunk_data) and not stop_flag[0]:
-            # Submit next batch of chunks
+        while chunk_idx_offset < len(pending_chunk_data):
+            remaining_target = (
+                None
+                if not target_qa_count
+                else max(0, target_qa_count - matching_qa_count[0])
+            )
+            batch_size = bounded_submission_size(
+                len(pending_chunk_data) - chunk_idx_offset,
+                QA_MAX_WORKERS,
+                remaining_target,
+            )
+            if batch_size == 0:
+                break
+
+            # Submit only the demand-bounded next batch of chunks.
             batch_end = min(chunk_idx_offset + batch_size, len(pending_chunk_data))
             current_batch = pending_chunk_data[chunk_idx_offset:batch_end]
             
@@ -2169,13 +2257,6 @@ def generate_qa_dataset_parallel(chunks: list, domain: str, expert_persona: str,
             }
             
             for future in as_completed(futures):
-                # Check if we should stop (target already reached by another future)
-                if stop_flag[0]:
-                    # Cancel remaining futures in this batch
-                    for f in futures:
-                        f.cancel()
-                    break
-                    
                 chunk_idx = futures[future]
                 pbar.update(1)
                 
@@ -2193,16 +2274,20 @@ def generate_qa_dataset_parallel(chunks: list, domain: str, expert_persona: str,
                     for qa in chunk_successful:
                         if is_qa_type_match(qa, QA_TYPE):
                             with count_lock:
-                                if target_qa_count is None or matching_qa_count[0] < target_qa_count:
-                                    successful_qa.append(qa)
-                                    chunk_success_list.append(qa)
-                                    matching_qa_count[0] += 1
-                                    
-                                    # Check if target reached
-                                    if target_qa_count and matching_qa_count[0] >= target_qa_count:
+                                # Retain every verified result from the already
+                                # bounded in-flight batch.  This avoids paying
+                                # for a valid completion and then discarding it;
+                                # a multi-candidate seed may therefore exceed
+                                # the requested minimum by a small amount.
+                                successful_qa.append(qa)
+                                chunk_success_list.append(qa)
+                                matching_qa_count[0] += 1
+
+                                if target_qa_count and matching_qa_count[0] >= target_qa_count:
+                                    if not stop_flag[0]:
                                         print(f"\nTarget reached: {matching_qa_count[0]}/{target_qa_count} '{QA_TYPE}' QA pairs")
-                                        stop_flag[0] = True
-                                        generation_stats['target_reached'] = True
+                                    stop_flag[0] = True
+                                    generation_stats['target_reached'] = True
                         else:
                             # QA doesn't match type, add to failed
                             qa['failure_reason'] = f"Does not match target type '{QA_TYPE}'"
@@ -2553,7 +2638,7 @@ def run_evaluation(qa_file: str, chunks_file: str, output_dir: str) -> dict:
 # ============================================================================
 # MAIN PIPELINE
 # ============================================================================
-def run_pipeline(runtime_config=None):
+def run_pipeline(runtime_config=None) -> bool:
     """Run the complete QA dataset generation pipeline.
     
     Note: Preflight checks are MANDATORY and always run.
@@ -2590,7 +2675,52 @@ def run_pipeline(runtime_config=None):
         print(f"Output directory from config: {OUTPUT_DIR}")
     
     setup_logging()
-    
+
+    # Resolve model routes and validate the corpus/run identity before any
+    # paid connectivity checks.  The cache is also initialized first so a
+    # repeated preflight can reuse its two minimal route probes.
+    from oceangraph import FRAMEWORK_VERSION
+    from oceangraph.core import llm as llm_module
+
+    llm_module._initialize_config()
+    fingerprint_stages = (
+        "default",
+        "corpus",
+        "retrieval",
+        "generation",
+        "correction",
+        "selection",
+        "verification",
+    )
+    model_routes = {
+        stage: llm_module.get_model_route_info(stage)
+        for stage in fingerprint_stages
+    }
+    run_fingerprint, run_metadata = build_run_fingerprint(
+        active_config,
+        INPUT_PDF_DIR,
+        INPUT_CHUNKS_FILE,
+        framework_version=FRAMEWORK_VERSION,
+        runtime_settings=_effective_runtime_settings(),
+        model_routes=model_routes,
+    )
+    # Reject a genuinely mixed output directory before any paid probe, but do
+    # not claim a fresh directory until mandatory preflight has passed.  This
+    # lets users repair a failed smoke-run configuration in place.
+    validate_output_fingerprint(
+        OUTPUT_DIR,
+        run_fingerprint,
+        run_metadata,
+        write_manifest=False,
+    )
+    _CHECKPOINT_MANAGER = None
+
+    llm_cache = init_llm_cache(os.path.join(OUTPUT_DIR, ".cache"), enabled=True)
+    if llm_cache:
+        stats = llm_cache.get_stats()
+        if stats['cache_size'] > 0:
+            print(f"LLM Cache: {stats['cache_size']} cached responses, {stats['hit_rate']} hit rate")
+
     # =========================================================================
     # PREFLIGHT CHECKS - Validate all services before expensive execution
     # MANDATORY: Cannot be skipped - ensures system is properly configured
@@ -2598,34 +2728,15 @@ def run_pipeline(runtime_config=None):
     print("\n" + "=" * 70)
     print("RUNNING PREFLIGHT CHECKS (mandatory)")
     print("=" * 70)
-    
+
     all_passed, results = run_preflight_checks(skip_expensive=False, quiet=False)
-    
+
     if not all_passed:
         print("\nSTOPPING: Preflight checks failed.")
         print("   Fix the issues above before running the pipeline.")
         print("   This prevents wasted LLM API calls on a misconfigured system.\n")
-        return
-    
-    print("\nAll preflight checks passed! Starting pipeline...\n")
-    
-    # Initialize GPU lock for thread-safe access
-    init_gpu_lock()
-    from oceangraph.agents import CorpusAgent
+        return False
 
-    corpus_agent = CorpusAgent()
-    
-    # =========================================================================
-    # INITIALIZE CHECKPOINT MANAGER AND LLM CACHE
-    # =========================================================================
-    from oceangraph import FRAMEWORK_VERSION
-
-    run_fingerprint, run_metadata = build_run_fingerprint(
-        active_config,
-        INPUT_PDF_DIR,
-        INPUT_CHUNKS_FILE,
-        framework_version=FRAMEWORK_VERSION,
-    )
     validate_output_fingerprint(OUTPUT_DIR, run_fingerprint, run_metadata)
     if ENABLE_CHECKPOINTING:
         _CHECKPOINT_MANAGER = CheckpointManager(
@@ -2635,29 +2746,27 @@ def run_pipeline(runtime_config=None):
         )
         _CHECKPOINT_MANAGER.print_status()
     else:
-        _CHECKPOINT_MANAGER = None
         print("Checkpointing disabled for this run")
-    
-    # Initialize LLM response cache (saves after every call for crash resilience)
-    llm_cache = init_llm_cache(os.path.join(OUTPUT_DIR, ".cache"), enabled=True)
-    if llm_cache:
-        stats = llm_cache.get_stats()
-        if stats['cache_size'] > 0:
-            print(f"LLM Cache: {stats['cache_size']} cached responses, {stats['hit_rate']} hit rate")
+
+    print("\nAll preflight checks passed! Starting pipeline...\n")
+
+    # Initialize GPU lock for thread-safe access
+    init_gpu_lock()
+    from oceangraph.agents import CorpusAgent
+
+    corpus_agent = CorpusAgent()
     
     print("=" * 70)
     checkpoint_label = "WITH CHECKPOINTING" if ENABLE_CHECKPOINTING else "NO CHECKPOINTING"
     print(f"QA DATASET GENERATION PIPELINE ({checkpoint_label})")
     print("=" * 70)
-    from oceangraph.core import llm as llm_module
-    llm_module._initialize_config()
     backend_display = llm_module.BACKEND or BACKEND
     llm_model_display = llm_module.LLM_MODEL_NAME or LLM_MODEL_NAME
     vlm_model_display = llm_module.VLM_MODEL_NAME or VLM_MODEL_NAME
     rpm_display = llm_module.GEMINI_RPM or GEMINI_RPM
     burst_display = llm_module.GEMINI_BURST or GEMINI_BURST
-    generation_route = llm_module.get_model_route_info("generation")
-    verification_route = llm_module.get_model_route_info("verification")
+    generation_route = model_routes["generation"]
+    verification_route = model_routes["verification"]
 
     print(f"Configuration:")
     print(f"   - Backend: {backend_display}")
@@ -2747,7 +2856,7 @@ def run_pipeline(runtime_config=None):
         chunks_file = OUTPUT_CHUNKS
         if not chunks:
             print("No chunks generated. Exiting.")
-            return
+            return False
     
     print(f"   Total chunks: {len(chunks)}")
     
@@ -2827,12 +2936,20 @@ def run_pipeline(runtime_config=None):
             chunks,
             os.path.join(OUTPUT_DIR, "training"),
             split=TRAINING_SPLIT,
+            split_ratios=TRAINING_SPLIT_RATIOS,
+            split_seed=TRAINING_SPLIT_SEED,
         )
         print(
             f"   Exported {training_manifest['exported_records']}/"
             f"{training_manifest['input_records']} verified records to "
             f"{os.path.join(OUTPUT_DIR, 'training')}"
         )
+        if not training_manifest.get("split_viable", True):
+            print(
+                "   [WARN] Training split is not ready for formal evaluation: "
+                f"empty_splits={training_manifest.get('empty_splits', [])}, "
+                "inspect training/manifest.json before downstream training."
+            )
 
     # Step 7: Generate Visualization for first multihop QA
     print("\n" + "=" * 70)
@@ -3024,6 +3141,7 @@ def run_pipeline(runtime_config=None):
     print_token_stats()
     
     print("\nPipeline completed!")
+    return True
 
 
 # Backward compatibility alias
@@ -3037,10 +3155,13 @@ if __name__ == "__main__":
     mp.set_start_method('spawn', force=True)
     
     try:
-        run_pipeline()
+        if run_pipeline() is False:
+            raise SystemExit(1)
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
+        raise SystemExit(130)
     except Exception as e:
         logging.error(f"Pipeline error: {e}")
         import traceback
         traceback.print_exc()
+        raise SystemExit(1)

@@ -21,9 +21,9 @@ the visible question.
 | QA Agent | Generates atomic questions, minimal answers, hidden sub-questions, reasoning paths, supporting facts, and evidence spans. |
 | Verifier Agent | Independently checks atomicity, evidence grounding, and multi-hop necessity, then emits the final acceptance decision and evidence graph. |
 
-The v2.2.1 runtime writes an ordered `agent_trace` and explicit coordination
+The v3.0.0 runtime writes an ordered `agent_trace` and explicit coordination
 state to every QA record. The trace
-distinguishes generation from verification while the v2.2.1 data contract
+distinguishes generation from verification while the v3.0.0 data contract
 enforces standalone questions, canonical short answers, and grounded evidence.
 
 Generation and validation are model-separated through `configs/llm.yaml`.
@@ -81,11 +81,22 @@ all context chunks when explicit or verifier-grounded support is unavailable.
 
 ## Downstream Training Export
 
-Each successful run produces `training/train.jsonl`, `training/corpus.jsonl`,
-and `training/manifest.json`. Training rows contain compact SFT messages,
+Each successful run produces source-document-disjoint `training/train.jsonl`,
+`training/dev.jsonl`, and `training/test.jsonl`, together with
+`training/corpus.jsonl` and `training/manifest.json`. Training rows contain compact SFT messages,
 canonical and short answers, reasoning annotations, evidence supervision,
 retrieval trajectories, and the four-Agent provenance. Full context text is
 kept in the aligned corpus rather than duplicated in every QA row.
+
+All source documents connected by a QA evidence graph are treated as one split
+component. This prevents the same source document from appearing in training
+and held-out QA, while a fixed seed keeps the assignment reproducible.
+
+The v3.0 exporter resolves every supporting chunk against the aligned corpus
+before accepting a training row. Its manifest reports empty splits, component
+counts, the largest connected-component fraction, and `split_viable`. Formal
+training requires a viable, leakage-free split; a two-sample smoke run remains
+useful for pipeline validation but is not presented as evaluation-ready data.
 
 The training `answer` is the single canonical EM ground truth, rather than a
 rationale or explanatory paragraph. Multi-step reasoning remains in separate

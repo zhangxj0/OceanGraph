@@ -92,7 +92,7 @@ def get_structured_qa_fields(qa_pair: Dict, domain_hint: str = "") -> Dict:
         "answer_type": normalize_answer_type(qa_pair.get("answer_type", "")),
         "short_answers": _as_list(qa_pair.get("short_answers")),
         "subdomain": subdomain,
-        "taxonomy_version": taxonomy.get("schema_version", "2.2.1"),
+        "taxonomy_version": taxonomy.get("schema_version", "3.0.0"),
         "declared_hop_count": qa_pair.get("hop_count", None),
         "sub_questions": _as_list(qa_pair.get("sub_questions")),
         "reasoning_path": qa_pair.get("reasoning_path", ""),

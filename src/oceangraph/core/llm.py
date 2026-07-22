@@ -217,6 +217,69 @@ def _request_fingerprint(prompt: str) -> str:
     return hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
 
 
+def _is_usable_model_text(value: Any) -> bool:
+    """Return whether a response is safe to parse or persist in the cache."""
+
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and not value.lstrip().startswith("ERROR:")
+    )
+
+
+def _extract_openai_response_text(payload: Dict[str, Any]) -> str:
+    """Extract non-empty assistant text from an OpenAI-compatible response.
+
+    Some reasoning-model deployments return HTTP 200 with an empty ``content``
+    field after consuming the output budget in ``reasoning_content``. Treating
+    that as success used to cache an unusable response and reject downstream
+    candidates. Raise a retryable error instead, with non-secret diagnostics.
+    """
+
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("OpenAI-compatible response contains no choices")
+    choice = choices[0] if isinstance(choices[0], dict) else {}
+    message = choice.get("message") if isinstance(choice, dict) else None
+    if not isinstance(message, dict):
+        raise ValueError("OpenAI-compatible response contains no assistant message")
+
+    content = message.get("content")
+    if isinstance(content, list):
+        text_parts = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                text_parts.append(part["text"])
+        content = "".join(text_parts)
+
+    if _is_usable_model_text(content):
+        return content.strip()
+
+    reasoning = message.get("reasoning_content")
+    reasoning_chars = len(reasoning) if isinstance(reasoning, str) else 0
+    finish_reason = choice.get("finish_reason", "unknown")
+    raise ValueError(
+        "OpenAI-compatible response content is empty "
+        f"(finish_reason={finish_reason}, reasoning_chars={reasoning_chars}). "
+        "Increase max_output_tokens or disable reasoning for this profile."
+    )
+
+
+def _requeue_invalid_cache_entries(
+    cached_responses: List[Optional[str]], miss_indices: List[int]
+) -> List[int]:
+    """Treat empty or cached error responses as misses so they can be retried."""
+
+    missing = set(miss_indices)
+    for index, response in enumerate(cached_responses):
+        if index not in missing and not _is_usable_model_text(response):
+            cached_responses[index] = None
+            missing.add(index)
+    return sorted(missing)
+
+
 def _text_only_mode() -> bool:
     try:
         from oceangraph.core.config import is_text_only_mode
@@ -371,6 +434,8 @@ def call_llm_simple(
     use_cache: bool = True,
     stage: str = "default",
     response_format: Optional[Dict[str, Any]] = None,
+    cache_max_age_seconds: Optional[float] = None,
+    request_timeout_seconds: Optional[float] = None,
 ) -> str:
     """Simple LLM call with text-only input. Supports OLLAMA, GEMINI, OPENAI.
     
@@ -378,6 +443,9 @@ def call_llm_simple(
         prompt: Text prompt to send to the LLM
         max_retries: Maximum number of retry attempts (default: 5)
         use_cache: Whether to use LLM response cache (default: True)
+        request_timeout_seconds: Optional per-request timeout override. Preflight
+            uses this to bound connectivity probes without leaving background
+            worker threads running.
     
     Returns:
         LLM response text
@@ -388,6 +456,11 @@ def call_llm_simple(
     _initialize_config()
     profile = _get_model_profile(stage)
     model_name = profile.model_name()
+    request_timeout = (
+        float(request_timeout_seconds)
+        if request_timeout_seconds is not None and float(request_timeout_seconds) > 0
+        else profile.timeout
+    )
     cache_model = profile.cache_identity(stage=stage, response_format=response_format)
     
     # Check cache first
@@ -396,10 +469,17 @@ def call_llm_simple(
             from oceangraph.utils.llm_cache import get_llm_cache
             cache = get_llm_cache()
             if cache:
-                cached = cache.get('llm_simple', prompt, model=cache_model)
-                if cached is not None:
+                cached = cache.get(
+                    'llm_simple',
+                    prompt,
+                    model=cache_model,
+                    max_age_seconds=cache_max_age_seconds,
+                )
+                if _is_usable_model_text(cached):
                     print(f"Cache hit for LLM call ({len(cached)} chars)")
                     return cached
+                if cached is not None:
+                    logging.warning("Ignoring an empty or failed cached LLM response")
         except ImportError:
             pass
     
@@ -428,7 +508,7 @@ def call_llm_simple(
                     "stream": False,
                     "options": {"temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(profile.url, json=data, timeout=profile.timeout)
+                response = requests.post(profile.url, json=data, timeout=request_timeout)
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["message"]["content"]
@@ -447,7 +527,7 @@ def call_llm_simple(
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {"temperature": profile.temperature or 0.0}
                 }
-                response = requests.post(url, headers=profile.headers, json=data, timeout=profile.timeout)
+                response = requests.post(url, headers=profile.headers, json=data, timeout=request_timeout)
                 if response.status_code == 200:
                     resp_json = response.json()
                     result = resp_json["candidates"][0]["content"]["parts"][0]["text"]
@@ -471,11 +551,11 @@ def call_llm_simple(
                     profile.url,
                     headers=profile.headers,
                     json=data,
-                    timeout=profile.timeout,
+                    timeout=request_timeout,
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = resp_json["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(resp_json)
                     # Track token usage
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
@@ -494,11 +574,11 @@ def call_llm_simple(
                     profile.url,
                     headers=profile.headers,
                     json=data,
-                    timeout=profile.timeout,
+                    timeout=request_timeout,
                 )
                 if response.status_code == 200:
                     response_data = response.json()
-                    result = response_data["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(response_data)
                 else:
                     raise Exception(f"HTTP {response.status_code}")
             
@@ -609,7 +689,7 @@ def call_vlm_simple(prompt: str, image_path: str) -> str:
                 response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = resp_json["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
@@ -633,7 +713,7 @@ def call_vlm_simple(prompt: str, image_path: str) -> str:
                 response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = resp_json["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
@@ -721,7 +801,7 @@ def call_vlm_with_examples(prompt: str, query_image_path: str, example_image_pat
                 data = {"model": VLM_MODEL_NAME, "messages": [{"role": "user", "content": content}]}
                 response = requests.post(API_URL, headers=HEADERS, json=data, timeout=300)
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(response.json())
                 else:
                     raise Exception(f"HTTP {response.status_code}")
             
@@ -835,7 +915,7 @@ def call_vlm_with_multiple_images(prompt: str, image_paths: List[str]) -> str:
                 response = requests.post(API_URL, headers=local_headers, json=data, timeout=300)
                 
                 if response.status_code == 200:
-                    result = response.json()["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(response.json())
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
                     print(f"[WARN] Server error ({response.status_code}). Retrying...")
                     # Note: Do NOT decrement attempt - rate limits count against max retries
@@ -1074,7 +1154,7 @@ def call_vlm_interweaved(
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = resp_json["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
@@ -1120,7 +1200,7 @@ def call_vlm_interweaved(
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = resp_json["choices"][0]["message"]["content"]
+                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
@@ -1634,7 +1714,7 @@ async def _async_call_llm_simple(
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0)
                     )
-                    return resp_json["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(resp_json)
                 else:
                     text = await resp.text()
                     raise Exception(f"HTTP {resp.status}: {text[:200]}")
@@ -1648,7 +1728,7 @@ async def _async_call_llm_simple(
                                    timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     response_data = await resp.json()
-                    return response_data["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(response_data)
                 else:
                     raise Exception(f"HTTP {resp.status}")
     finally:
@@ -1765,7 +1845,7 @@ async def _async_call_vlm_interweaved(
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0)
                     )
-                    return resp_json["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(resp_json)
                 else:
                     text = await resp.text()
                     raise Exception(f"HTTP {resp.status}: {text[:200]}")
@@ -1800,7 +1880,7 @@ async def _async_call_vlm_interweaved(
                                    timeout=aiohttp.ClientTimeout(total=request_timeout)) as resp:
                 if resp.status == 200:
                     response_data = await resp.json()
-                    return response_data["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(response_data)
                 else:
                     raise Exception(f"HTTP {resp.status}")
     finally:
@@ -1960,6 +2040,9 @@ def batch_call_llm(
                 cached_responses, miss_indices = cache.get_batch(
                     'llm_simple', requests, model=cache_model
                 )
+                miss_indices = _requeue_invalid_cache_entries(
+                    cached_responses, miss_indices
+                )
                 if len(miss_indices) < len(prompts):
                     cache_hits = len(prompts) - len(miss_indices)
                     if show_progress:
@@ -2001,13 +2084,20 @@ def batch_call_llm(
     # Save new results to cache
     if cache and use_cache:
         requests = [(prompts[i], None) for i in miss_indices]
-        cache.set_batch(
-            'llm_simple',
-            requests,
-            uncached_results,
-            list(range(len(miss_indices))),
-            model=cache_model,
-        )
+        valid = [
+            (request, result)
+            for request, result in zip(requests, uncached_results)
+            if _is_usable_model_text(result)
+        ]
+        if valid:
+            valid_requests, valid_results = zip(*valid)
+            cache.set_batch(
+                'llm_simple',
+                list(valid_requests),
+                list(valid_results),
+                list(range(len(valid_requests))),
+                model=cache_model,
+            )
     
     return results
 
@@ -2053,6 +2143,9 @@ def batch_call_vlm_interweaved(
                 cached_responses, miss_indices = cache.get_batch(
                     'vlm_interweaved', requests, model=cache_model
                 )
+                miss_indices = _requeue_invalid_cache_entries(
+                    cached_responses, miss_indices
+                )
                 if len(miss_indices) < len(requests):
                     cache_hits = len(requests) - len(miss_indices)
                     if show_progress:
@@ -2093,13 +2186,20 @@ def batch_call_vlm_interweaved(
     
     # Save new results to cache
     if cache and use_cache:
-        cache.set_batch(
-            'vlm_interweaved',
-            uncached_requests,
-            uncached_results,
-            list(range(len(uncached_requests))),
-            model=cache_model,
-        )
+        valid = [
+            (request, result)
+            for request, result in zip(uncached_requests, uncached_results)
+            if _is_usable_model_text(result)
+        ]
+        if valid:
+            valid_requests, valid_results = zip(*valid)
+            cache.set_batch(
+                'vlm_interweaved',
+                list(valid_requests),
+                list(valid_results),
+                list(range(len(valid_requests))),
+                model=cache_model,
+            )
     
     return results
 
@@ -2187,7 +2287,7 @@ async def _async_call_vlm_base64(prompt: str, base64_image: str,
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0)
                     )
-                    return resp_json["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(resp_json)
                 else:
                     raise Exception(f"HTTP {resp.status}")
                     
@@ -2205,7 +2305,7 @@ async def _async_call_vlm_base64(prompt: str, base64_image: str,
                                    timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
                 if resp.status == 200:
                     response_data = await resp.json()
-                    return response_data["choices"][0]["message"]["content"]
+                    return _extract_openai_response_text(response_data)
                 else:
                     raise Exception(f"HTTP {resp.status}")
     finally:

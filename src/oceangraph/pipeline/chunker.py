@@ -25,8 +25,8 @@ OUTPUT_DIR = "output/results/chunks"
 LLM_MODEL_NAME = "gemini-2.0-flash"
 
 # Windowing parameters (chars, not tokens)
-WINDOW_SIZE = 20000  # 5000 tokens
-OVERLAP_SIZE = 2000   # 500 tokens
+WINDOW_SIZE = 8000   # Keeps verbatim structured output within a 4096-token budget
+OVERLAP_SIZE = 800   # Ten percent overlap for boundary continuity
 
 # Parallel processing
 NUM_FILE_WORKERS = 4  # Number of files to process in parallel

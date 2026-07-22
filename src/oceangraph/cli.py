@@ -326,18 +326,23 @@ def main() -> None:
 
     setup_environment(args)
 
+    if args.preflight:
+        try:
+            from oceangraph.utils.preflight import run_preflight_checks
+        except ImportError as exc:
+            logger.error("Failed to import preflight checks: %s", exc)
+            logger.info("Install the project with: pip install -e .")
+            sys.exit(1)
+        logger.info("Running preflight checks...")
+        all_passed, _ = run_preflight_checks()
+        sys.exit(0 if all_passed else 1)
+
     try:
         from oceangraph.engine import run_pipeline
-        from oceangraph.utils.preflight import run_preflight_checks
     except ImportError as exc:
         logger.error("Failed to import the internal generation engine: %s", exc)
         logger.info("Install the project with: pip install -e .")
         sys.exit(1)
-
-    if args.preflight:
-        logger.info("Running preflight checks...")
-        success = run_preflight_checks()
-        sys.exit(0 if success else 1)
 
     if not args.input or not args.output:
         logger.error("Both --input and --output are required.")
@@ -358,7 +363,10 @@ def main() -> None:
     write_run_metadata(args)
 
     logger.info("Starting OceanGraph-R1 agent pipeline...")
-    run_pipeline()
+    completed = run_pipeline()
+    if completed is False:
+        logger.error("OceanGraph-R1 pipeline stopped before generation completed.")
+        sys.exit(1)
     logger.info("OceanGraph-R1 pipeline completed.")
 
 

@@ -2,7 +2,34 @@
 
 All notable changes to OceanGraph-R1 are documented here.
 
-## [2.2.1] - 2026-07-21
+## [3.0.0] - 2026-07-22
+
+### Added
+- Training-export readiness auditing with empty-split, connected-component,
+  unresolved-evidence, and largest-component statistics.
+- Killable subprocess isolation for local embedding and reranker preflight
+  checks; API probes use one attempt with a bounded request timeout.
+
+### Fixed
+- Separated immutable dataset semantics from operational controls in the run
+  fingerprint, so a two-record smoke run can resume in the same output
+  directory with a larger target or worker count.
+- Deferred output-manifest commitment until mandatory preflight succeeds and
+  allowed stale manifests to be replaced when no material dataset exists.
+- Made preflight fail-safe: Qwen, DeepSeek, and local model checks are skipped
+  after a mandatory local prerequisite fails, and later expensive checks stop
+  after the first expensive failure.
+- Rejected training records whose supporting chunk IDs cannot be resolved in
+  the exported retrieval corpus.
+
+### Changed
+- Advanced framework, Agent architecture, taxonomy, QA schema, configuration,
+  runner, and package versions to `3.0.0`.
+- Training manifests now expose `split_viable`; smoke runs may have empty
+  held-out splits, but formal downstream training must require this flag to be
+  `true`.
+
+## [2.2.1] - 2026-07-22
 
 - Isolated Qwen/DeepSeek endpoint and model routing in `configs/llm.yaml`; API
   keys remain environment-only.
@@ -19,8 +46,18 @@ All notable changes to OceanGraph-R1 are documented here.
 - Corpus/config fingerprints and per-fingerprint checkpoint namespaces to
   prevent stale state or artifacts from being mixed across runs.
 - A runtime-loaded canonical five-domain ocean taxonomy.
+- Deterministic source-document-component train/dev/test splitting with a
+  leakage audit in the training manifest.
+- Append-only checkpoint and LLM-cache journals with legacy JSON migration.
 
 ### Fixed
+- Raised Qwen and DeepSeek output budgets to 4,096 tokens, corrected the
+  `DeepSeek-V4-Pro` deployment name, and rejected empty reasoning-only responses
+  instead of caching them as successful calls.
+- Made source discovery recursive for nested normalized archives, rejected
+  duplicate source stems, and aligned preflight discovery with the engine.
+- Removed the hidden five-document fallback limit and reduced semantic
+  chunking defaults to an 8,000-character window with 800-character overlap.
 - Defined `hop_count` consistently as the number of distinct verified evidence
   chunks and separated retrieval expansion into `retrieval_hop_count`.
 - Stopped evidence graphs from treating every context chunk as supporting
@@ -29,11 +66,14 @@ All notable changes to OceanGraph-R1 are documented here.
   reordered model outputs cannot silently drop failed records.
 - Made verified-record-preserving deduplication, runtime configuration isolation,
   and Verifier-to-Evidence/QA feedback routing the default execution behavior.
+- Corrected CLI/API failure propagation, moved effective-config fingerprinting
+  before paid preflight calls, and skipped evaluation-only model checks when
+  evaluation is disabled.
 
 ### Changed
 - Replaced the fixed `1.1 * target` seed-chunk ceiling with target-driven
-  batched generation that stops only at the accepted-QA target or true corpus
-  exhaustion.
+  demand-bounded generation that keeps no more in-flight seed chunks than the
+  remaining accepted-QA target and stops at the target or true corpus exhaustion.
 - Updated package, runtime Agent, configuration, runner, documentation, and CI
   metadata to `2.2.1`.
 - Positioned generated records as inputs for downstream model training; no

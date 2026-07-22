@@ -198,6 +198,15 @@ def _get_default_config() -> Dict[str, Any]:
             'qa_max_workers': 6,
             'dedup_max_workers': 4
         },
+        'processing': {
+            'max_pdfs': None,
+            'sort_by_size': True,
+            'max_chunks': None,
+        },
+        'chunking': {
+            'window_size': 8000,
+            'overlap_size': 800,
+        },
         'pipeline': {
             'modality': 'text',
         },

@@ -3,7 +3,7 @@
 本文档用于复现当前已验证的纯文本多跳问答数据生成流程。推荐路由为：
 
 - `Qwen3.7-Plus`：语料分析、检索规划、问答生成与失败样本修正。
-- `deepseek-v4-pro`：答案验证、合并式多跳必要性验证与可选质量评估；候选模型选择默认关闭。
+- `DeepSeek-V4-Pro`：答案验证、合并式多跳必要性验证与可选质量评估；候选模型选择默认关闭。
 - `BAAI/bge-m3`：本地文本向量嵌入与评估向量。
 - `BAAI/bge-large-en-v1.5`：本地文本重排。
 
@@ -29,7 +29,7 @@
 ```bash
 git clone https://github.com/zhangxj0/OceanGraph.git
 cd OceanGraph
-git checkout v2.2.1
+git checkout v3.0.0
 ```
 
 在已包含指定 NVIDIA Torch 构建的 Paratera 镜像中安装：
@@ -51,7 +51,7 @@ python -m pytest -q
 python run_oceangraph.py --help
 ```
 
-当前版本应有 `45 passed`。
+测试数量会随回归覆盖增加；以命令退出码为准，所有测试均应通过。
 
 ## 3. 配置模型路由
 
@@ -64,22 +64,24 @@ cp configs/oceangraph.yaml.example config.yaml
 只通过环境变量提供密钥，禁止将密钥写入 YAML、脚本、日志或 Git：
 
 ```bash
-export PARATERA_API_KEY="YOUR_PARATERA_KEY"
-export DEEPSEEK_API_KEY="YOUR_DEEPSEEK_KEY"
+export OPENAI_API_KEY="YOUR_PARATERA_KEY"
 ```
 
 PowerShell：
 
 ```powershell
 Copy-Item configs/oceangraph.yaml.example config.yaml
-$env:PARATERA_API_KEY = "YOUR_PARATERA_KEY"
-$env:DEEPSEEK_API_KEY = "YOUR_DEEPSEEK_KEY"
+$env:OPENAI_API_KEY = "YOUR_PARATERA_KEY"
 ```
 
 推荐配置固定了以下关键行为：
 
 - `generation` 与 `correction` 路由到 Qwen。
 - `selection` 与 `verification` 路由到 DeepSeek，但推荐配置默认关闭冗余的候选模型选择。
+- 两个 profile 通过 Paratera 的 OpenAI 兼容端点调用，共用环境变量
+  `OPENAI_API_KEY`，YAML 中不保存密钥。
+- 两个 profile 的 `max_output_tokens` 均为 4096，并显式关闭 thinking；
+  HTTP 200 但正文为空的响应会触发重试，不会写入缓存。
 - `default`、`corpus` 与 `retrieval` 路由到 Qwen，避免意外访问 OpenAI 默认地址。
 - `pipeline.modality: text` 禁止图片进入模型调用。
 - `evaluation.run_evaluation: false` 默认不启动额外评估，先保证数据生成完成。
@@ -155,13 +157,37 @@ python run_oceangraph.py --config config.yaml --backend openai --preflight
 预检应确认：
 
 - generation 模型为 `Qwen3.7-Plus`；
-- verification 模型为 `deepseek-v4-pro`；
+- verification 模型为 `DeepSeek-V4-Pro`；
 - 两个 API 均可调用；
 - BGE-M3 与文本重排模型可加载；
 - 纯文本模式生效。
 
+预检失败时命令退出码为非零。`preflight.check_timeout_seconds` 默认将每个昂贵检查的等待时间限制为
+180 秒；当 `evaluation.run_evaluation: false` 时，不加载仅供评估使用的 embedding。模型连通性探测
+会写入输出目录的追加式 LLM cache；相同模型路由可在默认 3600 秒 TTL 内复用，超过 TTL 后重新检查
+当前密钥和服务连通性。
+
 若 DeepSeek 返回 HTTP `402 Insufficient Balance`，应先充值或更换有余额的密钥。此错误属于服务端
 账户状态，不是 OceanGraph 代码故障。
+
+### 归一化海洋语料配置
+
+对于 `data/normalized` 下的 NOAA、NASA 和 Argo Markdown，仓库提供了
+`configs/normalized_corpus.yaml.example`。该配置使用 8000 字符窗口、800
+字符重叠、全量文件处理和离线 BGE 模型。输入发现支持递归，因此 ZIP 解压后
+出现双层 `normalized/normalized` 时无需修改源码。
+
+```bash
+python run_oceangraph.py \
+  --config configs/normalized_corpus.yaml.example \
+  --backend openai \
+  --input data/normalized \
+  --output output/normalized_dataset \
+  --num-qa-pairs 80 \
+  --max-depth 2 \
+  --max-workers 4 \
+  --offline-models
+```
 
 ## 6. 生成两条完整样本
 
@@ -186,6 +212,9 @@ python run_oceangraph.py \
 若本地尚无模型缓存，首次运行去掉 `--offline-models`。生成和严格验证成功后，再按需增加
 `--num-qa-pairs` 与 `--max-workers`。
 
+v3.0.0 的语义指纹不会把目标数量、worker 数或输出路径作为数据身份；因此可直接复用上述
+输出目录从 2 条继续扩展到正式规模。预检成功前不会固化新的运行清单。
+
 ## 7. 验收生成结果
 
 重点检查 `output/repro_qwen_deepseek/`：
@@ -196,6 +225,12 @@ python run_oceangraph.py \
 - `chunks.json`：检索语料块。
 - `chunks_with_complete_context.json`：补全上下文后的语料块。
 - `oceangraph_run_config.json`：本次运行参数快照，不包含 API 密钥。
+- `training/train.jsonl`、`training/dev.jsonl`、`training/test.jsonl`：按源文档连通组划分的训练数据。
+- `training/manifest.json`：划分数量与 `source_leakage_detected` 审计结果。
+
+正式训练前确认 `training/manifest.json` 中 `source_leakage_detected` 为 `false` 且
+`split_viable` 为 `true`。共享任一 supporting source document 的 QA 会被固定分配到同一 split，
+避免同源内容同时进入训练集和测试集；小规模试跑产生空 dev/test 时只用于管线验收，不能直接训练。
 
 一条合格样本至少满足：
 
@@ -258,7 +293,7 @@ python scripts/oceangraph_to_search_r1.py \
 
 ## 10. 已验证结果与限制
 
-- 当前本地回归测试：`40 passed`；服务器历史验证结果仍为 `31 passed`，新增低成本审查逻辑尚待下一次服务器复测。
+- 本地与服务器都应运行完整 `pytest -q`；不要使用历史测试数量作为版本验收条件。
 - 两条样本的生成、自动修正、DeepSeek 严格多跳验证和去重流程已跑通。
 - 一次完整两样本评估成功；后续最新复测在最终评估阶段因 DeepSeek 账户余额不足返回 402，但此前
   的生成与严格验证均已成功，且评估可按第 8 节独立续跑。

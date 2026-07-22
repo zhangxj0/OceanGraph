@@ -15,8 +15,8 @@ from oceangraph.agents import VerificationDecision, make_agent_event
 def test_v22_exposes_ordered_four_agent_manifest():
     manifest = get_agent_manifest()
 
-    assert FRAMEWORK_VERSION == "2.2.1"
-    assert AGENT_ARCHITECTURE_VERSION == "2.2.1"
+    assert FRAMEWORK_VERSION == "3.0.0"
+    assert AGENT_ARCHITECTURE_VERSION == "3.0.0"
     assert [agent["agent_id"] for agent in manifest] == [
         "corpus",
         "evidence",

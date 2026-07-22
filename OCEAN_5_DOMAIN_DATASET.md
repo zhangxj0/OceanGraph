@@ -148,6 +148,10 @@ For a first paper-quality dataset, target roughly 20k-50k accepted QA pairs:
 | Marine Ecology, Ecosystems, and Fisheries | 5k-10k |
 | Coastal Hazards and Human Impacts | 3k-7k |
 
-Use document-level train/test splits later to avoid leakage. Keep all generated
-`supporting_facts`, `evidence_spans`, `evidence_graph`, and `search_trajectory`
-fields for evidence auditing, difficulty analysis, and downstream model studies.
+The automatic export builds deterministic train/dev/test splits from connected
+supporting-source components, so one source document cannot cross split
+boundaries. Keep all generated `supporting_facts`, `evidence_spans`,
+`evidence_graph`, and `search_trajectory` fields for evidence auditing,
+difficulty analysis, and downstream model studies.
+Before training, require `training/manifest.json` to report
+`split_viable: true`, no unresolved supporting chunks, and no source leakage.

@@ -46,7 +46,12 @@ def test_runtime_config_maps_public_execution_fields(tmp_path):
     assert runtime["qa_generation"]["max_answer_cjk_chars"] == 14
     assert runtime["qa_generation"]["counterfactual_verification"] is True
     assert runtime["checkpointing"]["enabled"] is False
-    assert runtime["training_export"] == {"enabled": True, "split": "train"}
+    assert runtime["training_export"] == {
+        "enabled": True,
+        "split": "train",
+        "split_ratios": {"train": 0.8, "dev": 0.1, "test": 0.1},
+        "seed": 42,
+    }
 
 
 def test_yaml_round_trip_preserves_new_runtime_controls(tmp_path):
