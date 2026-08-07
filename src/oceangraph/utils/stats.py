@@ -497,7 +497,7 @@ def compute_qa_category_stats(qa_data: List[Dict]) -> Dict[str, Any]:
     relevance_scores = []
     
     for qa in qa_data:
-        # v2.2.1: multi-hop means at least two verifier-grounded evidence chunks.
+        # v3.0.0: multi-hop means at least two verifier-grounded evidence chunks.
         hop_count = qa.get('hop_count', 0)
         is_multihop = hop_count >= 2
         

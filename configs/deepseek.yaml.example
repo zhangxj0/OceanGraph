@@ -1,6 +1,6 @@
 framework:
   name: OceanGraph-R1
-  version: 2.2.1
+  version: 3.0.0
   agent_architecture: four_agent
   agents: [corpus, evidence, qa, verifier]
 
@@ -63,7 +63,12 @@ deduplication:
 
 training_export:
   enabled: true
-  split: train
+  split: null
+  split_ratios:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  seed: 42
 
 evaluation:
   run_evaluation: false

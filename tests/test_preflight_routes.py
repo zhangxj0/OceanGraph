@@ -59,6 +59,25 @@ def test_input_check_accepts_resumable_output(monkeypatch, tmp_path):
     assert result.details["count"] == 2
 
 
+def test_input_check_rejects_duplicate_source_stems(monkeypatch, tmp_path):
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    (tmp_path / "a" / "same.md").write_text("one", encoding="utf-8")
+    (tmp_path / "b" / "same.txt").write_text("two", encoding="utf-8")
+    monkeypatch.delenv("OCEANGRAPH_OUTPUT_DIR", raising=False)
+    monkeypatch.delenv("OCEANGRAPH_INPUT_DIR", raising=False)
+    monkeypatch.setattr(
+        config,
+        "get_paths_config",
+        lambda: {"input_pdf_dir": str(tmp_path), "output_dir": str(tmp_path / "out")},
+    )
+
+    result = preflight.check_input_data()
+
+    assert result.status is preflight.CheckStatus.FAIL
+    assert "unique stems" in result.message
+
+
 def test_semantic_chunking_uses_corpus_route(monkeypatch):
     stages = []
 
@@ -72,3 +91,43 @@ def test_semantic_chunking_uses_corpus_route(monkeypatch):
 
     assert chunks == []
     assert stages == ["corpus"]
+
+
+def test_disabled_evaluation_skips_metrics_embedding_check(monkeypatch):
+    called = []
+
+    def passed(name):
+        return lambda: preflight.CheckResult(
+            name=name,
+            status=preflight.CheckStatus.PASS,
+            message="ok",
+        )
+
+    for name, attribute in (
+        ("config", "check_config"),
+        ("api", "check_api_key"),
+        ("input", "check_input_data"),
+        ("output", "check_output_directory"),
+        ("gpu", "check_gpu_availability"),
+        ("llm", "check_llm_call"),
+        ("verifier", "check_vlm_call"),
+        ("embedding", "check_embedding_model"),
+        ("reranker", "check_reranker"),
+    ):
+        monkeypatch.setattr(preflight, attribute, passed(name))
+
+    def metrics_check():
+        called.append(True)
+        return passed("metrics")()
+
+    monkeypatch.setattr(preflight, "check_metrics_embeddings", metrics_check)
+    monkeypatch.setattr(config, "load_config", lambda: {"evaluation": {"run_evaluation": False}})
+
+    all_passed, results = preflight.run_preflight_checks(
+        quiet=True,
+        check_timeout_seconds=1,
+    )
+
+    assert all_passed is True
+    assert called == []
+    assert any(result.name == "Metrics Embeddings" and result.status is preflight.CheckStatus.SKIP for result in results)

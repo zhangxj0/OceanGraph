@@ -22,7 +22,7 @@ class EvidenceSpan(BaseModel):
 
 
 class AgentTraceEvent(BaseModel):
-    """Per-record provenance emitted by one v2.2.x runtime agent."""
+    """Per-record provenance emitted by one v3.0 runtime agent."""
 
     model_config = ConfigDict(extra="allow", str_strip_whitespace=True)
 
@@ -36,7 +36,7 @@ class AgentTraceEvent(BaseModel):
 class QAPair(BaseModel):
     model_config = ConfigDict(extra="allow", str_strip_whitespace=True)
 
-    schema_version: str = "oceangraph.qa.v2.2.1"
+    schema_version: str = "oceangraph.qa.v3.0.0"
     question: str = Field(min_length=1)
     answer: str = Field(min_length=1)
     short_answers: List[str] = Field(default_factory=list)
@@ -49,7 +49,7 @@ class QAPair(BaseModel):
     declared_hop_count: int | None = Field(default=None, ge=0)
     retrieval_hop_count: int = Field(default=0, ge=0)
     context_chunk_count: int = Field(default=0, ge=0)
-    taxonomy_version: str = "2.2.1"
+    taxonomy_version: str = "3.0.0"
     sub_questions: List[str] = Field(default_factory=list)
     reasoning_path: str = ""
     supporting_facts: List[SupportingFact] = Field(default_factory=list)

@@ -137,6 +137,6 @@ def test_run_metadata_records_four_agent_architecture(tmp_path, monkeypatch):
     metadata = json.loads(
         (output_dir / "oceangraph_run_config.json").read_text(encoding="utf-8")
     )
-    assert metadata["framework_version"] == "2.2.1"
+    assert metadata["framework_version"] == "3.0.0"
     assert metadata["agents"] == ["corpus", "evidence", "qa", "verifier"]
     assert metadata["agent_architecture"]["sequence"] == metadata["agents"]

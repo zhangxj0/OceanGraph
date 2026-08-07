@@ -8,13 +8,12 @@
 #
 # Model names and endpoints are intentionally isolated in configs/llm.yaml.
 # Keep API keys in environment variables:
-#   export PARATERA_API_KEY="your-key-here"
-#   export DEEPSEEK_API_KEY="your-key-here"
+#   export OPENAI_API_KEY="your-paratera-key-here"
 # =============================================================================
 
 framework:
   name: OceanGraph-R1
-  version: 2.2.1
+  version: 3.0.0
   agent_architecture: four_agent
   agents: [corpus, evidence, qa, verifier]
 
@@ -28,6 +27,10 @@ llm_config_file: configs/llm.yaml
 # -----------------------------------------------------------------------------
 pipeline:
   modality: text
+
+preflight:
+  check_timeout_seconds: 180
+  api_probe_cache_ttl_seconds: 3600
 
 # -----------------------------------------------------------------------------
 # Input/Output Paths
@@ -169,8 +172,8 @@ pdf_processing:
 # Semantic Chunking
 # -----------------------------------------------------------------------------
 chunking:
-  window_size: 20000       # Characters per window
-  overlap_size: 2000       # Overlap between windows
+  window_size: 8000        # Prevent verbatim semantic-chunk output truncation
+  overlap_size: 800        # Ten percent overlap between windows
 
 # -----------------------------------------------------------------------------
 # Domain & Expert Role (auto-detect if null)
@@ -210,7 +213,12 @@ bertopic:
 # -----------------------------------------------------------------------------
 training_export:
   enabled: true
-  split: train
+  split: null                            # null = deterministic source-document train/dev/test
+  split_ratios:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  seed: 42
 
 # -----------------------------------------------------------------------------
 # Evaluation

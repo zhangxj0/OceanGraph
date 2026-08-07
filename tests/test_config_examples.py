@@ -13,7 +13,7 @@ def test_recommended_config_routes_qwen_and_deepseek():
 
     assert raw_config["llm_config_file"] == "configs/llm.yaml"
     assert "models" not in raw_config
-    assert config["framework"]["version"] == "2.2.1"
+    assert config["framework"]["version"] == "3.0.0"
     assert config["framework"]["agents"] == [
         "corpus",
         "evidence",
@@ -23,17 +23,32 @@ def test_recommended_config_routes_qwen_and_deepseek():
     assert profiles["generator"]["url"] == (
         "https://llmapi.paratera.com/v1/chat/completions"
     )
-    assert profiles["generator"]["api_key_env"] == "PARATERA_API_KEY"
+    assert profiles["generator"]["api_key_env"] == "OPENAI_API_KEY"
     assert profiles["generator"]["model"] == "Qwen3.7-Plus"
+    assert profiles["generator"]["max_output_tokens"] == 4096
     assert config["pipeline"]["modality"] == "text"
     assert profiles["generator"]["supports_vision"] is False
-    assert profiles["verifier"]["url"] == "https://api.deepseek.com/chat/completions"
-    assert profiles["verifier"]["api_key_env"] == "DEEPSEEK_API_KEY"
-    assert profiles["verifier"]["model"] == "deepseek-v4-pro"
+    assert profiles["verifier"]["url"] == (
+        "https://llmapi.paratera.com/v1/chat/completions"
+    )
+    assert profiles["verifier"]["api_key_env"] == "OPENAI_API_KEY"
+    assert profiles["verifier"]["model"] == "DeepSeek-V4-Pro"
+    assert profiles["verifier"]["thinking"] is False
+    assert profiles["verifier"]["max_output_tokens"] == 4096
+    assert config["processing"]["max_pdfs"] is None
+    assert config["chunking"] == {"window_size": 8000, "overlap_size": 800}
     assert config["evaluation"]["run_evaluation"] is False
     assert config["evaluation"]["judge_stage"] == "verification"
     assert config["evaluation"]["embedding_backend"] == "local"
     assert config["evaluation"]["embedding_model"] == "BAAI/bge-m3"
+    assert config["training_export"]["split"] is None
+    assert config["training_export"]["split_ratios"] == {
+        "train": 0.8,
+        "dev": 0.1,
+        "test": 0.1,
+    }
+    assert config["preflight"]["check_timeout_seconds"] == 180
+    assert config["preflight"]["api_probe_cache_ttl_seconds"] == 3600
 
 
 def test_recommended_config_uses_cost_bounded_verification():
@@ -58,6 +73,24 @@ def test_llm_file_is_the_only_recommended_model_edit_location():
 
     assert config["models"]["stages"]["generation"] == "generator"
     assert config["models"]["stages"]["verification"] == "verifier"
-    assert config["models"]["profiles"]["generator"]["api_key_env"] == "PARATERA_API_KEY"
-    assert config["models"]["profiles"]["verifier"]["api_key_env"] == "DEEPSEEK_API_KEY"
+    assert config["models"]["profiles"]["generator"]["api_key_env"] == "OPENAI_API_KEY"
+    assert config["models"]["profiles"]["verifier"]["api_key_env"] == "OPENAI_API_KEY"
     assert "api_key" not in config["models"]["profiles"]["generator"]
+
+
+def test_normalized_corpus_profile_matches_server_safe_defaults():
+    root = Path(__file__).parents[1]
+    profile_path = root / "configs" / "normalized_corpus.yaml.example"
+    profile = yaml.safe_load(
+        profile_path.read_text(encoding="utf-8")
+    )
+    resolved = load_config(str(profile_path))
+
+    assert profile["paths"]["input_pdf_dir"] == "data/normalized"
+    assert profile["paths"]["output_dir"] == "output/normalized_dataset"
+    assert profile["processing"]["max_pdfs"] is None
+    assert profile["chunking"] == {"window_size": 8000, "overlap_size": 800}
+    assert profile["embedding"]["local_files_only"] is True
+    assert profile["faiss"]["use_gpu"] is False
+    assert resolved["models"]["profiles"]["generator"]["model"] == "Qwen3.7-Plus"
+    assert resolved["models"]["profiles"]["verifier"]["model"] == "DeepSeek-V4-Pro"

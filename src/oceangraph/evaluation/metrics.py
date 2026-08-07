@@ -485,7 +485,7 @@ class RoutedMetricsEvaluator:
     """
     
     def __init__(self, 
-                 model_name: str = "deepseek-v4-pro",
+                 model_name: str = "DeepSeek-V4-Pro",
                  embedding_model: str = "BAAI/bge-m3",
                  num_reverse_questions: int = 3,
                  max_workers: int = 8,

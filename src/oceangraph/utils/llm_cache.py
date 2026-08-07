@@ -35,6 +35,7 @@ class LLMCache:
         self.enabled = enabled
         self.cache_dir = Path(cache_dir)
         self.cache_file = self.cache_dir / "llm_responses.json"
+        self.journal_file = self.cache_dir / "llm_responses.jsonl"
         self.stats_file = self.cache_dir / "llm_cache_stats.json"
         
         # Thread safety
@@ -68,6 +69,39 @@ class LLMCache:
             except (json.JSONDecodeError, IOError) as e:
                 logging.warning(f"Failed to load LLM cache: {e}")
                 self._cache = {}
+
+        if self.journal_file.exists():
+            incomplete_tail = False
+            with self.journal_file.open("r", encoding="utf-8") as handle:
+                journal_lines = handle.readlines()
+                for line_number, line in enumerate(journal_lines, 1):
+                    if not line.strip():
+                        continue
+                    try:
+                        event = json.loads(line)
+                        key = str(event["key"])
+                        entry = event["entry"]
+                        if isinstance(entry, dict):
+                            self._cache[key] = entry
+                    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                        if line_number == len(journal_lines):
+                            logging.warning(
+                                "Ignoring incomplete LLM cache journal tail %s:%s",
+                                self.journal_file,
+                                line_number,
+                            )
+                            incomplete_tail = True
+                            break
+                        raise RuntimeError(
+                            f"LLM cache journal is corrupted at {self.journal_file}:{line_number}"
+                        ) from exc
+            if incomplete_tail:
+                repair_path = self.journal_file.with_suffix(".repair.tmp")
+                repair_path.write_text(
+                    "".join(journal_lines[:-1]),
+                    encoding="utf-8",
+                )
+                repair_path.replace(self.journal_file)
         
         if self.stats_file.exists():
             try:
@@ -80,22 +114,30 @@ class LLMCache:
             except (json.JSONDecodeError, IOError):
                 pass
     
-    def _save_cache(self):
-        """Save cache to disk atomically."""
+    def _append_cache_entries(self, entries: List[Tuple[str, Dict[str, Any]]]):
+        """Append cache deltas durably without rewriting the full cache."""
         if not self.enabled:
             return
-        
-        temp_file = self.cache_file.with_suffix('.tmp')
+
         try:
-            with open(temp_file, 'w', encoding='utf-8') as f:
-                json.dump(self._cache, f, ensure_ascii=False)
-            temp_file.replace(self.cache_file)
+            with self.journal_file.open("a", encoding="utf-8") as handle:
+                for key, entry in entries:
+                    handle.write(
+                        json.dumps(
+                            {"key": key, "entry": entry},
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
+                handle.flush()
+                os.fsync(handle.fileno())
             self._stats['saves'] += 1
-        except IOError as e:
+        except OSError as e:
             logging.error(f"Failed to save LLM cache: {e}")
             self._stats['errors'] += 1
-            if temp_file.exists():
-                temp_file.unlink()
+            raise RuntimeError(
+                f"LLM cache write failed; stopping to avoid unresumable API spend: {self.journal_file}"
+            ) from e
     
     def _save_stats(self):
         """Save statistics to disk."""
@@ -198,7 +240,7 @@ class LLMCache:
         return f"{call_type}{model_part}_{prompt_hash}_{chunks_hash}"
     
     def get(self, call_type: str, prompt: str, chunks: Optional[List[Dict]] = None,
-            model: str = None) -> Optional[str]:
+            model: str = None, max_age_seconds: Optional[float] = None) -> Optional[str]:
         """Get cached response if available.
         
         Args:
@@ -217,8 +259,17 @@ class LLMCache:
         
         with self._lock:
             if key in self._cache:
-                self._stats['hits'] += 1
                 entry = self._cache[key]
+                if max_age_seconds is not None:
+                    try:
+                        created = datetime.fromisoformat(str(entry.get('timestamp', '')))
+                        age_seconds = (datetime.now() - created).total_seconds()
+                    except (TypeError, ValueError):
+                        age_seconds = float('inf')
+                    if age_seconds > max(0, float(max_age_seconds)):
+                        self._stats['misses'] += 1
+                        return None
+                self._stats['hits'] += 1
                 # Estimate tokens saved (rough: 4 chars per token)
                 self._stats['total_tokens_saved'] += len(entry.get('response', '')) // 4
                 return entry.get('response')
@@ -257,8 +308,8 @@ class LLMCache:
             entry['metadata'] = metadata
         
         with self._lock:
+            self._append_cache_entries([(key, entry)])
             self._cache[key] = entry
-            self._save_cache()
     
     def get_batch(self, call_type: str, requests: List[Tuple[str, Optional[List[Dict]]]],
                   model: str = None) -> Tuple[List[Optional[str]], List[int]]:
@@ -301,11 +352,12 @@ class LLMCache:
             return
         
         with self._lock:
+            entries = []
             for idx, response in zip(indices, responses):
                 if idx < len(requests) and response:
                     prompt, chunks = requests[idx]
                     key = self._make_key(call_type, prompt, chunks, model)
-                    self._cache[key] = {
+                    entry = {
                         'response': response,
                         'call_type': call_type,
                         'model': model,
@@ -313,7 +365,10 @@ class LLMCache:
                         'prompt_length': len(prompt),
                         'response_length': len(response)
                     }
-            self._save_cache()
+                    entries.append((key, entry))
+            if entries:
+                self._append_cache_entries(entries)
+                self._cache.update(entries)
     
     def get_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
@@ -348,6 +403,8 @@ class LLMCache:
             self._cache = {}
             if self.cache_file.exists():
                 self.cache_file.unlink()
+            if self.journal_file.exists():
+                self.journal_file.unlink()
             print("LLM cache cleared")
 
 

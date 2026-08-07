@@ -15,6 +15,7 @@ Or import: from oceangraph.utils.preflight import run_preflight_checks
 
 import json
 import os
+import subprocess
 import sys
 import time
 from typing import Dict, List, Tuple, Optional, Any
@@ -27,6 +28,10 @@ class CheckStatus(Enum):
     FAIL = "[FAIL]"
     WARN = "[WARN]"
     SKIP = "[SKIP]"
+
+
+_RESULT_PREFIX = "OCEANGRAPH_PREFLIGHT_RESULT="
+_check_timeout_override: Optional[float] = None
 
 
 @dataclass
@@ -46,6 +51,113 @@ def _timer(func):
         result.duration_ms = (time.time() - start) * 1000
         return result
     return wrapper
+
+
+def _run_check_in_subprocess(
+    name: str,
+    timeout_seconds: float | None,
+    runtime_config: Optional[Dict[str, Any]] = None,
+) -> CheckResult:
+    """Run a local model check in a killable child interpreter."""
+    if timeout_seconds is None or timeout_seconds <= 0:
+        return _single_check_function(name)()
+
+    environment = os.environ.copy()
+    source_root = str(Path(__file__).resolve().parents[2])
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value
+        for value in (source_root, environment.get("PYTHONPATH", ""))
+        if value
+    )
+    if runtime_config:
+        environment["OCEANGRAPH_PREFLIGHT_CONFIG_JSON"] = json.dumps(
+            runtime_config,
+            ensure_ascii=False,
+            default=str,
+        )
+    command = [
+        sys.executable,
+        "-m",
+        "oceangraph.utils.preflight",
+        "--single-check",
+        name,
+    ]
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return CheckResult(
+            name=name,
+            status=CheckStatus.FAIL,
+            message=f"Check timed out after {timeout_seconds:g} seconds",
+            details={"timeout_seconds": timeout_seconds, "isolated_process": True},
+            duration_ms=timeout_seconds * 1000,
+        )
+    except OSError as exc:
+        return CheckResult(
+            name=name,
+            status=CheckStatus.FAIL,
+            message=f"Cannot start isolated check: {exc}",
+            details={"error": str(exc), "isolated_process": True},
+            duration_ms=(time.monotonic() - started) * 1000,
+        )
+
+    result_line = next(
+        (
+            line[len(_RESULT_PREFIX) :]
+            for line in reversed(completed.stdout.splitlines())
+            if line.startswith(_RESULT_PREFIX)
+        ),
+        None,
+    )
+    if completed.returncode != 0 or result_line is None:
+        diagnostic = (completed.stderr or completed.stdout).strip()[-1000:]
+        return CheckResult(
+            name=name,
+            status=CheckStatus.FAIL,
+            message=f"Isolated check failed with exit code {completed.returncode}",
+            details={"error": diagnostic, "isolated_process": True},
+            duration_ms=(time.monotonic() - started) * 1000,
+        )
+    try:
+        payload = json.loads(result_line)
+        return CheckResult(
+            name=str(payload.get("name") or name),
+            status=CheckStatus[str(payload["status"])],
+            message=str(payload.get("message", "")),
+            details=dict(payload.get("details") or {}),
+            duration_ms=float(payload.get("duration_ms", 0.0) or 0.0),
+        )
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return CheckResult(
+            name=name,
+            status=CheckStatus.FAIL,
+            message=f"Cannot decode isolated check result: {exc}",
+            details={"isolated_process": True},
+        )
+
+
+def _active_preflight_timeout() -> float:
+    """Return the CLI override or configured probe/model-load timeout."""
+    if _check_timeout_override is not None:
+        return float(_check_timeout_override)
+    try:
+        from oceangraph.core.config import load_config
+
+        return float(
+            (load_config().get("preflight", {}) or {}).get(
+                "check_timeout_seconds", 180
+            )
+        )
+    except Exception:
+        return 180.0
 
 
 # ============================================================================
@@ -135,7 +247,20 @@ def check_llm_call() -> CheckResult:
         from oceangraph.core.llm import call_llm_simple, get_model_route_info
         
         test_prompt = "Say 'OK' and nothing else."
-        response = call_llm_simple(test_prompt, stage="generation")
+        from oceangraph.core.config import load_config
+
+        probe_ttl = float(
+            (load_config().get("preflight", {}) or {}).get(
+                "api_probe_cache_ttl_seconds", 3600
+            )
+        )
+        response = call_llm_simple(
+            test_prompt,
+            max_retries=1,
+            stage="generation",
+            cache_max_age_seconds=probe_ttl,
+            request_timeout_seconds=_active_preflight_timeout(),
+        )
         route = get_model_route_info("generation")
         
         if response and len(response.strip()) > 0:
@@ -177,10 +302,20 @@ def check_vlm_call() -> CheckResult:
         )
 
         route = get_model_route_info("verification")
+        from oceangraph.core.config import load_config
+
+        probe_ttl = float(
+            (load_config().get("preflight", {}) or {}).get(
+                "api_probe_cache_ttl_seconds", 3600
+            )
+        )
         if is_text_only_mode():
             response = call_llm_simple(
                 "Say 'VERIFY OK' and nothing else.",
+                max_retries=1,
                 stage="verification",
+                cache_max_age_seconds=probe_ttl,
+                request_timeout_seconds=_active_preflight_timeout(),
             )
         else:
             response = call_vlm_interweaved(
@@ -554,28 +689,28 @@ def check_input_data() -> CheckResult:
             )
         
         if input_pdf_dir and os.path.exists(input_pdf_dir):
-            # Check for supported source files
-            ignored_names = {"README.md", ".gitkeep"}
+            # Match the engine's recursive source discovery so a nested archive
+            # layout cannot pass one stage and fail the other.
+            from oceangraph.utils.sources import (
+                count_source_types,
+                discover_source_documents,
+            )
 
-            def source_files(pattern: str):
-                return [
-                    path for path in Path(input_pdf_dir).glob(pattern)
-                    if path.is_file() and path.name not in ignored_names
-                ]
-
-            pdf_files = source_files("*.pdf")
-            html_files = source_files("*.html") + source_files("*.htm")
-            text_files = source_files("*.txt") + source_files("*.md") + source_files("*.markdown")
-            total_files = len(pdf_files) + len(html_files) + len(text_files)
+            documents = discover_source_documents(
+                input_pdf_dir,
+                require_unique_stems=True,
+            )
+            counts = count_source_types(documents)
+            total_files = len(documents)
             
             if total_files > 0:
                 file_types = []
-                if pdf_files:
-                    file_types.append(f"{len(pdf_files)} PDF")
-                if html_files:
-                    file_types.append(f"{len(html_files)} HTML")
-                if text_files:
-                    file_types.append(f"{len(text_files)} text/Markdown")
+                if counts["pdf"]:
+                    file_types.append(f"{counts['pdf']} PDF")
+                if counts["html"]:
+                    file_types.append(f"{counts['html']} HTML")
+                if counts["text"]:
+                    file_types.append(f"{counts['text']} text/Markdown")
                 return CheckResult(
                     name="Input Data",
                     status=CheckStatus.PASS,
@@ -609,10 +744,27 @@ def check_input_data() -> CheckResult:
 # MAIN PREFLIGHT CHECK RUNNER
 # ============================================================================
 
+
+_ISOLATED_CHECK_FUNCTIONS = {
+    "embedding": check_embedding_model,
+    "reranker": check_reranker,
+    "metrics_emb": check_metrics_embeddings,
+}
+
+
+def _single_check_function(name: str):
+    """Resolve a local model check by its stable subprocess name."""
+    try:
+        return _ISOLATED_CHECK_FUNCTIONS[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown isolated preflight check: {name}") from exc
+
+
 def run_preflight_checks(
     skip_expensive: bool = False,
     quiet: bool = False,
-    input_dir: Optional[str] = None
+    input_dir: Optional[str] = None,
+    check_timeout_seconds: Optional[float] = None,
 ) -> Tuple[bool, List[CheckResult]]:
     """
     Run all preflight checks.
@@ -621,14 +773,35 @@ def run_preflight_checks(
         skip_expensive: Skip model loading checks (LLM, VLM, embedding, reranker)
         quiet: Suppress output
         input_dir: Override input directory for check (uses config.yaml if None)
+        check_timeout_seconds: Maximum wait for each expensive check. ``None``
+            loads ``preflight.check_timeout_seconds`` (default: 180 seconds).
     
     Returns:
         Tuple of (all_passed: bool, results: List[CheckResult])
     """
-    global _input_dir_override
+    global _input_dir_override, _check_timeout_override
     _input_dir_override = input_dir
     
     results = []
+
+    try:
+        from oceangraph.core.config import load_config
+
+        active_config = load_config()
+    except Exception:
+        active_config = {}
+    preflight_config = active_config.get("preflight", {}) or {}
+    if check_timeout_seconds is None:
+        check_timeout_seconds = float(
+            preflight_config.get("check_timeout_seconds", 180)
+        )
+    previous_timeout_override = _check_timeout_override
+    _check_timeout_override = check_timeout_seconds
+    evaluation_enabled = bool(
+        (active_config.get("evaluation", {}) or {}).get("run_evaluation", False)
+    )
+    if os.environ.get("OCEANGRAPH_RUN_EVALUATION") is not None:
+        evaluation_enabled = os.environ["OCEANGRAPH_RUN_EVALUATION"] == "1"
     
     # Define checks in order of importance
     checks = [
@@ -649,21 +822,59 @@ def run_preflight_checks(
         print("PREFLIGHT CHECKS - Validating all services before execution")
         print("=" * 70 + "\n")
     
+    prerequisite_failed = False
+    expensive_failed = False
+    isolated_checks = {"embedding", "reranker", "metrics_emb"}
     for name, check_func, is_expensive in checks:
-        if is_expensive and skip_expensive:
+        if name == "metrics_emb" and not evaluation_enabled:
+            result = CheckResult(
+                name="Metrics Embeddings",
+                status=CheckStatus.SKIP,
+                message="Skipped because evaluation.run_evaluation is false",
+            )
+        elif is_expensive and skip_expensive:
             result = CheckResult(
                 name=name.upper(),
                 status=CheckStatus.SKIP,
                 message="Skipped (--skip-expensive)"
             )
+        elif is_expensive and prerequisite_failed:
+            result = CheckResult(
+                name=name.upper(),
+                status=CheckStatus.SKIP,
+                message="Skipped because a mandatory local prerequisite failed",
+            )
+        elif is_expensive and expensive_failed:
+            result = CheckResult(
+                name=name.upper(),
+                status=CheckStatus.SKIP,
+                message="Skipped after an earlier expensive check failed",
+            )
         else:
             if not quiet:
                 print(f"  Checking {name}...", end=" ", flush=True)
-            result = check_func()
+            if (
+                name in isolated_checks
+                and check_func is _ISOLATED_CHECK_FUNCTIONS[name]
+            ):
+                result = _run_check_in_subprocess(
+                    name,
+                    check_timeout_seconds,
+                    runtime_config=active_config,
+                )
+            else:
+                result = check_func()
             if not quiet:
                 print(f"{result.status.value} ({result.duration_ms:.0f}ms)")
         
         results.append(result)
+        if result.status == CheckStatus.FAIL:
+            if is_expensive:
+                expensive_failed = True
+            else:
+                prerequisite_failed = True
+
+    _check_timeout_override = previous_timeout_override
     
     # Count results
     passed = sum(1 for r in results if r.status == CheckStatus.PASS)
@@ -754,12 +965,47 @@ def main():
                        help="Skip expensive checks (model loading, API calls)")
     parser.add_argument("--quiet", action="store_true",
                        help="Suppress output")
+    parser.add_argument("--timeout", type=float, default=None,
+                        help="Per-check timeout in seconds")
+    parser.add_argument(
+        "--single-check",
+        choices=("embedding", "reranker", "metrics_emb"),
+        default=None,
+        help=argparse.SUPPRESS,
+    )
     
     args = parser.parse_args()
+
+    if args.single_check:
+        runtime_config_json = os.environ.pop(
+            "OCEANGRAPH_PREFLIGHT_CONFIG_JSON",
+            "",
+        )
+        if runtime_config_json:
+            from oceangraph.core.config import set_runtime_config
+
+            set_runtime_config(json.loads(runtime_config_json))
+        result = _single_check_function(args.single_check)()
+        print(
+            _RESULT_PREFIX
+            + json.dumps(
+                {
+                    "name": result.name,
+                    "status": result.status.name,
+                    "message": result.message,
+                    "details": result.details,
+                    "duration_ms": result.duration_ms,
+                },
+                ensure_ascii=False,
+                default=str,
+            )
+        )
+        sys.exit(0)
     
     all_passed, _ = run_preflight_checks(
         skip_expensive=args.skip_expensive,
-        quiet=args.quiet
+        quiet=args.quiet,
+        check_timeout_seconds=args.timeout,
     )
     
     sys.exit(0 if all_passed else 1)

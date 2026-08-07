@@ -145,8 +145,8 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
     return {
         "framework": {
             "name": "OceanGraph-R1",
-            "version": "2.2.1",
-            "agent_architecture_version": "2.2.1",
+            "version": "3.0.0",
+            "agent_architecture_version": "3.0.0",
             "description": "Domain-aware multi-agent generation for ocean science multi-hop QA datasets",
             "agents": [
                 "corpus",
@@ -205,7 +205,12 @@ def build_config(args: argparse.Namespace, domain: OceanDomain) -> dict[str, Any
         "qa_correction": {"enabled": False, "max_attempts": 0},
         "deduplication": {"enabled": args.deduplication},
         "evaluation": {"run_evaluation": args.evaluation, "sample_size": None},
-        "training_export": {"enabled": True, "split": "train"},
+        "training_export": {
+            "enabled": True,
+            "split": None,
+            "split_ratios": {"train": 0.8, "dev": 0.1, "test": 0.1},
+            "seed": 42,
+        },
         "faiss": {
             "index_type": "IndexFlatIP",
             "normalize_l2": True,
@@ -340,7 +345,7 @@ def main(default_domain: str | None = None) -> int:
     manifest = {
         "framework": {
             "name": "OceanGraph-R1",
-            "version": "2.2.1",
+            "version": "3.0.0",
             "task": "ocean science evidence-grounded multi-hop search reasoning",
         },
         "domain": asdict(domain),

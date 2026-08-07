@@ -260,11 +260,11 @@ class OceanGraphConfig:
     # =========================================================================
     # Chunking
     # =========================================================================
-    chunk_window_size: int = 20000
-    """Window size in characters for semantic chunking (default: 20000 ~ 5000 tokens)."""
+    chunk_window_size: int = 8000
+    """Window size in characters for semantic chunking (default: 8000)."""
     
-    chunk_overlap_size: int = 2000
-    """Overlap between chunking windows in characters (default: 2000 ~ 500 tokens)."""
+    chunk_overlap_size: int = 800
+    """Overlap between chunking windows in characters (default: 800)."""
     
     # =========================================================================
     # Embeddings & Indexing
@@ -336,8 +336,16 @@ class OceanGraphConfig:
     export_training_data: bool = True
     """Write compact verified QA and corpus JSONL files for downstream training."""
 
-    training_split: str = "train"
-    """Split label stored in the automatic training export."""
+    training_split: Optional[str] = None
+    """Optional single-split compatibility mode; ``None`` creates train/dev/test."""
+
+    training_split_ratios: Dict[str, float] = field(
+        default_factory=lambda: {"train": 0.8, "dev": 0.1, "test": 0.1}
+    )
+    """Target ratios for source-document-disjoint automatic splits."""
+
+    training_split_seed: int = 42
+    """Deterministic seed for assigning source-document components."""
     
     max_pages: Optional[int] = None
     """Maximum number of pages to process. None = no limit."""
@@ -485,6 +493,8 @@ class OceanGraphConfig:
             "training_export": {
                 "enabled": self.export_training_data,
                 "split": self.training_split,
+                "split_ratios": dict(self.training_split_ratios),
+                "seed": self.training_split_seed,
             },
             "pdf_processing": {
                 "ocr_engine": self.ocr_engine,
@@ -594,8 +604,8 @@ class OceanGraphConfig:
             max_pdfs=processing.get('max_pdfs'),
             sort_by_size=processing.get('sort_by_size', True),
             max_chunks=processing.get('max_chunks'),
-            chunk_window_size=chunking.get('window_size', 20000),
-            chunk_overlap_size=chunking.get('overlap_size', 2000),
+            chunk_window_size=chunking.get('window_size', 8000),
+            chunk_overlap_size=chunking.get('overlap_size', 800),
             shuffle=(data.get('shuffling') or {}).get('enabled', True),
             shuffle_seed=(data.get('shuffling') or {}).get('seed', 42),
             text_only_mode=str((data.get('pipeline') or {}).get('modality', 'text')).lower()
@@ -619,7 +629,11 @@ class OceanGraphConfig:
             run_evaluation=eval_cfg.get('run_evaluation', False),
             enable_checkpointing=(data.get('checkpointing') or {}).get('enabled', True),
             export_training_data=(data.get('training_export') or {}).get('enabled', True),
-            training_split=(data.get('training_export') or {}).get('split', 'train'),
+            training_split=(data.get('training_export') or {}).get('split'),
+            training_split_ratios=(data.get('training_export') or {}).get(
+                'split_ratios', {"train": 0.8, "dev": 0.1, "test": 0.1}
+            ),
+            training_split_seed=(data.get('training_export') or {}).get('seed', 42),
             # File reference
             config_file=path,
         )
@@ -778,7 +792,9 @@ class OceanGraphResults:
         self,
         path: Optional[str] = None,
         *,
-        split: str = "train",
+        split: Optional[str] = None,
+        split_ratios: Optional[Dict[str, float]] = None,
+        split_seed: int = 42,
     ) -> Dict[str, Any]:
         """Export only fully verified multi-agent records for model training."""
         from oceangraph.training import export_training_dataset
@@ -789,6 +805,8 @@ class OceanGraphResults:
             self.chunks,
             output_path,
             split=split,
+            split_ratios=split_ratios,
+            split_seed=split_seed,
         )
     
     def filter(self, **kwargs) -> "OceanGraphResults":
@@ -1174,7 +1192,12 @@ class OceanGraph:
             project_root = self._get_project_root()
             os.chdir(project_root)
             from oceangraph.engine import run_pipeline
-            run_pipeline(cfg)
+            completed = run_pipeline(cfg)
+            if completed is False:
+                raise RuntimeError(
+                    "OceanGraph pipeline stopped because a mandatory preflight or "
+                    "input-data check failed"
+                )
             return self._collect_results()
         finally:
             os.chdir(original_cwd)
