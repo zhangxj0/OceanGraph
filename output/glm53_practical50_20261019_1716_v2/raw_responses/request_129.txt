@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the Pacific Arctic, the DBO site located in the Chirikov Basin showed which interannual trend in fall bloom occurrence compared with the site near the St. Lawrence Island polynya, where fall blooms decreased?",
+    "answer": "No clear trend",
+    "short_answers": ["No clear trend"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "Arctic phytoplankton phenology",
+    "relevance_score": 8,
+    "difficulty_score": 6,
+    "reasoning_path": "Identify DBO2 as the Chirikov Basin site; the study reported clear increasing and decreasing trends only in the southern Chukchi Sea and St. Lawrence Island polynya, so DBO2 had no clear trend."
+  },
+  {
+    "question": "Fall blooms in the Pacific Arctic are accompanied by an increased proportion of larger phytoplankton such as diatoms; what ecological function does this larger cell size enhance via faster sinking?",
+    "answer": "Biological pump efficiency",
+    "short_answers": ["Biological pump efficiency"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "Marine biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Fact 1: fall blooms increase proportion of larger phytoplankton; Fact 2: large cells sink faster, supporting a highly efficient biological pump."
+  },
+  {
+    "question": "The Arctic is warming at approximately how many times the global average rate, and by roughly what century period is it expected to become ice-free in summer?",
+    "answer": "Three times; mid-to-late twenty-first century",
+    "short_answers": ["Three times; mid-to-late twenty-first century"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "short_text",
+    "subdomain": "Arctic climate forcing",
+    "relevance_score": 8,
+    "difficulty_score": 5,
+    "reasoning_path": "Combine two stated facts: warming ~3x global average and projected summer ice-free condition by mid-to-late 21st century."
+  },
+  {
+    "question": "Among the three DBO sites monitored in the Pacific Arctic fall bloom study, which one is located in the region that showed a clear decreasing trend in fall bloom occurrence?",
+    "answer": "DBO1",
+    "short_answers": ["DBO1"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "Arctic phytoplankton phenology",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Fact 1: decreasing trend occurred in the St. Lawrence Island polynya region; Fact 2: DBO1 is the site near the St. Lawrence Island polynya."
+  }
+]}

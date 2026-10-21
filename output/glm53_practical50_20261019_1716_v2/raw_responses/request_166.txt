@@ -1,0 +1,46 @@
+{"qa_pairs": [
+{
+"question": "In the Schiermonnikoog coastal microbial mats, how much higher was the relative abundance of Nitrosopumilus amoA sequences at Station 1 in July compared to Station 1 in January, in percentage points?",
+"answer": "4.8 percentage points",
+"short_answers": ["4.8 percentage points"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "marine microbial ecology / nitrification",
+"relevance_score": 9,
+"difficulty_score": 6,
+"reasoning_path": "Table 3 gives Nitrosopumilus at ST1_July = 44.5% and ST1_Jan = 39.7%; subtract to get 4.8 percentage points."
+},
+{
+"question": "In the North Sea microbial mats where amoA gene abundance did not correlate with potential nitrification rates but amoA transcripts did, which group was concluded to perform the bulk of ammonium oxidation?",
+"answer": "ammonia-oxidizing bacteria (AOB)",
+"short_answers": ["ammonia-oxidizing bacteria (AOB)"],
+"question_type": "bridge",
+"answer_type": "entity",
+"subdomain": "marine biogeochemistry / nitrification",
+"relevance_score": 9,
+"difficulty_score": 6,
+"reasoning_path": "Chunk 1 states AOB amoA transcripts (not genes) correlated with potential nitrification rate, and concludes AOB are responsible for the bulk of ammonium oxidation."
+},
+{
+"question": "In the Schiermonnikoog microbial mats, the AOB amoA sequences were dominated by two clusters that both relate to which previously described Nitrosospira cluster?",
+"answer": "Nitrosospira cluster 3",
+"short_answers": ["Nitrosospira cluster 3"],
+"question_type": "bridge",
+"answer_type": "entity",
+"subdomain": "microbial ecology / ammonia oxidizers",
+"relevance_score": 8,
+"difficulty_score": 6,
+"reasoning_path": "Table 3 shows clusters B and C dominate AOB amoA percentages; Chunk 5 states clusters B and C both relate to Nitrosospira cluster 3 described by Purkhold et al. (2003)."
+},
+{
+"question": "How many more unique AOB amoA sequences did Station 1 harbor in July than in January in the Schiermonnikoog microbial mats?",
+"answer": "8",
+"short_answers": ["8"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "marine microbial ecology / nitrification",
+"relevance_score": 8,
+"difficulty_score": 5,
+"reasoning_path": "Chunk 3 reports 9 unique sequences at Station 1 in July and 1 in January; difference = 8."
+}
+]}

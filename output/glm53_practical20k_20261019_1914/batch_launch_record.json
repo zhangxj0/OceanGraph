@@ -1,0 +1,9 @@
+{
+  "batch_pid": 1701077,
+  "target": 20000,
+  "workers": 8,
+  "started_utc": "2026-10-20T01:36:50Z",
+  "resumes_pilot_samples": 17,
+  "uses_same_cumulative_limits": true,
+  "output": "/opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_practical20k_20261019_1914"
+}

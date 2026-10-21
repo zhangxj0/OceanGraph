@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+  "question": "After the seabed image analysis revised the per-fjord mean zoobenthic carbon production upward, by how many tonnes per year did the West Antarctic Peninsula fjord-wide estimate increase over the literature-based value for 216 fjords?",
+  "answer": "1,406 t zC/year",
+  "short_answers": ["1,406 t zC/year"],
+  "question_type": "numeric_aggregation",
+  "answer_type": "numeric",
+  "subdomain": "polar blue carbon / marine biogeochemistry",
+  "relevance_score": 9,
+  "difficulty_score": 6
+},
+{
+  "question": "Which of the three West Antarctic Peninsula study fjords produced the highest fjord floor carbon total in the literature-based estimate, and was it still the highest in the seabed image-based estimate?",
+  "answer": "Börgen Bay; yes",
+  "short_answers": ["Börgen Bay; yes"],
+  "question_type": "comparison",
+  "answer_type": "entity",
+  "subdomain": "polar blue carbon / benthic ecology",
+  "relevance_score": 8,
+  "difficulty_score": 6
+},
+{
+  "question": "Ice-bound carbon released by retreating marine glaciers was subtracted from blue carbon gains to yield a net balance; what fraction of the estimated blue carbon gains did these ice-bound carbon losses represent?",
+  "answer": "0.3% to 1%",
+  "short_answers": ["0.3% to 1%"],
+  "question_type": "causal",
+  "answer_type": "numeric",
+  "subdomain": "glacier biogeochemistry / carbon cycling",
+  "relevance_score": 9,
+  "difficulty_score": 5
+}
+]}

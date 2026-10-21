@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "The answer is directly supported: the 25°C Kiel Fjord record (CHUNK 4) links to the 26°C Amplified treatments (CHUNK 1) that caused 100% mortality, a comparison chain explicitly stated in CHUNK 4."}

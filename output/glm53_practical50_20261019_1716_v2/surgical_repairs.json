@@ -1,0 +1,35 @@
+[
+  {
+    "sample_id": "ocean50_003",
+    "question": "In the southern North Sea bottom-water and sediment study, at the station where pelagic and benthic nitrogen fixation rates peaked in August, in which month was the highest sediment nifH gene expression recorded?",
+    "answer": "February",
+    "reason": "Add the regional study scope so the unnamed intermediate station can be found."
+  },
+  {
+    "sample_id": "ocean50_004",
+    "question": "Assuming the reported annual tourism and aquaculture income per hectare applies uniformly, what annual income would be associated with the Potengi mangrove area that remained undestroyed by 1997?",
+    "answer": "about US$13.14 million per year",
+    "answer_type": "numeric",
+    "question_type": "numeric_aggregation",
+    "reasoning_path": "(1488 - 436.60) hectares times about US$12,500 per hectare per year is about US$13.14 million per year.",
+    "reason": "Replace the incompatible one-time service valuation minus annual income with a dimensionally consistent, explicitly hypothetical area-times-annual-income calculation."
+  },
+  {
+    "sample_id": "ocean50_031",
+    "question": "In the Asterias rubens experiment, what was the overall reduction in mussel consumption relative to the no-heatwave control for the treatment with +5 degrees C intensity and 13-day duration?",
+    "answer": "53%",
+    "answer_type": "numeric",
+    "question_type": "bridge",
+    "reasoning_path": "The +5 degrees C, 13-day treatment identifies the Extended treatment; its overall mussel-consumption reduction was 53% relative to No heatwave.",
+    "reason": "Replace an unclear request for an unspecified treatment outcome with one final measured attribute after identifying the treatment."
+  },
+  {
+    "sample_id": "ocean50_045",
+    "question": "How many years elapsed between the end of the H.M.S. Challenger expedition and the invention of the wet-chemical method that remains the standard for dissolved oxygen in seawater?",
+    "answer": "12 years",
+    "answer_type": "numeric",
+    "question_type": "numeric_aggregation",
+    "reasoning_path": "The expedition ended in 1876; the referenced method is Winkler, invented in 1888; 1888 minus 1876 equals 12 years.",
+    "reason": "Correct the false one-year-after premise and use the two source dates in a valid calculation."
+  }
+]

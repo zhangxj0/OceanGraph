@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Pacific Arctic study of fall blooms (2003–2017), which DBO region showed a decreasing trend in fall bloom occurrence while the southern Chukchi Sea showed an increasing trend?",
+    "answer": "St. Lawrence Island polynya region",
+    "short_answers": ["St. Lawrence Island polynya region"],
+    "question_type": "comparison",
+    "answer_type": "entity",
+    "subdomain": "Arctic phytoplankton bloom phenology",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why do fall blooms in the Pacific Arctic, which increase the proportion of larger phytoplankton such as diatoms, matter for the biological pump?",
+    "answer": "Larger cells sink faster, enhancing vertical organic-carbon transport",
+    "short_answers": ["Larger cells sink faster, enhancing vertical organic-carbon transport"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "Marine biogeochemistry and carbon export",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "How did the study detect fall blooms in the Pacific Arctic from satellite data, and what phytoplankton property did it then relate them to?",
+    "answer": "Gaussian-model chl a peaks in fall, related to size structure",
+    "short_answers": ["Gaussian-model chl a peaks in fall, related to size structure"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "Satellite oceanography of phytoplankton",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

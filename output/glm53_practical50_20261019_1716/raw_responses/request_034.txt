@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Asterias rubens experiment, how did the 13-day Extended heatwave of present-day intensity (+5°C, max 23°C) affect overall mussel consumption compared to the No heatwave treatment, and what happened to starfish exposed to the Amplified future heatwave treatments instead?",
+    "answer": "53% reduction in feeding; 100% mortality",
+    "short_answers": ["53% reduction in feeding; 100% mortality"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "marine heatwave effects on benthic predators",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why did the simulated upwelling event impair Asterias rubens feeding and activity, and why did this impairment appear alleviated in starfish previously exposed to a present-day heatwave?",
+    "answer": "Acidification and low oxygen; cross-stress tolerance from prior heatwave",
+    "short_answers": ["Acidification and low oxygen; cross-stress tolerance from prior heatwave"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "multiple stressors and ecological memory",
+    "relevance_score": 9,
+    "difficulty_score": 7
+  },
+  {
+    "question": "Given that peak temperatures of 25°C were recorded in Kiel Fjord's shallow waters in summer 2018, what does the experiment imply about the mortality risk for Asterias rubens at temperatures only 1°C above this record?",
+    "answer": "100% mortality",
+    "short_answers": ["100% mortality"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "thermal tolerance limits of marine invertebrates",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

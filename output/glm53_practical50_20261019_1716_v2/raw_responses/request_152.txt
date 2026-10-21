@@ -1,0 +1,1 @@
+{"verdict": "REJECT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": false, "reason": "The reasons (data restrictions and sluggish float motion) are stated together in a single sentence in CHUNK 3, making this a direct single-fact lookup rather than a linked multi-hop reasoning chain."}

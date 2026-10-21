@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the Moorea fore reef IBM study, by what percentage did the OA scenario that affected both coral growth and competition reduce 7-year coral cover relative to the ambient-pCO2 projection?",
+    "answer": "56%",
+    "short_answers": ["56%"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "coral reef community ecology under ocean acidification",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Ambient 7-year cover was 67% (66-67.1%); OA growth+competition cover was 28.9% (~29%); (67-29)/67 ≈ 56% reduction."
+  },
+  {
+    "question": "In the Moorea fore reef simulations, which coral genus dominated total coral cover at the end of the 7-year OA projection in which both growth and competition were affected, and what percentage of total cover did it account for?",
+    "answer": "Pocillopora, 81%",
+    "short_answers": ["Pocillopora, 81%"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "coral community composition under ocean acidification",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Identify the OA growth+competition scenario (28.9% cover after 7 years), then retrieve that Pocillopora accounted for 81% of that cover."
+  },
+  {
+    "question": "In the sensitivity analysis of the Moorea fore reef IBM, what was the difference in projected 7-year coral cover change between a +20% and a -20% perturbation of coral linear growth rate?",
+    "answer": "43.5 percentage points",
+    "short_answers": ["43.5 percentage points"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "model sensitivity analysis of coral recovery",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "+20% growth caused +19.1% cover change; -20% caused -24.4%; difference = 19.1 - (-24.4) = 43.5 percentage points."
+  },
+  {
+    "question": "In the Moorea fore reef model, which ecological process, when additionally affected by OA beyond coral growth suppression, caused community recovery to drop from 7.2% cover per year to 4.8% cover per year?",
+    "answer": "competition among corals",
+    "short_answers": ["competition among corals"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "ocean acidification effects on coral community recovery",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "OA on growth alone gave 7.2% y-1; OA on growth plus competition gave 4.8% y-1; the added process is coral-coral competition."
+  }
+]}

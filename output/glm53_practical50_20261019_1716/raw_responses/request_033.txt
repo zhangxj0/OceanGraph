@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the southern Gulf of St. Lawrence estuary study, upper estuary anoxia was detected at 10 sites, most of which were on Prince Edward Island. How many of the anoxia sites were located on Prince Edward Island?",
+"answer": "eight",
+"short_answers": ["eight"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "estuarine biogeochemistry and dissolved oxygen dynamics",
+"relevance_score": 9,
+"difficulty_score": 5
+},
+{
+"question": "In the estuaries of the southern Gulf of St. Lawrence, dissolved oxygen logger data from 2014 showed hypoxia was more prevalent at the 10% location than the 50% location, and anoxia at the 10% location occurred earlier and lasted longer. Which estuary was the exception where anoxia was observed at both the 10% and 50% locations?",
+"answer": "Kildare",
+"short_answers": ["Kildare"],
+"question_type": "bridge",
+"answer_type": "entity",
+"subdomain": "estuarine hypoxia monitoring",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "In the southern Gulf of St. Lawrence study, chlorophyll in the upper estuary appeared coupled with sustained anoxia, with blooms occurring within a certain number of days after anoxia. What was the maximum number of days after anoxia onset that phytoplankton blooms typically occurred?",
+"answer": "14 days",
+"short_answers": ["14 days"],
+"question_type": "causal",
+"answer_type": "numeric",
+"subdomain": "phytoplankton blooms and eutrophication",
+"relevance_score": 9,
+"difficulty_score": 6
+}
+]}

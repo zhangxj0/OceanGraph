@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "The ocean has absorbed about 31% of human-produced CO2 emissions, causing surface ocean pH to decline from 8.2 to 8.1 since 1860. Given that the pH scale is logarithmic, what does this one-unit pH decrease represent in terms of acidity?",
+    "answer": "10-fold increase in acidity",
+    "short_answers": ["10-fold increase in acidity"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "ocean acidification chemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Combine the pH decline from 8.2 to 8.1 with the stated logarithmic rule that a one-unit pH decrease equals a 10-fold acidity increase."
+  },
+  {
+    "question": "In the U.S. Southeast, acidification combined with low oxygen profoundly affects genes regulating which physiological process, while in corals it reduces the rate of which skeletal-building process?",
+    "answer": "oxygen consumption; calcification",
+    "short_answers": ["oxygen consumption; calcification"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "marine organismal responses to acidification",
+    "relevance_score": 8,
+    "difficulty_score": 6,
+    "reasoning_path": "Link two organismal impacts stated for the U.S. Southeast: acidification plus low oxygen affects genes regulating oxygen consumption, and coral calcification rate decreases with acidification."
+  },
+  {
+    "question": "SOCAN was formed in January 2015 with support from NOAA's Ocean Acidification Program and which regional observing association?",
+    "answer": "SECOORA",
+    "short_answers": ["SECOORA"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "coastal acidification networks and governance",
+    "relevance_score": 8,
+    "difficulty_score": 5,
+    "reasoning_path": "Identify SOCAN via its formation date and NOAA support, then retrieve the co-facilitating regional association (SECOORA)."
+  },
+  {
+    "question": "Under increasingly acidic conditions, the decrease in carbonate ion concentration lowers which saturation state that makes aragonite skeletons energetically more difficult to form?",
+    "answer": "aragonite saturation state (Ωarag)",
+    "short_answers": ["aragonite saturation state (Ωarag)"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "carbonate chemistry and calcification",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Connect the mechanism of decreasing carbonate ions under acidification to the resulting lowered aragonite saturation state affecting skeleton formation."
+  }
+]}

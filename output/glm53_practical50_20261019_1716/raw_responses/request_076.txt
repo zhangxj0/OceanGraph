@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the STRATIPHYT transect region, the low chlorophyll a concentrations observed north of 45°N in spring 2011 were attributed to which growth limitation, given the water-column mixing state there?",
+"answer": "light limitation",
+"short_answers": ["light limitation"],
+"question_type": "causal",
+"answer_type": "entity",
+"subdomain": "marine biogeochemistry / phytoplankton dynamics",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+  "question": "According to the mechanisms described for a warming ocean, why is nutrient transport into the upper ocean expected to decrease in nutrient-limited midlatitude Atlantic areas?",
+  "answer": "SST increase inhibits vertical mixing causing stratification",
+  "short_answers": ["SST increase inhibits vertical mixing causing stratification"],
+  "question_type": "causal",
+  "answer_type": "short_text",
+  "subdomain": "ocean climate / biogeochemistry",
+  "relevance_score": 9,
+  "difficulty_score": 7
+},
+{
+  "question": "How does the century-scale average Chl a increase rate found by Wernand et al. for the North Atlantic north of 20°N compare qualitatively with local decadal variations reported by Antoine et al.?",
+  "answer": "decadal local variations are much larger",
+  "short_answers": ["decadal local variations are much larger"],
+  "question_type": "comparison",
+  "answer_type": "short_text",
+  "subdomain": "marine biogeochemistry / chlorophyll trends",
+  "relevance_score": 8,
+  "difficulty_score": 6
+}
+]}

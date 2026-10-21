@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "Among the Greenland Zostera marina meadows where organic carbon burial rates could be resolved from the 1940s to present, how many times larger was the fold-increase in Corg burial at Kapisillit than at Kobbefjord?",
+    "answer": "2.6",
+    "short_answers": ["2.6"],
+    "question_type": "comparison",
+    "answer_type": "numeric",
+    "subdomain": "coastal carbon burial in Arctic seagrass meadows",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why were carbon stocks and burial rates at the dense Kapisillit seagrass meadow only estimated from 1935 onwards?",
+    "answer": "Its 16 cm sediment core covers just 77 years",
+    "short_answers": ["Its 16 cm sediment core covers just 77 years"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "sediment chronology and carbon stock estimation",
+    "relevance_score": 8,
+    "difficulty_score": 6
+  },
+  {
+    "question": "In the Greenland seagrass sediments, what source of organic carbon dominated before 1900, as indicated by highly 13C-depleted Corg pools averaging −30.44‰?",
+    "answer": "Phytoplankton (with other depleted sources)",
+    "short_answers": ["Phytoplankton"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "sediment organic carbon sources and isotopic reconstruction",
+    "relevance_score": 8,
+    "difficulty_score": 5
+  }
+]}

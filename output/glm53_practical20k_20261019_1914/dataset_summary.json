@@ -1,0 +1,38 @@
+{
+  "accepted": 16171,
+  "target": 20000,
+  "source_documents": 9146,
+  "topics": {
+    "nutrients_microbes": 5971,
+    "coastal_blue_carbon": 1018,
+    "carbon_pump_flux": 708,
+    "physical_climate": 528,
+    "ecology_plankton": 3709,
+    "acidification_carbonate": 1652,
+    "observing_models": 361,
+    "sediment_paleo": 2224
+  },
+  "question_types": {
+    "numeric_aggregation": 4941,
+    "bridge": 7809,
+    "causal": 1066,
+    "comparison": 2137,
+    "spatial": 103,
+    "temporal": 115
+  },
+  "quality_labels": {
+    "clear_multi_step": 6378,
+    "shallow_linkage": 9793
+  },
+  "api_usage": {
+    "requests": 27168,
+    "input_accounted": 83249560,
+    "output_accounted": 25383723,
+    "input_reported": 83035904,
+    "output_reported": 25252651,
+    "accepted": 16171,
+    "numeric": 4941
+  },
+  "completed": false,
+  "verification_scope": "GLM-5.3 qualitative review, source-backed arithmetic, exact deduplication and within-source near-duplicate check; no proof of per-hop necessity."
+}

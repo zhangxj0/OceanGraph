@@ -1,0 +1,157 @@
+framework:
+  name: OceanGraph-R1
+  version: 3.0.0
+  agent_architecture: four_agent
+  agents:
+  - corpus
+  - evidence
+  - qa
+  - verifier
+llm_config_file: /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_practical50_20261019_1716_v2/llm_run.yaml
+pipeline:
+  modality: text
+preflight:
+  check_timeout_seconds: 180
+  api_probe_cache_ttl_seconds: 3600
+paths:
+  input_pdf_dir: data/data1
+  input_chunks_file: null
+  output_dir: /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_practical50_20261019_1716_v2
+processing:
+  max_pdfs: 300
+  sort_by_size: true
+  max_chunks: null
+qa_generation:
+  num_qa_pairs: 50
+  type: multihop
+  strict_multihop_verification: false
+  min_supporting_chunks: 2
+  output_jsonl: true
+  model_selection: false
+  verification_profile: practical_multihop
+  max_answer_words: 12
+  max_answer_cjk_chars: 16
+  multihop_verification_mode: balanced
+  max_verification_chunks: 4
+  max_unknown_verdicts: 1
+  counterfactual_verification: false
+shuffling:
+  enabled: true
+  seed: 42
+embedding:
+  model: bge_m3
+  cache_embeddings: true
+  local_files_only: true
+  batch_size: 8
+  gpus:
+  - 0
+  models:
+    bge_m3:
+      name: BAAI/bge-m3
+    bge_large:
+      name: BAAI/bge-large-en-v1.5
+    minilm:
+      name: sentence-transformers/all-MiniLM-L6-v2
+reranker:
+  default: text_embedding
+  models:
+    text_embedding:
+      model_name: BAAI/bge-large-en-v1.5
+qa_correction:
+  enabled: false
+  max_attempts: 0
+retrieval:
+  multihop:
+    max_depth: 2
+    max_breadth: 5
+    chunks_per_search: 2
+    log_details: true
+    chunk_addition_mode: RELATED
+  simple:
+    method: top_k
+    top_k: 20
+    top_p: 0.9
+    rerank_top_k: 10
+    context_size: 2
+deduplication:
+  question_similarity_threshold: 0.75
+  answer_similarity:
+    high: 0.95
+    medium: 0.85
+    low: 0.7
+  min_community_size: 2
+  alpha: 0.6
+parallel:
+  num_workers: 4
+  available_gpus:
+  - 0
+  qa_max_workers: 6
+  dedup_max_workers: 4
+pdf_processing:
+  input_path: data/data1
+  output_dir: output/practical_multihop50/markdown
+  image_resolution_scale: 2.0
+  num_threads: 4
+  cuda_device_id: 0
+  pipeline_options:
+    do_picture_classification: false
+    do_picture_description: false
+    do_ocr: true
+    do_code_enrichment: true
+    do_formula_enrichment: true
+    do_table_structure: true
+    generate_table_images: true
+chunking:
+  window_size: 8000
+  overlap_size: 800
+domain_expert:
+  expert_persona: Ocean Science Multi-Hop QA Curator
+  domain: Ocean Science and Marine Engineering
+  use_multimodal_embeddings: false
+  output_dir: output/practical_multihop50/domain_analysis
+bertopic:
+  umap:
+    n_neighbors: 15
+    n_components: 5
+    min_dist: 0.0
+    metric: cosine
+    random_state: 42
+  umap_2d:
+    n_neighbors: 10
+    n_components: 2
+    min_dist: 0.0
+    metric: cosine
+  vectorizer:
+    stop_words: english
+    min_df: 2
+    ngram_range:
+    - 1
+    - 2
+  mmr:
+    diversity: 0.5
+  calculate_probabilities: false
+  verbose: true
+training_export:
+  enabled: true
+  split: null
+  split_ratios:
+    train: 0.8
+    dev: 0.1
+    test: 0.1
+  seed: 42
+evaluation:
+  run_evaluation: false
+  sample_size: null
+  run_context_necessity: true
+  judge_stage: verification
+  embedding_backend: local
+  embedding_model: BAAI/bge-m3
+faiss:
+  index_type: IndexFlatIP
+  normalize_l2: true
+logging:
+  level: INFO
+retry:
+  initial_wait: 2
+  max_wait: 60
+  max_attempts: 3

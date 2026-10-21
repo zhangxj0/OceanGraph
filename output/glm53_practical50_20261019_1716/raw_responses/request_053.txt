@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Schiermonnikoog coastal microbial mats, which group's amoA transcripts (rather than gene abundance) correlated with potential nitrification rates, and what group does that imply performs the bulk of ammonium oxidation?",
+    "answer": "AOB (ammonia-oxidizing bacteria)",
+    "short_answers": ["AOB (ammonia-oxidizing bacteria)"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "Marine nitrogen cycling / nitrification",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "In the GeoChip analysis of Schiermonnikoog microbial mats, which AOB amoA cluster (related to Nitrosospira cluster 3 and typical of brackish/marine environments) had the highest percentage across all stations and seasons, and what was its approximate range?",
+    "answer": "Nitrosospira cluster B, 34.5–42.6%",
+    "short_answers": ["Nitrosospira cluster B, 34.5–42.6%"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "short_text",
+    "subdomain": "Microbial ecology / ammonia oxidizer diversity",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "In the Schiermonnikoog mat study, how did the fraction of unique AOB amoA sequences at Station 1 change from July (9 of 103) to January, when only 1 of 85 was unique?",
+    "answer": "Decreased from 8.7% to 1.2%",
+    "short_answers": ["Decreased from 8.7% to 1.2%"],
+    "question_type": "temporal",
+    "answer_type": "numeric",
+    "subdomain": "Microbial community temporal dynamics",
+    "relevance_score": 8,
+    "difficulty_score": 5
+  }
+]}

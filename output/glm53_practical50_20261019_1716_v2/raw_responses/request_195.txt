@@ -1,0 +1,22 @@
+{"reviews": [
+{"sample_id": "ocean50_026", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "We find that a transport mechanism for bicarbonate is required to supplement carbon into the calcifying fluid because CO2 diffusion alone is not sufficient to sustain the observed calcification rates.",
+"notes": "Answer is directly and unambiguously stated in the abstract; the question merely paraphrases the source sentence. Correct content but no genuine multi-step reasoning — a single-fact lookup with model-context framing."},
+{"sample_id": "ocean50_027", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "shallow_linkage", "question_ambiguity": "minor", "scientific_error_risk": "low",
+"source_excerpt": "Strain GW6 demonstrated the highest nitrogen removal performance, removing approximately 99% of ammonium and 98% of nitrate within 24 hours, while the other strains removed around 90-95% of ammonium and nitrate within the same time frame.",
+"notes": "The 99% ammonium value for GW6 must be retrieved, then subtracted from the 90-95% range already supplied in the question to get 4-9 points. Since one operand is embedded in the question and the other is a single adjacent stated value, this is only shallow linkage. Minor ambiguity: answer is a range approximation, and source mixes ammonium/nitrate figures; question correctly isolates ammonium."},
+{"sample_id": "ocean50_028", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "Table 2: Wheatley 10% location '< 4' = 0.10; Wheatley 50% bottom '< 4' = 0.02. 'The first three metrics are the proportion of the entire deployment that dissolved oxygen concentration (mg/L) was above or below the indicated thresholds.'",
+"notes": "Requires locating two separate values in Table 2 (Wheatley 10% and 50% bottom, <4 mg/L proportion) and computing 0.10 - 0.02 = 0.08. Both values must be retrieved and disambiguated from other rows/locations (e.g., 50% top = 0), so this is a genuine two-fact computation. Question correctly specifies 2014 deployments, estuary, and bottom vs 10% logger; answer is precise and unique."},
+{"sample_id": "ocean50_029", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "anoxia was rarely observed at the 50% location at all sites except for Kildare which was impacted at both the 10 and 50% locations",
+"notes": "Answer (Kildare) is stated verbatim in the text; the framing about the five instrumented estuaries is decorative context rather than a reasoning step. Correct and unambiguous, but a single-fact lookup, not multi-step."},
+{"sample_id": "ocean50_030", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "By day 21 (i.e. 8 days of heatwave exposure), 83% and 75% of the starfish had died when the temperature exceeded 25.8°C for 3 days in the Amplified and the Future heatwave treatments, respectively.",
+"notes": "Requires retrieving two mortality values (83% Amplified, 75% Future) from one sentence and computing the 8-point difference. Even though the operands are adjacent, this is a valid two-fact computation. The question correctly specifies day 21, the 25.8°C/3-day condition, and the treatment names as given in the source (the paper itself labels both as 'Amplified treatments' elsewhere, a minor internal wording inconsistency, but the question follows the sentence's explicit naming). Answer is exact and unique."}
+]}

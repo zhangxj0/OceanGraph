@@ -1,0 +1,325 @@
+{
+  "fingerprint": "b0314f5cf48a0563d5f093a188a738a978365cd25ae9335aa6d1eb52518c1c9a",
+  "framework_version": "3.0.0",
+  "source_count": 3,
+  "config": {
+    "backend": {
+      "active": "OPENAI",
+      "openai": {
+        "llm_model": "GLM-5.3",
+        "timeout": 300,
+        "url": "https://llmapi.paratera.com/v1/chat/completions",
+        "vlm_model": "GLM-5.3"
+      }
+    },
+    "bertopic": {
+      "calculate_probabilities": false,
+      "mmr": {
+        "diversity": 0.5
+      },
+      "umap": {
+        "metric": "cosine",
+        "min_dist": 0.0,
+        "n_components": 5,
+        "n_neighbors": 15,
+        "random_state": 42
+      },
+      "umap_2d": {
+        "metric": "cosine",
+        "min_dist": 0.0,
+        "n_components": 2,
+        "n_neighbors": 10
+      },
+      "vectorizer": {
+        "min_df": 2,
+        "ngram_range": [
+          1,
+          2
+        ],
+        "stop_words": "english"
+      },
+      "verbose": true
+    },
+    "chunking": {
+      "overlap_size": 800,
+      "window_size": 8000
+    },
+    "domain_expert": {
+      "domain": "Marine Carbon Biogeochemistry",
+      "expert_persona": "Ocean Science Multi-Hop QA Curator",
+      "use_multimodal_embeddings": false
+    },
+    "embedding": {
+      "model": "bge_m3",
+      "models": {
+        "bge_large": {
+          "name": "BAAI/bge-large-en-v1.5"
+        },
+        "bge_m3": {
+          "name": "BAAI/bge-m3"
+        },
+        "minilm": {
+          "name": "sentence-transformers/all-MiniLM-L6-v2"
+        }
+      }
+    },
+    "faiss": {
+      "index_type": "IndexFlatIP",
+      "normalize_l2": true
+    },
+    "framework": {
+      "agent_architecture": "four_agent",
+      "agents": [
+        "corpus",
+        "evidence",
+        "qa",
+        "verifier"
+      ],
+      "name": "OceanGraph-R1",
+      "version": "3.0.0"
+    },
+    "models": {
+      "profiles": {
+        "generator": {
+          "api_key_env": "<redacted>",
+          "backend": "OPENAI",
+          "extra_body": {
+            "reasoning_effort": "low",
+            "thinking": {
+              "type": "enabled"
+            }
+          },
+          "max_output_tokens": "<redacted>",
+          "model": "GLM-5.3",
+          "structured_output": true,
+          "supports_vision": false,
+          "temperature": 0.0,
+          "timeout": 300,
+          "url": "https://llmapi.paratera.com/v1/chat/completions"
+        },
+        "verifier": {
+          "api_key_env": "<redacted>",
+          "backend": "OPENAI",
+          "extra_body": {
+            "reasoning_effort": "high",
+            "thinking": {
+              "type": "enabled"
+            }
+          },
+          "max_output_tokens": "<redacted>",
+          "model": "GLM-5.3",
+          "structured_output": true,
+          "supports_vision": false,
+          "temperature": 0.0,
+          "timeout": 300,
+          "url": "https://llmapi.paratera.com/v1/chat/completions"
+        }
+      },
+      "stages": {
+        "corpus": "generator",
+        "correction": "generator",
+        "default": "generator",
+        "generation": "generator",
+        "retrieval": "generator",
+        "selection": "verifier",
+        "verification": "verifier"
+      }
+    },
+    "pdf_processing": {
+      "image_resolution_scale": 2.0,
+      "pipeline_options": {
+        "do_code_enrichment": true,
+        "do_formula_enrichment": true,
+        "do_ocr": true,
+        "do_picture_classification": false,
+        "do_picture_description": false,
+        "do_table_structure": true,
+        "generate_table_images": true
+      }
+    },
+    "pipeline": {
+      "modality": "text"
+    },
+    "processing": {
+      "max_chunks": null,
+      "max_pdfs": 3,
+      "sort_by_size": true
+    },
+    "qa_correction": {
+      "enabled": false,
+      "max_attempts": 0
+    },
+    "qa_generation": {
+      "counterfactual_verification": false,
+      "max_answer_cjk_chars": 16,
+      "max_answer_words": 12,
+      "max_unknown_verdicts": 1,
+      "max_verification_chunks": 4,
+      "min_supporting_chunks": 2,
+      "model_selection": false,
+      "multihop_verification_mode": "balanced",
+      "strict_multihop_verification": true,
+      "type": "multihop",
+      "verification_profile": "cost_efficient"
+    },
+    "rate_limiting": {
+      "burst_size": 15,
+      "requests_per_minute": 60
+    },
+    "reranker": {
+      "default": "text_embedding",
+      "model": "text_embedding",
+      "models": {
+        "text_embedding": {
+          "model_name": "BAAI/bge-large-en-v1.5"
+        }
+      }
+    },
+    "retrieval": {
+      "multihop": {
+        "chunk_addition_mode": "RELATED",
+        "chunks_per_search": 2,
+        "log_details": true,
+        "max_breadth": 2,
+        "max_depth": 2
+      },
+      "simple": {
+        "context_size": 2,
+        "method": "top_k",
+        "rerank_top_k": 10,
+        "top_k": 20,
+        "top_p": 0.9
+      }
+    },
+    "retry": {
+      "initial_wait": 2,
+      "max_attempts": 3,
+      "max_wait": 60
+    },
+    "shuffling": {
+      "enabled": true,
+      "seed": 42
+    }
+  },
+  "runtime_settings": {
+    "embedding": {
+      "model": "bge_m3",
+      "reranker": "text_embedding"
+    },
+    "pipeline": {
+      "text_only": true
+    },
+    "processing": {
+      "max_chunks": null,
+      "max_files": 3,
+      "sort_by_size": true
+    },
+    "qa_generation": {
+      "correction_enabled": false,
+      "correction_max_attempts": 0,
+      "counterfactual_verification": false,
+      "max_answer_cjk_chars": 16,
+      "max_answer_words": 12,
+      "max_unknown_verdicts": 1,
+      "max_verification_chunks": 4,
+      "min_supporting_chunks": 2,
+      "model_selection": false,
+      "multihop_verification_mode": "balanced",
+      "strict_multihop": true,
+      "type": "multihop",
+      "verification_profile": "cost_efficient"
+    },
+    "retrieval": {
+      "chunk_addition_mode": "RELATED",
+      "chunks_per_search": 2,
+      "max_breadth": 2,
+      "max_depth": 2
+    },
+    "shuffling": {
+      "enabled": true,
+      "seed": 42
+    }
+  },
+  "model_routes": {
+    "corpus": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "generator",
+      "stage": "corpus",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "correction": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "generator",
+      "stage": "correction",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "default": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "generator",
+      "stage": "default",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "generation": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "generator",
+      "stage": "generation",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "retrieval": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "generator",
+      "stage": "retrieval",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "selection": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "verifier",
+      "stage": "selection",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    },
+    "verification": {
+      "backend": "OPENAI",
+      "model": "GLM-5.3",
+      "profile": "verifier",
+      "stage": "verification",
+      "structured_output": true,
+      "temperature": 0.0,
+      "thinking": null
+    }
+  },
+  "sources": [
+    {
+      "path": "ocean_corpus_03860.md",
+      "size": 3852,
+      "sha256": "22fdf71ca20e353a34234aa7a08bf35d5751467109ba0d3644228805959e2217"
+    },
+    {
+      "path": "ocean_corpus_03883.md",
+      "size": 6200,
+      "sha256": "e7b112a8ad65b1a837d4becb91528117e8546a339058c7bb415e02a61e633f31"
+    },
+    {
+      "path": "ocean_corpus_05998.md",
+      "size": 6623,
+      "sha256": "77697e6d8505ab1f505ca3481af8f6f2272c1d4339d8c2a79e606a0acb1677f2"
+    }
+  ]
+}

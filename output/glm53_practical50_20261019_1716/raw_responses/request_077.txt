@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "Given that NPP has significantly declined in 48% of the ocean at an average rate of −34 mg C m−2 d−1 decade−1, while significant increases cover only 4% of the ocean at 48 mg C m−2 d−1 decade−1, what is the difference between the average rates of decline and increase in NPP?",
+    "answer": "82 mg C m−2 d−1 decade−1",
+    "short_answers": ["82 mg C m−2 d−1 decade−1"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "marine primary productivity",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "Phytoplankton in the warming stratified ocean show diminished photosynthetic light harvesting capacity and declining growth rates; what mechanism do the authors identify as driving these declines and the corresponding drop in NPP?",
+    "answer": "Strengthening nutrient limitation",
+    "short_answers": ["Strengthening nutrient limitation"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "The 15 °C isotherm marks the transition between temperate seasonally mixing biomes and permanently stratified biomes; on which side of this isotherm do most NPP trends exceed the 90% confidence interval as declines?",
+    "answer": "Above 15 °C",
+    "short_answers": ["Above 15 °C"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "ocean biogeography and productivity",
+    "relevance_score": 8,
+    "difficulty_score": 6
+  }
+]}

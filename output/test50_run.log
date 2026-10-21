@@ -1,0 +1,814 @@
+2026-10-19 10:55:31,529 - INFO - ============================================================================
+2026-10-19 10:55:31,529 - INFO -   OceanGraph-R1: Ocean Science Multi-Agent Dataset Generator
+2026-10-19 10:55:31,529 - INFO - ============================================================================
+2026-10-19 10:55:31,956 - DEBUG - Environment variable FAISS_OPT_LEVEL is not set, so let's pick the instruction set according to the current CPU
+2026-10-19 10:55:31,956 - INFO - Loading faiss with AVX512 support.
+2026-10-19 10:55:31,992 - INFO - Successfully loaded faiss with AVX512 support.
+2026-10-19 10:55:32,004 - INFO - Failed to load GPU Faiss: name 'GpuIndexIVFFlat' is not defined. Will not load constructor refs for GPU indexes.
+2026-10-19 10:55:32,944 - INFO - Backend: OPENAI
+2026-10-19 10:55:32,944 - INFO - Input directory: data/data1
+2026-10-19 10:55:32,944 - INFO - Output directory: output/test50
+2026-10-19 10:55:32,944 - INFO - Target QA pairs: 50
+2026-10-19 10:55:32,944 - INFO - Strict multi-hop verification: ON
+2026-10-19 10:55:32,955 - INFO - Starting OceanGraph-R1 agent pipeline...
+Configuration loaded from config.yaml
+Output directory set from CLI: output/test50
+Terminal output being captured to: output/test50/terminal_pipeline.log
+
+======================================================================
+RUNNING PREFLIGHT CHECKS (mandatory)
+======================================================================
+
+======================================================================
+PREFLIGHT CHECKS - Validating all services before execution
+======================================================================
+
+  Checking config... [PASS] (0ms)
+  Checking api_key... [PASS] (0ms)
+  Checking input_data... [PASS] (6353ms)
+  Checking output_dir... [PASS] (14ms)
+  Checking gpu... [PASS] (5186ms)
+  Checking llm... 2026-10-19 10:57:24,150 - INFO - LLM Request stage=generation profile=generator model=GLM-5.3 prompt_sha=4b6ed6d77869 prompt_chars=26
+2026-10-19 10:57:24,151 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:57:35,259 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 1106
+2026-10-19 10:57:35,259 - INFO - LLM Response stage=generation chars=2
+Calling LLM stage=generation via generator/OPENAI (GLM-5.3)...
+[OK] LLM response received (2 chars)
+[PASS] (11123ms)
+  Checking vlm... 2026-10-19 10:57:35,274 - INFO - LLM Request stage=verification profile=verifier model=GLM-5.3 prompt_sha=c4831720233e prompt_chars=33
+2026-10-19 10:57:35,274 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:57:49,249 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 2493
+2026-10-19 10:57:49,250 - INFO - LLM Response stage=verification chars=9
+Calling LLM stage=verification via verifier/OPENAI (GLM-5.3)...
+[OK] LLM response received (9 chars)
+[PASS] (13984ms)
+  Checking embedding... [PASS] (18042ms)
+  Checking reranker... 2026-10-19 10:58:50,791 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=58f743c88051 prompt_chars=11750
+2026-10-19 10:58:50,792 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:58:50,793 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=a869667642b4 prompt_chars=11845
+2026-10-19 10:58:50,793 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:58:50,794 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=9326e635bede prompt_chars=13566
+2026-10-19 10:58:50,794 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:58:50,795 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=9326e635bede prompt_chars=13566
+2026-10-19 10:58:50,795 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+[PASS] (12884ms)
+
+======================================================================
+PREFLIGHT CHECK SUMMARY
+======================================================================
+
+  Results: 9 passed, 0 failed, 0 warnings, 1 skipped
+
+  ------------------------------------------------------------------
+  Service                   Status       Details                       
+  ------------------------------------------------------------------
+  Configuration             [PASS]       OPENAI                        
+  API Key                   [PASS]                                     
+  Input Data                [PASS]       data1                         
+  Output Directory          [PASS]       test50                        
+  GPU                       [PASS]                                     
+  LLM API                   [PASS]       GLM-5.3                       
+  Verifier API              [PASS]       GLM-5.3                       
+  Embedding Model           [PASS]       BAAI/bge-m3                   
+  Reranker                  [PASS]       BAAI/bge-large-en-v1.5        
+  Metrics Embeddings        [SKIP]                                     
+  ------------------------------------------------------------------
+
+  Active Configuration:
+     - Backend:    OPENAI
+     - LLM Model:  GLM-5.3
+     - VLM Model:  GLM-5.3
+     - Embeddings: bge_m3
+     - Output Dir: output/test50
+
+======================================================================
+[OK] ALL CHECKS PASSED - Ready to start pipeline execution
+======================================================================
+
+
+CHECKPOINT STATUS
+============================================================
+   No checkpoints found - starting fresh
+============================================================
+
+All preflight checks passed! Starting pipeline...
+
+======================================================================
+QA DATASET GENERATION PIPELINE (WITH CHECKPOINTING)
+======================================================================
+Configuration:
+   - Backend: OPENAI
+   - LLM Model: GLM-5.3
+   - VLM Model: GLM-5.3
+   - Generation Route: generator / GLM-5.3
+   - Verification Route: verifier / GLM-5.3
+   - Verification Profile: cost_efficient
+   - API Rate Limit: 60 RPM, burst=15
+   - CPU Workers: 4
+   - QA Workers: 4
+   - Dedup Workers: 4
+   - Embed Batch Size: 8
+   - Target QA Pairs: 50
+   - QA Type: multihop
+   - Max Depth: 2
+   - Strict Multihop Verification: True
+   - Min Supporting Chunks: 2
+   - Model Selection Review: False
+   - Multihop Verification Mode: balanced
+   - Max Verification Chunks: 4
+   - Max Unknown Verdicts: 1
+   - Counterfactual Verification: False
+   - Run Evaluation: False
+   - Checkpointing: ENABLED
+======================================================================
+
+Checking for existing checkpoints...
+   [INFO] No checkpoints found - starting from scratch
+
+Phase 1a: Preparing 300 plain text/Markdown documents
+  [OK] ocean_corpus_01995.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01995
+  [OK] ocean_corpus_03860.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03860
+  [OK] ocean_corpus_07995.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07995
+  [OK] ocean_corpus_19751.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19751
+  [OK] ocean_corpus_01889.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01889
+  [OK] ocean_corpus_01264.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01264
+  [OK] ocean_corpus_03883.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03883
+  [OK] ocean_corpus_02976.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02976
+  [OK] ocean_corpus_05369.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05369
+  [OK] ocean_corpus_00484.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00484
+  [OK] ocean_corpus_03868.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03868
+  [OK] ocean_corpus_19753.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19753
+  [OK] ocean_corpus_03859.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03859
+  [OK] ocean_corpus_07393.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07393
+  [OK] ocean_corpus_17346.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17346
+  [OK] ocean_corpus_11727.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11727
+  [OK] ocean_corpus_05998.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05998
+  [OK] ocean_corpus_16000.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16000
+  [OK] ocean_corpus_02975.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02975
+  [OK] ocean_corpus_14215.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14215
+  [OK] ocean_corpus_18188.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18188
+  [OK] ocean_corpus_02727.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02727
+  [OK] ocean_corpus_18504.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18504
+  [OK] ocean_corpus_01798.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01798
+  [OK] ocean_corpus_05956.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05956
+  [OK] ocean_corpus_13418.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13418
+  [OK] ocean_corpus_01846.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01846
+  [OK] ocean_corpus_15956.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_15956
+  [OK] ocean_corpus_17977.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17977
+  [OK] ocean_corpus_03867.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03867
+  [OK] ocean_corpus_11625.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11625
+  [OK] ocean_corpus_03875.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03875
+  [OK] ocean_corpus_05008.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05008
+  [OK] ocean_corpus_08703.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08703
+  [OK] ocean_corpus_17936.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17936
+  [OK] ocean_corpus_02180.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02180
+  [OK] ocean_corpus_01769.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01769
+  [OK] ocean_corpus_01886.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01886
+  [OK] ocean_corpus_01881.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01881
+  [OK] ocean_corpus_13220.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13220
+  [OK] ocean_corpus_08510.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08510
+  [OK] ocean_corpus_16617.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16617
+  [OK] ocean_corpus_01899.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01899
+  [OK] ocean_corpus_09803.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09803
+  [OK] ocean_corpus_03853.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03853
+  [OK] ocean_corpus_01969.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01969
+  [OK] ocean_corpus_01854.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01854
+  [OK] ocean_corpus_01980.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01980
+  [OK] ocean_corpus_07605.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07605
+  [OK] ocean_corpus_17430.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17430
+  [OK] ocean_corpus_13104.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13104
+  [OK] ocean_corpus_07234.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07234
+  [OK] ocean_corpus_10067.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10067
+  [OK] ocean_corpus_16755.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16755
+  [OK] ocean_corpus_07628.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07628
+  [OK] ocean_corpus_19578.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19578
+  [OK] ocean_corpus_01911.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01911
+  [OK] ocean_corpus_13405.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13405
+  [OK] ocean_corpus_01976.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01976
+  [OK] ocean_corpus_11756.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11756
+  [OK] ocean_corpus_14576.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14576
+  [OK] ocean_corpus_01297.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01297
+  [OK] ocean_corpus_01926.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01926
+  [OK] ocean_corpus_01789.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01789
+  [OK] ocean_corpus_14666.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14666
+  [OK] ocean_corpus_03863.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03863
+  [OK] ocean_corpus_01777.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01777
+  [OK] ocean_corpus_03862.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03862
+  [OK] ocean_corpus_02616.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02616
+  [OK] ocean_corpus_03979.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03979
+  [OK] ocean_corpus_05949.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05949
+  [OK] ocean_corpus_03940.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03940
+  [OK] ocean_corpus_01787.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01787
+  [OK] ocean_corpus_19742.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19742
+  [OK] ocean_corpus_07530.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07530
+  [OK] ocean_corpus_01818.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01818
+  [OK] ocean_corpus_03557.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03557
+  [OK] ocean_corpus_13276.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13276
+  [OK] ocean_corpus_19318.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19318
+  [OK] ocean_corpus_02373.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02373
+  [OK] ocean_corpus_09865.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09865
+  [OK] ocean_corpus_01790.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01790
+  [OK] ocean_corpus_00487.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00487
+  [OK] ocean_corpus_08565.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08565
+  [OK] ocean_corpus_16638.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16638
+  [OK] ocean_corpus_01407.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01407
+  [OK] ocean_corpus_01764.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01764
+  [OK] ocean_corpus_01925.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01925
+  [OK] ocean_corpus_01920.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01920
+  [OK] ocean_corpus_04010.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04010
+  [OK] ocean_corpus_06697.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06697
+  [OK] ocean_corpus_08154.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08154
+  [OK] ocean_corpus_18518.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18518
+  [OK] ocean_corpus_06265.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06265
+  [OK] ocean_corpus_02299.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02299
+  [OK] ocean_corpus_03856.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03856
+  [OK] ocean_corpus_03869.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03869
+  [OK] ocean_corpus_00339.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00339
+  [OK] ocean_corpus_02010.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02010
+  [OK] ocean_corpus_02000.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02000
+  [OK] ocean_corpus_14298.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14298
+  [OK] ocean_corpus_02557.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02557
+  [OK] ocean_corpus_03964.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03964
+  [OK] ocean_corpus_19988.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19988
+  [OK] ocean_corpus_05999.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05999
+  [OK] ocean_corpus_00293.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00293
+  [OK] ocean_corpus_02046.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02046
+  [OK] ocean_corpus_09901.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09901
+  [OK] ocean_corpus_01761.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01761
+  [OK] ocean_corpus_14665.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14665
+  [OK] ocean_corpus_04126.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04126
+  [OK] ocean_corpus_12151.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12151
+  [OK] ocean_corpus_05074.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05074
+  [OK] ocean_corpus_16753.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16753
+  [OK] ocean_corpus_00424.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00424
+  [OK] ocean_corpus_13944.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13944
+  [OK] ocean_corpus_00383.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00383
+  [OK] ocean_corpus_04253.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04253
+  [OK] ocean_corpus_04062.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04062
+  [OK] ocean_corpus_04018.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04018
+  [OK] ocean_corpus_01975.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01975
+  [OK] ocean_corpus_01866.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01866
+  [OK] ocean_corpus_17642.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17642
+  [OK] ocean_corpus_01015.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01015
+  [OK] ocean_corpus_18639.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18639
+  [OK] ocean_corpus_10336.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10336
+  [OK] ocean_corpus_06874.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06874
+  [OK] ocean_corpus_01962.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01962
+  [OK] ocean_corpus_06011.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06011
+  [OK] ocean_corpus_05757.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05757
+  [OK] ocean_corpus_09984.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09984
+  [OK] ocean_corpus_14096.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14096
+  [OK] ocean_corpus_15135.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_15135
+  [OK] ocean_corpus_14191.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14191
+  [OK] ocean_corpus_16148.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16148
+  [OK] ocean_corpus_03969.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03969
+  [OK] ocean_corpus_06283.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06283
+  [OK] ocean_corpus_18234.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18234
+  [OK] ocean_corpus_01774.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01774
+  [OK] ocean_corpus_03038.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03038
+  [OK] ocean_corpus_12295.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12295
+  [OK] ocean_corpus_07950.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07950
+  [OK] ocean_corpus_07993.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07993
+  [OK] ocean_corpus_05085.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05085
+  [OK] ocean_corpus_07321.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07321
+  [OK] ocean_corpus_10680.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10680
+  [OK] ocean_corpus_19033.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19033
+  [OK] ocean_corpus_13642.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13642
+  [OK] ocean_corpus_03091.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03091
+  [OK] ocean_corpus_01823.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01823
+  [OK] ocean_corpus_17628.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17628
+  [OK] ocean_corpus_11216.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11216
+  [OK] ocean_corpus_17110.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17110
+  [OK] ocean_corpus_02999.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02999
+  [OK] ocean_corpus_04264.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04264
+  [OK] ocean_corpus_18167.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18167
+  [OK] ocean_corpus_13791.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13791
+  [OK] ocean_corpus_01840.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01840
+  [OK] ocean_corpus_03637.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03637
+  [OK] ocean_corpus_08897.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08897
+  [OK] ocean_corpus_10085.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10085
+  [OK] ocean_corpus_16765.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16765
+  [OK] ocean_corpus_03848.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03848
+  [OK] ocean_corpus_17623.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17623
+  [OK] ocean_corpus_05251.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05251
+  [OK] ocean_corpus_09071.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09071
+  [OK] ocean_corpus_12530.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12530
+  [OK] ocean_corpus_03847.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03847
+  [OK] ocean_corpus_13996.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13996
+  [OK] ocean_corpus_01653.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01653
+  [OK] ocean_corpus_03857.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03857
+  [OK] ocean_corpus_09900.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09900
+  [OK] ocean_corpus_17478.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17478
+  [OK] ocean_corpus_08169.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08169
+  [OK] ocean_corpus_12257.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12257
+  [OK] ocean_corpus_01850.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01850
+  [OK] ocean_corpus_08071.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08071
+  [OK] ocean_corpus_01828.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01828
+  [OK] ocean_corpus_17631.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17631
+  [OK] ocean_corpus_12040.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12040
+  [OK] ocean_corpus_16022.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16022
+  [OK] ocean_corpus_01703.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01703
+  [OK] ocean_corpus_01907.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01907
+  [OK] ocean_corpus_17774.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17774
+  [OK] ocean_corpus_05875.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05875
+  [OK] ocean_corpus_05153.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05153
+  [OK] ocean_corpus_08119.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08119
+  [OK] ocean_corpus_16416.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16416
+  [OK] ocean_corpus_08113.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08113
+  [OK] ocean_corpus_05158.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05158
+  [OK] ocean_corpus_02997.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02997
+  [OK] ocean_corpus_02038.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02038
+  [OK] ocean_corpus_18029.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18029
+  [OK] ocean_corpus_03987.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03987
+  [OK] ocean_corpus_02808.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02808
+  [OK] ocean_corpus_05218.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05218
+  [OK] ocean_corpus_12881.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12881
+  [OK] ocean_corpus_19087.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19087
+  [OK] ocean_corpus_01936.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01936
+  [OK] ocean_corpus_19981.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19981
+  [OK] ocean_corpus_06471.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06471
+  [OK] ocean_corpus_10307.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10307
+  [OK] ocean_corpus_12493.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12493
+  [OK] ocean_corpus_03415.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03415
+  [OK] ocean_corpus_11578.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11578
+  [OK] ocean_corpus_00164.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00164
+  [OK] ocean_corpus_08183.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08183
+  [OK] ocean_corpus_16487.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16487
+  [OK] ocean_corpus_09793.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09793
+  [OK] ocean_corpus_11693.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11693
+  [OK] ocean_corpus_04765.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04765
+  [OK] ocean_corpus_18459.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18459
+  [OK] ocean_corpus_12074.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12074
+  [OK] ocean_corpus_08398.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08398
+  [OK] ocean_corpus_09542.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09542
+  [OK] ocean_corpus_09989.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09989
+  [OK] ocean_corpus_01795.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01795
+  [OK] ocean_corpus_17626.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17626
+  [OK] ocean_corpus_01890.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01890
+  [OK] ocean_corpus_01819.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01819
+  [OK] ocean_corpus_00306.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00306
+  [OK] ocean_corpus_14262.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14262
+  [OK] ocean_corpus_18238.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18238
+  [OK] ocean_corpus_08212.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08212
+  [OK] ocean_corpus_01781.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01781
+  [OK] ocean_corpus_01839.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01839
+  [OK] ocean_corpus_15447.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_15447
+  [OK] ocean_corpus_03143.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03143
+  [OK] ocean_corpus_05993.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05993
+  [OK] ocean_corpus_17996.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17996
+  [OK] ocean_corpus_13221.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13221
+  [OK] ocean_corpus_09862.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09862
+  [OK] ocean_corpus_09769.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09769
+  [OK] ocean_corpus_04000.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04000
+  [OK] ocean_corpus_20000.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_20000
+  [OK] ocean_corpus_03882.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03882
+  [OK] ocean_corpus_07190.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07190
+  [OK] ocean_corpus_08787.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08787
+  [OK] ocean_corpus_08542.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08542
+  [OK] ocean_corpus_15055.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_15055
+  [OK] ocean_corpus_13144.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13144
+  [OK] ocean_corpus_06133.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06133
+  [OK] ocean_corpus_01765.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01765
+  [OK] ocean_corpus_09815.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09815
+  [OK] ocean_corpus_00437.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00437
+  [OK] ocean_corpus_18247.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18247
+  [OK] ocean_corpus_01816.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01816
+  [OK] ocean_corpus_12357.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12357
+  [OK] ocean_corpus_00241.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00241
+  [OK] ocean_corpus_18134.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18134
+  [OK] ocean_corpus_08504.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08504
+  [OK] ocean_corpus_05957.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05957
+  [OK] ocean_corpus_01821.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01821
+  [OK] ocean_corpus_01900.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01900
+  [OK] ocean_corpus_19758.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19758
+  [OK] ocean_corpus_10813.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_10813
+  [OK] ocean_corpus_05073.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_05073
+  [OK] ocean_corpus_11516.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11516
+  [OK] ocean_corpus_16752.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16752
+  [OK] ocean_corpus_06019.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_06019
+  [OK] ocean_corpus_02274.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02274
+  [OK] ocean_corpus_04149.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04149
+  [OK] ocean_corpus_01805.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01805
+  [OK] ocean_corpus_01780.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01780
+  [OK] ocean_corpus_17625.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17625
+  [OK] ocean_corpus_08891.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08891
+  [OK] ocean_corpus_16749.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16749
+  [OK] ocean_corpus_00407.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00407
+  [OK] ocean_corpus_16216.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_16216
+  [OK] ocean_corpus_14194.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14194
+  [OK] ocean_corpus_13093.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13093
+  [OK] ocean_corpus_17126.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17126
+  [OK] ocean_corpus_02362.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_02362
+  [OK] ocean_corpus_01820.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01820
+  [OK] ocean_corpus_08238.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08238
+  [OK] ocean_corpus_11728.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_11728
+  [OK] ocean_corpus_17921.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_17921
+  [OK] ocean_corpus_19931.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_19931
+  [OK] ocean_corpus_14015.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14015
+  [OK] ocean_corpus_12119.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_12119
+  [OK] ocean_corpus_18069.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18069
+  [OK] ocean_corpus_04653.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04653
+  [OK] ocean_corpus_18382.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18382
+  [OK] ocean_corpus_01928.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01928
+  [OK] ocean_corpus_00037.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00037
+  [OK] ocean_corpus_08832.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08832
+  [OK] ocean_corpus_18815.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18815
+  [OK] ocean_corpus_01863.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_01863
+  [OK] ocean_corpus_04937.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_04937
+  [OK] ocean_corpus_14007.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14007
+  [OK] ocean_corpus_14210.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_14210
+  [OK] ocean_corpus_03855.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03855
+  [OK] ocean_corpus_09358.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09358
+  [OK] ocean_corpus_00280.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_00280
+  [OK] ocean_corpus_18158.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_18158
+  [OK] ocean_corpus_03931.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_03931
+  [OK] ocean_corpus_08084.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_08084
+  [OK] ocean_corpus_09931.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_09931
+  [OK] ocean_corpus_13879.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_13879
+  [OK] ocean_corpus_07598.md -> markdown
+   [SAVE] Checkpoint: Markdown saved for ocean_corpus_07598
+
+Phase 2: Chunking markdown files...
+   [Pending] 300 files to chunk
+Document size: 3,755 characters
+Window: 8,000 chars, Overlap: 800 chars
+
+Processing window 1 (pos 0 - 3,755)
+Calling LLM stage=corpus via generator/OPENAI (GLM-5.3)...
+Document size: 3,850 characters
+Window: 8,000 chars, Overlap: 800 chars
+
+Processing window 1 (pos 0 - 3,850)
+Document size: 5,571 characters
+Window: 8,000 chars, Overlap: 800 chars
+
+Processing window 1 (pos 0 - 5,571)
+Calling LLM stage=corpus via generator/OPENAI (GLM-5.3)...Calling LLM stage=corpus via generator/OPENAI (GLM-5.3)...
+
+Document size: 5,571 characters
+Window: 8,000 chars, Overlap: 800 chars
+
+Processing window 1 (pos 0 - 5,571)
+Calling LLM stage=corpus via generator/OPENAI (GLM-5.3)...
+Chunking:   0%|          | 0/300 [00:00<?, ?it/s]2026-10-19 10:59:27,659 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 27486
+2026-10-19 10:59:28,196 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 24945
+2026-10-19 10:59:29,660 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:59:30,198 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:59:31,341 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 30255
+2026-10-19 10:59:33,342 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 10:59:45,597 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 27180
+2026-10-19 10:59:47,598 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:00:12,716 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 32199
+2026-10-19 11:00:13,328 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 27633
+2026-10-19 11:00:13,575 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 28043
+2026-10-19 11:00:16,718 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:00:17,329 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:00:17,576 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:00:28,038 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 31449
+2026-10-19 11:00:32,039 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:00:55,648 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 25989
+2026-10-19 11:00:58,543 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 30581
+2026-10-19 11:01:03,649 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:01:06,544 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:01:12,937 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 31437
+2026-10-19 11:01:17,519 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 32721
+2026-10-19 11:01:20,938 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:01:25,521 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:01:47,111 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 25222
+2026-10-19 11:02:02,442 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 29599
+2026-10-19 11:02:03,113 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:02:05,703 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 26832
+2026-10-19 11:02:10,659 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 23887
+2026-10-19 11:02:18,443 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:02:21,705 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:02:26,661 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:02:54,752 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 25623
+2026-10-19 11:02:54,760 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=85c2bc23daf1 prompt_chars=13906
+2026-10-19 11:02:54,761 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+Chunking:   0%|          | 1/300 [04:03<20:15:46, 243.97s/it]2026-10-19 11:03:02,489 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 29059
+2026-10-19 11:03:02,494 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=057e4ec8ff0d prompt_chars=13999
+2026-10-19 11:03:02,495 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+Chunking:   1%|          | 2/300 [04:11<8:41:31, 105.01s/it] 2026-10-19 11:03:07,969 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 29881
+2026-10-19 11:03:07,974 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=04cc7a7e4426 prompt_chars=14195
+2026-10-19 11:03:07,974 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+Chunking:   1%|          | 3/300 [04:17<4:54:49, 59.56s/it] 2026-10-19 11:03:22,456 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 31206
+2026-10-19 11:03:22,461 - INFO - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=9f13a5b4bc6d prompt_chars=14262
+2026-10-19 11:03:22,462 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+Chunking:   1%|▏         | 4/300 [04:31<3:26:02, 41.77s/it]2026-10-19 11:03:28,688 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 35739
+2026-10-19 11:03:30,690 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:03:55,990 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 37508
+2026-10-19 11:03:57,991 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:03:59,664 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 36248
+2026-10-19 11:04:01,665 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:04:14,325 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 36235
+2026-10-19 11:04:15,595 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 35647
+2026-10-19 11:04:16,327 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:04:19,597 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:04:40,885 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 36469
+2026-10-19 11:04:44,887 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:05:01,897 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 36345
+2026-10-19 11:05:04,401 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 38281
+2026-10-19 11:05:07,012 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 37645
+2026-10-19 11:05:08,417 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:05:09,899 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:05:11,014 - DEBUG - Starting new HTTPS connection (1): llmapi.paratera.com:443
+2026-10-19 11:05:22,707 - DEBUG - https://llmapi.paratera.com:443 "POST /v1/chat/completions HTTP/1.1" 200 34337

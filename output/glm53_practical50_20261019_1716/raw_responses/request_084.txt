@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "The chunks state four taxonomic groups are separable on global scales and up to six on local scales (e.g., Palmer site), so the difference of 2 is supported by a comparison across two linked facts."}

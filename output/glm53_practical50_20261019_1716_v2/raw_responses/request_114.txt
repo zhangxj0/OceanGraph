@@ -1,0 +1,46 @@
+{"qa_pairs": [
+{
+  "question": "In the March 2022 Celtic Sea ALR deployment, which carbonate parameter measured by the Lab-On-Chip sensors had the fewest in situ measurements, and what mean residual did that parameter show against CTD co-samples?",
+  "answer": "DIC; 4–7 μmol kg–1",
+  "short_answers": ["DIC; 4–7 μmol kg–1"],
+  "question_type": "bridge",
+  "answer_type": "short_text",
+  "subdomain": "autonomous carbonate sensing",
+  "relevance_score": 9,
+  "difficulty_score": 6,
+  "reasoning_path": "Measurement counts (pH 947, TA 423, DIC 251) identify DIC as fewest; then retrieve DIC mean residual of 4–7 μmol kg–1 versus CTD co-samples."
+},
+{
+  "question": "Across the two ALR transects in the Celtic Sea (March 2022), what was the difference between the ship-CTD-derived and ALR-derived mean mixed layer depths on the Deep Transect?",
+  "answer": "7 m",
+  "short_answers": ["7 m"],
+  "question_type": "numeric_aggregation",
+  "answer_type": "numeric",
+  "subdomain": "physical oceanography",
+  "relevance_score": 8,
+  "difficulty_score": 5,
+  "reasoning_path": "Retrieve ship CTD mixed layer depth (345 m) and ALR mixed layer depth (338 m) on the DT, then compute the difference."
+},
+{
+  "question": "During the OCEANIDS ALR deployment, how many times longer was the mean lag between ALR sensor measurements and validation bottle samples on the Deep Transect than on the Shelf Transect?",
+  "answer": "about 6.7 times",
+  "short_answers": ["about 6.7 times"],
+  "question_type": "numeric_aggregation",
+  "answer_type": "numeric",
+  "subdomain": "ocean observation methodology",
+  "relevance_score": 8,
+  "difficulty_score": 5,
+  "reasoning_path": "Retrieve mean co-location lags (ST = 6 h, DT = 40 h) and compute the ratio 40/6 ≈ 6.7."
+},
+{
+  "question": "According to the study, which environmental driver makes co-location of sensor measurements and validation samples more critical in shallow Celtic Sea waters along the Shelf Transect?",
+  "answer": "light-driven diel biogeochemical variability (with tidal mixing)",
+  "short_answers": ["light-driven diel biogeochemical variability (with tidal mixing)"],
+  "question_type": "causal",
+  "answer_type": "short_text",
+  "subdomain": "marine biogeochemistry",
+  "relevance_score": 8,
+  "difficulty_score": 6,
+  "reasoning_path": "Link the shallow ST sampling setting (mixed photic zone waters) to the stated mechanism—light-driven diel biogeochemical variability, phytoplankton irregularity, and tidal mixing—that makes co-location critical."
+}
+]}

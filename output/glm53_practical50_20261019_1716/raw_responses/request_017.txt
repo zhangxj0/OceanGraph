@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the study of calibrating one biogeochemistry model across five different circulations, which model quantity showed the highest sensitivity and residual variability when both circulation and parameter changes were considered?",
+"answer": "OMZ volume",
+"short_answers": ["OMZ volume"],
+"question_type": "bridge",
+"answer_type": "entity",
+"subdomain": "marine biogeochemical modelling",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "Why can biogeochemical parameters optimised for one circulation depend strongly on that circulation, according to the study's discussion of physical parameterisations?",
+"answer": "Physical parameterisations introduce errors affecting calibration",
+"short_answers": ["Physical parameterisations introduce errors affecting calibration"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "ocean modelling and calibration",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "The three adjusted biogeochemical parameters (oxygen utilisation of remineralisation, particle flux parameter, potential nitrogen fixation rate) were found to correlate significantly with which circulation characteristics?",
+"answer": "Deep mixing, NADW ideal age, AAIW/SAMW outcrop area",
+"short_answers": ["Deep mixing, NADW ideal age, AAIW/SAMW outcrop area"],
+"question_type": "bridge",
+"answer_type": "short_text",
+"subdomain": "marine biogeochemical modelling",
+"relevance_score": 9,
+"difficulty_score": 7
+}
+]}

@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the ReCAD-NAACOM-pCO2 reconstruction evaluated against SOCAT observations, how much larger is the accumulative uncertainty than the root-mean-square error?",
+    "answer": "10.55 µatm",
+    "short_answers": ["10.55 µatm"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "sea surface pCO2 reconstruction",
+    "reasoning_path": "Retrieve RMSE (12.70 µatm) and accumulative uncertainty (23.25 µatm) of the pCO2 product versus SOCAT samples; compute 23.25 − 12.70 = 10.55 µatm.",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "In which NAACOM subregion, where measurements north of Cape Cod are very sparse, have reported air–sea CO2 fluxes ranged from −0.50 to +2.50 mol C m−2 yr−1 with conflicting source/sink characterizations?",
+    "answer": "Gulf of Maine",
+    "short_answers": ["Gulf of Maine"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "air–sea CO2 exchange",
+    "reasoning_path": "Fact 1: observations are very sparse north of Cape Cod; Fact 2: reported GoMe fluxes span −0.50 to +2.50 mol C m−2 yr−1 with conflicting source/neutral/sink reports. Combine to identify the subregion.",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "What fraction of grid cells in the NAACOM had pCO2 observations during 1993–2021, given that data scarcity is concentrated in the north and in winter?",
+    "answer": "2.9 %",
+    "short_answers": ["2.9 %"],
+    "question_type": "temporal",
+    "answer_type": "numeric",
+    "subdomain": "ocean carbon observations",
+    "reasoning_path": "Combine the stated period of sparse coverage (1993–2021, north of Cape Cod, winter) with the reported fraction of observed grid cells (2.9 %).",
+    "relevance_score": 8,
+    "difficulty_score": 4
+  },
+  {
+    "question": "Because global pCO2 products prioritize global-average accuracy, what capability have regional NAACOM products demonstrated in comparison?",
+    "answer": "resolving detailed small-scale variations",
+    "short_answers": ["resolving detailed small-scale variations"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "pCO2 data products",
+    "reasoning_path": "Fact 1: global products may not guarantee regional-scale accuracy; Fact 2: regional products have demonstrated superior capability in resolving detailed small-scale variations.",
+    "relevance_score": 8,
+    "difficulty_score": 5
+  }
+]}

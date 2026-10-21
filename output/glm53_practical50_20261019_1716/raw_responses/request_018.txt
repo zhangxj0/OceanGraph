@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the Pasur River estuary study, DIN was higher in the tidal mangrove creeks during the dry season, but which location showed higher DIN during the wet season, and what pollution sources explain this reversal?",
+"answer": "The estuary; industrial wastewater, agricultural runoff, sewage, shrimp farms",
+"short_answers": ["The estuary; industrial wastewater, agricultural runoff, sewage, shrimp farms"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "estuarine nutrient biogeochemistry",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "In the Sundarbans tidal mangrove creeks of the Pasur River estuary, why were dissolved inorganic nitrogen, phosphate, and silica concentrations higher during spring tide than neap tide?",
+"answer": "Nutrients flushed from mangrove area by spring-tide inundation and tidal mixing",
+"short_answers": ["Nutrients flushed from mangrove area by spring-tide inundation and tidal mixing"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "mangrove nutrient outwelling",
+"relevance_score": 9,
+"difficulty_score": 5
+},
+{
+"question": "Comparing wet and dry seasons in the Pasur River estuary and its tidal mangrove creeks, in which season and location was chlorophyll-a highest, and what was that concentration?",
+"answer": "Wet season tidal mangrove creeks, 9.03 µg/L",
+"short_answers": ["Wet season tidal mangrove creeks, 9.03 µg/L"],
+"question_type": "comparison",
+"answer_type": "numeric",
+"subdomain": "phytoplankton biomass and coastal eutrophication",
+"relevance_score": 9,
+"difficulty_score": 6
+}
+]}

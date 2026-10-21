@@ -1,0 +1,34 @@
+[
+  {
+    "sample_id": "ocean50_003",
+    "old_question": "At the station where pelagic and benthic nitrogen fixation rates peaked in August, in which month was the highest nifH gene expression recorded in the sediment?",
+    "old_answer": "February",
+    "new_question": "In the southern North Sea bottom-water and sediment study, at the station where pelagic and benthic nitrogen fixation rates peaked in August, in which month was the highest sediment nifH gene expression recorded?",
+    "new_answer": "February",
+    "reason": "Add the regional study scope so the unnamed intermediate station can be found."
+  },
+  {
+    "sample_id": "ocean50_004",
+    "old_question": "In the Potengi estuary mangrove valuation study, how much larger was the per-hectare ecological service value (based on wastewater treatment replacement costs) than the annual per-hectare tourism and aquaculture income?",
+    "old_answer": "US$3,000 per hectare",
+    "new_question": "Assuming the reported annual tourism and aquaculture income per hectare applies uniformly, what annual income would be associated with the Potengi mangrove area that remained undestroyed by 1997?",
+    "new_answer": "about US$13.14 million per year",
+    "reason": "Replace the incompatible one-time service valuation minus annual income with a dimensionally consistent, explicitly hypothetical area-times-annual-income calculation."
+  },
+  {
+    "sample_id": "ocean50_031",
+    "old_question": "In the Asterias rubens experiment, the heatwave treatment with intensity +5°C and 13-day duration reduced overall mussel consumption relative to the No heatwave control by a certain percentage; which longer-term treatment outcome does this percentage correspond to?",
+    "old_answer": "Extended heatwave treatment",
+    "new_question": "In the Asterias rubens experiment, what was the overall reduction in mussel consumption relative to the no-heatwave control for the treatment with +5 degrees C intensity and 13-day duration?",
+    "new_answer": "53%",
+    "reason": "Replace an unclear request for an unspecified treatment outcome with one final measured attribute after identifying the treatment."
+  },
+  {
+    "sample_id": "ocean50_045",
+    "old_question": "Which standard wet-chemical method, invented the year after the H.M.S. Challenger expedition ended, remains the reference for measuring dissolved oxygen in seawater?",
+    "old_answer": "the Winkler method",
+    "new_question": "How many years elapsed between the end of the H.M.S. Challenger expedition and the invention of the wet-chemical method that remains the standard for dissolved oxygen in seawater?",
+    "new_answer": "12 years",
+    "reason": "Correct the false one-year-after premise and use the two source dates in a valid calculation."
+  }
+]

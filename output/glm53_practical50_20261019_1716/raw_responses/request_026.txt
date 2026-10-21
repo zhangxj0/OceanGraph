@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Hohn and Merico coral polyp model, why does bicarbonate transport need to supplement CO2 diffusion into the calcifying fluid, and what happens to aragonite saturation there when seawater pCO2 rises?",
+    "answer": "CO2 diffusion alone cannot sustain observed calcification rates; aragonite saturation decreases",
+    "short_answers": ["CO2 diffusion alone cannot sustain observed calcification rates; aragonite saturation decreases"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "coral calcification and ocean acidification modelling",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "According to the study, corals raise pH in the calcifying fluid by a mechanism linked to calcium transport. Which pump enables both active proton removal and calcium transport into the calcifying fluid?",
+    "answer": "Ca2+-mediated ATPase (Ca-ATPase)",
+    "short_answers": ["Ca2+-mediated ATPase (Ca-ATPase)"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "coral physiology and biomineralization",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "The oceans absorb about a quarter of annually emitted CO2, causing pH decline. Given that tropical surface waters will not become undersaturated with respect to aragonite within 100 years, what maximum decrease in coral calcification rates is still expected from carbonate chemistry changes?",
+    "answer": "up to 30%",
+    "short_answers": ["up to 30%"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "ocean acidification impacts on coral reefs",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  }
+]}

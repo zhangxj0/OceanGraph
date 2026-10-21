@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the South China Sea deep subsurface study, which IODP site had the lowest sedimentation rate, and did sulfate-reducing bacteria change in abundance in its methanogenic zone sediments?",
+    "answer": "U1431; no change in abundance",
+    "short_answers": ["U1431; no change in abundance"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "deep subsurface microbial ecology",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Given that microbial communities in South China Sea sediments were structured by sediment age and sulfate availability but showed no partitioning by sediment type, what factor was concluded to control community structure instead of sedimentology?",
+    "answer": "availability of electron donors and acceptors",
+    "short_answers": ["availability of electron donors and acceptors"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "At South China Sea sites U1432 and U1433, how did TOC content compare between the sulfate reduction zone and the methanogenic zone, and what statistical test supported this difference?",
+    "answer": "higher in sulfate reduction zone; Wilcoxon rank-sum p = 0.02",
+    "short_answers": ["higher in sulfate reduction zone; Wilcoxon rank-sum p = 0.02"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "sediment geochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the central Red Sea study, which plankton groups showed the most variable vertical distribution within the mixed layer, and which showed the least, given the coefficient of variation ranged from 10 to 100%?",
+    "answer": "Most variable: diatoms and Synechococcus; least: heterotrophic flagellates and bacteria",
+    "short_answers": ["diatoms and Synechococcus most; heterotrophic flagellates and bacteria least"],
+    "question_type": "comparison",
+    "answer_type": "entity",
+    "subdomain": "Marine Plankton Ecology",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why did the abrupt addition of nutrient-rich deep water to the nutrient-poor upper layer of the central Red Sea trigger dense phytoplankton blooms during thermal stratification?",
+    "answer": "Vertical patches provided seeding stocks that rapidly exploited the nutrient influx",
+    "short_answers": ["Vertical patches provided seeding stocks that rapidly exploited the nutrient influx"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "Marine Biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 7
+  },
+  {
+    "question": "In the central Red Sea in 2012, the seasonal phytoplankton bloom began when temperature abruptly dropped in November; when did it reach its maximum, and what phase did the July sampling coincide with?",
+    "answer": "February 2013; the initial phase of the bloom",
+    "short_answers": ["February 2013; initial bloom phase"],
+    "question_type": "temporal",
+    "answer_type": "date",
+    "subdomain": "Phytoplankton Phenology",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  }
+]}

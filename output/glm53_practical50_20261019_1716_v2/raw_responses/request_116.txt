@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the weekly zooplankton sampling off the Soya Warm Current-influenced site, by how many degrees Celsius did water temperature increase between the March 18 and July 13 sampling dates in 2020?",
+    "answer": "16.3 °C",
+    "short_answers": ["16.3 °C"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "marine zooplankton ecology and environmental oceanography",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 3 gives temperature −0.3 °C on March 18 and 16.0 °C on July 13; compute 16.0 − (−0.3) = 16.3 °C."
+  },
+  {
+    "question": "The Picorna-like virus detected in Pseudocalanus newmani whose phylogenetic relation to Bacillarnavirus matches the copepod's diatom prey belongs to which viral family?",
+    "answer": "Marnaviridae",
+    "short_answers": ["Marnaviridae"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "marine virology",
+    "relevance_score": 9,
+    "difficulty_score": 7,
+    "reasoning_path": "Chunks 1 and 4 identify diatoms as P. newmani's major prey and link PSNE-Pico1 to the diatom virus Bacillarnavirus; chunk 2 states PSNE-Pico1 is classified in Marnaviridae."
+  },
+  {
+    "question": "According to gene expression analysis of Pseudocalanus newmani infected with the Picorna-like virus, which behavioral trait possibly decreased alongside increased viral replication?",
+    "answer": "copepod movement",
+    "short_answers": ["copepod movement"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "zooplankton–virus interactions",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 1 states gene expression analysis indicated possible increased viral replication and decreased copepod movement in P. newmani with the Picorna-like virus."
+  },
+  {
+    "question": "Among the four major RNA viruses found in Pseudocalanus newmani, the most dominant one based on mapped reads was not classified into any known groups of which virus family?",
+    "answer": "Togaviridae",
+    "short_answers": ["Togaviridae"],
+    "question_type": "comparison",
+    "answer_type": "entity",
+    "subdomain": "marine virology",
+    "relevance_score": 9,
+    "difficulty_score": 7,
+    "reasoning_path": "Chunk 2 states PSNE-Toga was the most dominant contig by mapped reads, and separately that PSNE-Toga was not classified into any known groups of Togaviridae."
+  }
+]}

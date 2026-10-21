@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "Across the local observatory sites in the global-vs-local HPLC pigment analysis, which site with the highest median Tchla concentration has a different dominant phytoplankton group than the lowest-median-Tchla site at BOUSSOLE in the Mediterranean?",
+    "answer": "Bowdoin Buoy",
+    "short_answers": ["Bowdoin Buoy"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "phytoplankton community structure and ocean color remote sensing",
+    "relevance_score": 9,
+    "difficulty_score": 7
+  },
+  {
+    "question": "By how many taxonomic groups does the maximum number of phytoplankton groups separable from HPLC pigments at local scales exceed the number identifiable on global scales?",
+    "answer": "2",
+    "short_answers": ["2"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "phytoplankton community structure and ocean color remote sensing",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "What is the cause of the difference between global and local hierarchical cluster analyses in the number of resolvable phytoplankton groups, according to the pigment study?",
+    "answer": "Dominant taxa vary among local observatory sites",
+    "short_answers": ["Dominant taxa vary among local observatory sites"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "phytoplankton community structure and ocean color remote sensing",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

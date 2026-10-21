@@ -1,0 +1,643 @@
+=== Terminal Log Started ===
+Terminal output being captured to: /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/terminal_pipeline.log
+LLM Cache: 5 cached responses, 0.0% hit rate
+
+======================================================================
+RUNNING PREFLIGHT CHECKS (mandatory)
+======================================================================
+
+======================================================================
+PREFLIGHT CHECKS - Validating all services before execution
+======================================================================
+
+  Checking config... [PASS] (0ms)
+  Checking api_key... [PASS] (0ms)
+  Checking input_data... [PASS] (1ms)
+  Checking output_dir... [PASS] (15ms)
+  Checking gpu... [PASS] (4332ms)
+  Checking llm... Cache hit for LLM call (2 chars)
+[PASS] (0ms)
+  Checking vlm... Cache hit for LLM call (9 chars)
+[PASS] (0ms)
+  Checking embedding... [PASS] (17191ms)
+  Checking reranker... [PASS] (13417ms)
+
+======================================================================
+PREFLIGHT CHECK SUMMARY
+======================================================================
+
+  Results: 9 passed, 0 failed, 0 warnings, 1 skipped
+
+  ------------------------------------------------------------------
+  Service                   Status       Details                       
+  ------------------------------------------------------------------
+  Configuration             [PASS]       OPENAI                        
+  API Key                   [PASS]                                     
+  Input Data                [PASS]       chunks.json                   
+  Output Directory          [PASS]       glm53_low_smoke_20261019      
+  GPU                       [PASS]                                     
+  LLM API                   [PASS]       GLM-5.3                       
+  Verifier API              [PASS]       GLM-5.3                       
+  Embedding Model           [PASS]       BAAI/bge-m3                   
+  Reranker                  [PASS]       BAAI/bge-large-en-v1.5        
+  Metrics Embeddings        [SKIP]                                     
+  ------------------------------------------------------------------
+
+  Active Configuration:
+     - Backend:    OPENAI
+     - LLM Model:  GLM-5.3
+     - VLM Model:  GLM-5.3
+     - Embeddings: bge_m3
+     - Output Dir: /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019
+
+======================================================================
+[OK] ALL CHECKS PASSED - Ready to start pipeline execution
+======================================================================
+
+
+CHECKPOINT STATUS
+============================================================
+   Markdown:  3 completed, 0 failed
+   Chunks:    3 files chunked ([OK] final saved)
+============================================================
+
+All preflight checks passed! Starting pipeline...
+
+======================================================================
+QA DATASET GENERATION PIPELINE (WITH CHECKPOINTING)
+======================================================================
+Configuration:
+   - Backend: OPENAI
+   - LLM Model: GLM-5.3
+   - VLM Model: GLM-5.3
+   - Generation Route: generator / GLM-5.3
+   - Verification Route: verifier / GLM-5.3
+   - Verification Profile: cost_efficient
+   - API Rate Limit: 60 RPM, burst=15
+   - CPU Workers: 1
+   - QA Workers: 1
+   - Dedup Workers: 1
+   - Embed Batch Size: 4
+   - Target QA Pairs: 2
+   - QA Type: multihop
+   - Max Depth: 2
+   - Strict Multihop Verification: True
+   - Min Supporting Chunks: 2
+   - Model Selection Review: False
+   - Multihop Verification Mode: balanced
+   - Max Verification Chunks: 4
+   - Max Unknown Verdicts: 1
+   - Counterfactual Verification: False
+   - Run Evaluation: False
+   - Checkpointing: ENABLED
+======================================================================
+
+Checking for existing checkpoints...
+   [OK] Found existing chunks - will skip document conversion
+   [OK] Found existing embeddings - will reuse FAISS index
+
+Resuming from existing chunks: /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json
+Loading chunks from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json...
+Loaded 11 chunks
+   Total chunks: 11
+Found existing embeddings: bge_m3_index.faiss
+   Index exists but embeddings not in cache - will recompute for topic modeling
+Loading embedding model: bge_m3...
+bge_m3 model loaded and cached
+Loading text_embedding reranker...
+Loading text embedding model: BAAI/bge-large-en-v1.5
+[OK] Text embedding model loaded on cuda:0
+text_embedding reranker loaded and cached
+Configured retrieval with cached embeddings + reranker + GPU lock
+Using domain and expert persona from config.yaml
+   Domain: Marine Carbon Biogeochemistry
+   Expert Persona: Ocean Science Multi-Hop QA Curator
+Saved to environment: DATASET_DOMAIN=Marine Carbon Biogeochemistry, DATASET_EXPERT_PERSONA=Ocean Science Multi-Hop QA Curator
+Shuffled 11 chunks (seed=42)
+
+Using 1 parallel workers for QA generation
+Target: 2 'multihop' QA pairs
+Processing 11 chunks from corpus
+Generating QA:   0%|          | 0/11 [00:00<?, ?it/s]================================================================================
+MULTI-HOP CONTEXT COMPLETION
+Chunk Addition Mode: RELATED
+================================================================================
+
+Initial chunk length: 2147 chars
+
+================================================================================
+DEPTH 1/2
+================================================================================
+
+Verifying chunk completeness...
+Calling VLM stage=retrieval with 1 chunks via generator/OPENAI (GLM-5.3)...
+[OK] VLM response received (425 chars)
+Status: COMPLETE
+Explanation: The chunk is a self-contained abstract that defines all acronyms (CSIRO Mk3L, COAL) and explains all terminology (delta13C, delta15N) without relying on missing external content.
+
+[INFO] Context verified as COMPLETE but has only 1/2 chunks; forcing retrieval for strict multi-hop.
+
+Generated 2 search strings:
+  1. Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0 The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly used proxies for understanding the ocean. When used in tandem, they provide powerful insight into physical and biogeochemical processes. Here, we detail the implementation of delta13C and delta15N in the ocean component of an Earth system model. We evaluate our simulated delta13C and delta15N against contemporary measurements, place the model's performance alongside other isotope enabled models, and document the response of delta13C and delta15N to changes in ecosystem functioning. The model combines the Commonwealth Scientific and Industrial Res
+  2. related evidence needed to connect this ocean-science statement: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0 The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly used proxies for understanding the ocean. When used in tandem, they provide powerful insight into physical and biogeochemical processes. Here, we detail the implementation of delta13C and delta15N in th
+
+Retrieving top 2 chunks per search string...
+
+  Search 1/2: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0 The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly used proxies for understanding the ocean. When used in tandem, they provide powerful insight into physical and biogeochemical processes. Here, we detail the implementation of delta13C and delta15N in the ocean component of an Earth system model. We evaluate our simulated delta13C and delta15N against contemporary measurements, place the model's performance alongside other isotope enabled models, and document the response of delta13C and delta15N to changes in ecosystem functioning. The model combines the Commonwealth Scientific and Industrial Res
+Loading chunks from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json...
+Loaded 11 chunks
+Loading FAISS index from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/embeddings/bge_m3_index.faiss...
+Using cached embedder from main pipeline (GPU-enabled)...
+Embedding query...
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][A
+Batches: 100%|██████████| 1/1 [00:00<00:00,  2.86it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00,  2.86it/s]
+
+Retrieving top-10 chunks...
+
+Top 10 Retrieved Chunks (before reranking):
+1. Document: ocean_corpus_05998, Chunk ID: chunk_8, Score: 0.9434
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+2. Document: ocean_corpus_05998, Chunk ID: chunk_7, Score: 0.7160
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+3. Document: ocean_corpus_05998, Chunk ID: chunk_11, Score: 0.6965
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+4. Document: ocean_corpus_05998, Chunk ID: chunk_9, Score: 0.6109
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+5. Document: ocean_corpus_05998, Chunk ID: chunk_10, Score: 0.5483
+   Text: The data is available online on the NCI TDS server:
+
+https://dapds00.nci.org.au/thredds/catalogs/ks32/ARCCSS/Mk3L_COAL/Mk3L_COAL.html
+
+and for NCI use...
+   Has image: False
+6. Document: ocean_corpus_03860, Chunk ID: chunk_1, Score: 0.5258
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+7. Document: ocean_corpus_03883, Chunk ID: chunk_4, Score: 0.5042
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+8. Document: ocean_corpus_03860, Chunk ID: chunk_2, Score: 0.5020
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+9. Document: ocean_corpus_03883, Chunk ID: chunk_6, Score: 0.4349
+   Text: EXTENDED PERIOD OF K/T BOUNDARY MASS EXTINCTION
+K e l l e r , G.
+Tunisia and Texas. In Tunisia species populations decline soon after the W boundary e...
+   Has image: False
+10. Document: ocean_corpus_03883, Chunk ID: chunk_5, Score: 0.4320
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+
+============================================================
+Reranking 10 chunks with MonoVLM to get top 5...
+============================================================
+[OK] Using cached MonoVLM reranker
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 88.53it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 16.36it/s]
+
+Top 5 Reranked Chunks:
+1. Document: ocean_corpus_05998, Chunk ID: chunk_8, Relevance: 0.9482
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+2. Document: ocean_corpus_05998, Chunk ID: chunk_7, Relevance: 0.8330
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+3. Document: ocean_corpus_05998, Chunk ID: chunk_11, Relevance: 0.8182
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+4. Document: ocean_corpus_05998, Chunk ID: chunk_9, Relevance: 0.7662
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+5. Document: ocean_corpus_05998, Chunk ID: chunk_10, Relevance: 0.7192
+   Text: The data is available online on the NCI TDS server:
+
+https://dapds00.nci.org.au/thredds/catalogs/ks32/ARCCSS/Mk3L_COAL/Mk3L_COAL.html
+
+and for NCI use...
+   Has image: False
+    [SKIP] Chunk ocean_corpus_05998:chunk_8 already added
+    Queued chunk ocean_corpus_05998:chunk_7 (score: 0.8330) for verification
+
+  Search 2/2: related evidence needed to connect this ocean-science statement: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0 The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly used proxies for understanding the ocean. When used in tandem, they provide powerful insight into physical and biogeochemical processes. Here, we detail the implementation of delta13C and delta15N in th
+Loading chunks from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json...
+Loaded 11 chunks
+Loading FAISS index from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/embeddings/bge_m3_index.faiss...
+Embedding query...
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 82.80it/s]
+
+Retrieving top-10 chunks...
+
+Top 10 Retrieved Chunks (before reranking):
+1. Document: ocean_corpus_05998, Chunk ID: chunk_8, Score: 0.8998
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+2. Document: ocean_corpus_05998, Chunk ID: chunk_11, Score: 0.7005
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+3. Document: ocean_corpus_05998, Chunk ID: chunk_7, Score: 0.6978
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+4. Document: ocean_corpus_05998, Chunk ID: chunk_9, Score: 0.6156
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+5. Document: ocean_corpus_03860, Chunk ID: chunk_1, Score: 0.5418
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+6. Document: ocean_corpus_05998, Chunk ID: chunk_10, Score: 0.5372
+   Text: The data is available online on the NCI TDS server:
+
+https://dapds00.nci.org.au/thredds/catalogs/ks32/ARCCSS/Mk3L_COAL/Mk3L_COAL.html
+
+and for NCI use...
+   Has image: False
+7. Document: ocean_corpus_03860, Chunk ID: chunk_2, Score: 0.5159
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+8. Document: ocean_corpus_03883, Chunk ID: chunk_4, Score: 0.5131
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+9. Document: ocean_corpus_03860, Chunk ID: chunk_3, Score: 0.4440
+   Text: Diachronism between e x t i n c t i o n
+Hansen, 11. J .
+2 . Lcrbekni0,J.F. & C o u l t e r , K . C . 1985. Canadian Jol~rrl. E a r t h
+S c i . , 2 2 ,...
+   Has image: False
+10. Document: ocean_corpus_03883, Chunk ID: chunk_5, Score: 0.4325
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+
+============================================================
+Reranking 10 chunks with MonoVLM to get top 5...
+============================================================
+[OK] Using cached MonoVLM reranker
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 91.04it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 69.22it/s]
+
+Top 5 Reranked Chunks:
+1. Document: ocean_corpus_05998, Chunk ID: chunk_8, Relevance: 0.9030
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+2. Document: ocean_corpus_05998, Chunk ID: chunk_7, Relevance: 0.8001
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+3. Document: ocean_corpus_05998, Chunk ID: chunk_11, Relevance: 0.7859
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+4. Document: ocean_corpus_05998, Chunk ID: chunk_9, Relevance: 0.7365
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+5. Document: ocean_corpus_05998, Chunk ID: chunk_10, Relevance: 0.6805
+   Text: The data is available online on the NCI TDS server:
+
+https://dapds00.nci.org.au/thredds/catalogs/ks32/ARCCSS/Mk3L_COAL/Mk3L_COAL.html
+
+and for NCI use...
+   Has image: False
+    [SKIP] Chunk ocean_corpus_05998:chunk_8 already added
+    Queued chunk ocean_corpus_05998:chunk_7 (score: 0.8001) for verification
+    Batch verifying 2 candidates...
+Rate limiter initialized: 60 RPM, burst=15
+    [REL] RELATED: ocean_corpus_05998:chunk_7 - The candidate chunk is bibliographic metadata (DOI, source, license) for the same Buchanan CSIRO Mk3...
+    [SKIP] Duplicate content after verification: ocean_corpus_05998:chunk_7
+
+Adding 1 verified chunks to context (0 EXPLANATORY, 1 RELATED)
+
+================================================================================
+DEPTH 2/2
+================================================================================
+
+Verifying chunk completeness...
+Calling VLM stage=retrieval with 2 chunks via generator/OPENAI (GLM-5.3)...
+[OK] VLM response received (472 chars)
+Status: COMPLETE
+Explanation: Both chunks are self-contained: the abstract fully defines its acronyms (CSIRO Mk3L, COAL) and concepts, and the second chunk is standalone metadata requiring no external context.
+
+[OK] Context is COMPLETE at depth 2, evidence_chunks=2, retrieval_hops=1
+Generating Q&A pairs from 2 context chunks...
+Calling VLM stage=generation with 2 chunks via generator/OPENAI (GLM-5.3)...
+[OK] VLM response received (3720 chars)
+[OK] Generated 2 structured Q&A pair(s)
+Selecting Q&A pairs (2 candidates)...
+[OK] Local selection complete: 1 selected, 1 rejected (0 selection API calls)
+Calling VLM stage=verification with 2 chunks via verifier/OPENAI (GLM-5.3)...
+[OK] VLM response received (312 chars)
+Generating QA:   9%|▉         | 1/11 [00:31<05:12, 31.26s/it]   [SAVE] Checkpoint: QA saved for chunk 1 (1 pass, 1 fail)
+================================================================================
+MULTI-HOP CONTEXT COMPLETION
+Chunk Addition Mode: RELATED
+================================================================================
+
+Initial chunk length: 745 chars
+
+================================================================================
+DEPTH 1/2
+================================================================================
+
+Verifying chunk completeness...
+Calling VLM stage=retrieval with 1 chunks via generator/OPENAI (GLM-5.3)...
+[OK] VLM response received (512 chars)
+Status: INCOMPLETE
+Explanation: The chunk contains only metadata with no substantive content, so the actual findings, terminology, and arguments of the report are entirely missing.
+
+Generated 2 search strings:
+  1. K/T boundary mass extinction marine realm Keller
+  2. Cretaceous-Tertiary boundary extended extinction ocean
+
+Retrieving top 2 chunks per search string...
+
+  Search 1/2: K/T boundary mass extinction marine realm Keller
+Loading chunks from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json...
+Loaded 11 chunks
+Loading FAISS index from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/embeddings/bge_m3_index.faiss...
+Embedding query...
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 78.65it/s]
+
+Retrieving top-10 chunks...
+
+Top 10 Retrieved Chunks (before reranking):
+1. Document: ocean_corpus_03883, Chunk ID: chunk_4, Score: 0.6526
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+2. Document: ocean_corpus_03883, Chunk ID: chunk_6, Score: 0.6030
+   Text: EXTENDED PERIOD OF K/T BOUNDARY MASS EXTINCTION
+K e l l e r , G.
+Tunisia and Texas. In Tunisia species populations decline soon after the W boundary e...
+   Has image: False
+3. Document: ocean_corpus_03883, Chunk ID: chunk_5, Score: 0.5958
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+4. Document: ocean_corpus_03860, Chunk ID: chunk_1, Score: 0.4876
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+5. Document: ocean_corpus_03860, Chunk ID: chunk_2, Score: 0.4801
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+6. Document: ocean_corpus_05998, Chunk ID: chunk_9, Score: 0.4531
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+7. Document: ocean_corpus_05998, Chunk ID: chunk_11, Score: 0.4457
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+8. Document: ocean_corpus_05998, Chunk ID: chunk_7, Score: 0.4424
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+9. Document: ocean_corpus_05998, Chunk ID: chunk_8, Score: 0.4107
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+10. Document: ocean_corpus_03860, Chunk ID: chunk_3, Score: 0.4014
+   Text: Diachronism between e x t i n c t i o n
+Hansen, 11. J .
+2 . Lcrbekni0,J.F. & C o u l t e r , K . C . 1985. Canadian Jol~rrl. E a r t h
+S c i . , 2 2 ,...
+   Has image: False
+
+============================================================
+Reranking 10 chunks with MonoVLM to get top 5...
+============================================================
+[OK] Using cached MonoVLM reranker
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 91.87it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 71.29it/s]
+
+Top 5 Reranked Chunks:
+1. Document: ocean_corpus_03883, Chunk ID: chunk_5, Relevance: 0.8353
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+2. Document: ocean_corpus_03883, Chunk ID: chunk_4, Relevance: 0.8110
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+3. Document: ocean_corpus_03883, Chunk ID: chunk_6, Relevance: 0.7778
+   Text: EXTENDED PERIOD OF K/T BOUNDARY MASS EXTINCTION
+K e l l e r , G.
+Tunisia and Texas. In Tunisia species populations decline soon after the W boundary e...
+   Has image: False
+4. Document: ocean_corpus_03860, Chunk ID: chunk_1, Relevance: 0.7166
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+5. Document: ocean_corpus_03860, Chunk ID: chunk_2, Relevance: 0.6837
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+    Queued chunk ocean_corpus_03883:chunk_5 (score: 0.8353) for verification
+    [SKIP] Chunk ocean_corpus_03883:chunk_4 already added
+
+  Search 2/2: Cretaceous-Tertiary boundary extended extinction ocean
+Loading chunks from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/chunks.json...
+Loaded 11 chunks
+Loading FAISS index from /opt/huawei/dataset/RL_Collab/zxj_data/graph/OceanGraph/output/glm53_low_smoke_20261019/embeddings/bge_m3_index.faiss...
+Embedding query...
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 97.84it/s]
+
+Retrieving top-10 chunks...
+
+Top 10 Retrieved Chunks (before reranking):
+1. Document: ocean_corpus_03883, Chunk ID: chunk_5, Score: 0.6006
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+2. Document: ocean_corpus_03883, Chunk ID: chunk_6, Score: 0.5877
+   Text: EXTENDED PERIOD OF K/T BOUNDARY MASS EXTINCTION
+K e l l e r , G.
+Tunisia and Texas. In Tunisia species populations decline soon after the W boundary e...
+   Has image: False
+3. Document: ocean_corpus_03883, Chunk ID: chunk_4, Score: 0.5848
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+4. Document: ocean_corpus_03860, Chunk ID: chunk_2, Score: 0.5521
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+5. Document: ocean_corpus_03860, Chunk ID: chunk_1, Score: 0.4906
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+6. Document: ocean_corpus_05998, Chunk ID: chunk_9, Score: 0.4747
+   Text: This dataset includes the following variables:
+
+name title I J K
+martin_exp Exponent (b) of the canonical Martin curve controlling remineralisation 1:...
+   Has image: False
+7. Document: ocean_corpus_05998, Chunk ID: chunk_11, Score: 0.4421
+   Text: Contact: pearse.buchanan@liverpool.ac.uk or pearseb@princeton.edu for any question on the dataset content and provenance
+paola.petrelli@utas.edu.au fo...
+   Has image: False
+8. Document: ocean_corpus_05998, Chunk ID: chunk_7, Score: 0.4416
+   Text: ---
+document_id: "zenodo-899c6428c745ed18"
+title: "Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL version 1.0"
+authors: ["Buc...
+   Has image: False
+9. Document: ocean_corpus_03860, Chunk ID: chunk_3, Score: 0.4337
+   Text: Diachronism between e x t i n c t i o n
+Hansen, 11. J .
+2 . Lcrbekni0,J.F. & C o u l t e r , K . C . 1985. Canadian Jol~rrl. E a r t h
+S c i . , 2 2 ,...
+   Has image: False
+10. Document: ocean_corpus_05998, Chunk ID: chunk_8, Score: 0.4286
+   Text: Oceanic carbon-13 and nitrogen-15 isotopes simulated by CSIRO Mk3L-COAL v1.0
+
+The isotopes of carbon (delta13C) and nitrogen (delta15N) are commonly u...
+   Has image: False
+
+============================================================
+Reranking 10 chunks with MonoVLM to get top 5...
+============================================================
+[OK] Using cached MonoVLM reranker
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 102.77it/s]
+
+Batches:   0%|          | 0/1 [00:00<?, ?it/s][ABatches: 100%|██████████| 1/1 [00:00<00:00, 73.03it/s]
+
+Top 5 Reranked Chunks:
+1. Document: ocean_corpus_03883, Chunk ID: chunk_5, Relevance: 0.7673
+   Text: EXTENDED PERIOD OF K/r BOUNDARY MASS EXTINCTION IN THE
+MARINE REALM; G. Keller, Dept. of Geological and Geophysical Sciences, Princeton
+University, Pr...
+   Has image: False
+2. Document: ocean_corpus_03883, Chunk ID: chunk_6, Relevance: 0.7386
+   Text: EXTENDED PERIOD OF K/T BOUNDARY MASS EXTINCTION
+K e l l e r , G.
+Tunisia and Texas. In Tunisia species populations decline soon after the W boundary e...
+   Has image: False
+3. Document: ocean_corpus_03860, Chunk ID: chunk_2, Relevance: 0.6952
+   Text: DIACMRONISM I3ETWGEN EXTINCTION TIME O F TERtIESTHIAL
+AND MARINE 1)lNOSAURS; 1l.J.Hansen , G e o l o g i c a l I n s t . ,
+aster Voldgade lo,DK-1350,
+...
+   Has image: False
+4. Document: ocean_corpus_03883, Chunk ID: chunk_4, Relevance: 0.6950
+   Text: ---
+document_id: "nasa-technical-reports-server-ff60801db47265ea"
+title: "Extended period of K/T boundary mass extinction in the marine realm"
+authors...
+   Has image: False
+5. Document: ocean_corpus_03860, Chunk ID: chunk_1, Relevance: 0.6699
+   Text: ---
+document_id: "nasa-technical-reports-server-5713dec591eca4d1"
+title: "Diachronism between extinction time of terrestrial and marine dinosaurs"
+aut...
+   Has image: False
+    Queued chunk ocean_corpus_03883:chunk_5 (score: 0.7673) for verification
+    Queued chunk ocean_corpus_03883:chunk_6 (score: 0.7386) for verification
+    Batch verifying 3 candidates...
+    [EXPL] EXPLANATORY: ocean_corpus_03883:chunk_5 - The candidate chunk is the full text of the very report (Keller's "Extended period of K/T boundary m...
+    [SKIP] Duplicate content after verification: ocean_corpus_03883:chunk_5
+    [EXPL] EXPLANATORY: ocean_corpus_03883:chunk_6 - The candidate chunk provides the actual body text of the same Keller report referenced in the origin...
+
+Adding 2 verified chunks to context (2 EXPLANATORY, 0 RELATED)
+
+================================================================================
+DEPTH 2/2
+================================================================================
+
+Verifying chunk completeness...
+Calling VLM stage=retrieval with 3 chunks via generator/OPENAI (GLM-5.3)...

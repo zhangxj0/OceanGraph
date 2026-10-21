@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "The question requires retrieving two mortality values (83% Amplified, 75% Future) from the supplied text and computing their difference (8 percentage points), a valid multi-hop comparison fully supported by CHUNK 1."}

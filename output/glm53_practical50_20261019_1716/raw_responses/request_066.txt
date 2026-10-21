@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "The question requires linking Kautsky's 1939 description of luminescence quenching (CHUNK 3) to oxygen optodes and their favored use on Biogeochemical-Argo floats (CHUNK 1), both supported by the supplied content."}

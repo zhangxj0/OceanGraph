@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "The question requires linking two model scenarios (OA affecting growth only vs. growth plus competition) and comparing their outcomes, with CHUNK 3 explicitly supporting both the 42.9% and 28.9% cover values."}

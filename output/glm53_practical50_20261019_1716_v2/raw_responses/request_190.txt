@@ -1,0 +1,57 @@
+{"reviews": [
+{
+"sample_id": "ocean50_001",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "likely_single_lookup",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "When Ω < 1, the water is undersaturated and calcium carbonate tends to dissolve.",
+"notes": "The long preamble about CO2 dissolution chemistry is decorative; the question directly asks the single fact stated verbatim in the saturation-state paragraph. Answer is supported and unambiguous, but this is a one-fact lookup, not linked reasoning."
+},
+{
+"sample_id": "ocean50_002",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "likely_single_lookup",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "The number of nifH transcripts was 13 times higher at station DB (on average 1.2 × 10^4 transcripts g−1 wet sediment) than that at station OG (on average 8.7 × 10^2 transcripts g−1 wet sediment).",
+"notes": "The comparison ratio (13 times) is explicitly stated in the source, so no computation is required; a reader retrieves the stated number. Independently computing from the averages gives ~13.8, which rounds to the stated 13, so the answer is consistent and unambiguous, but as posed this is a direct textual lookup rather than a two-operand calculation."
+},
+{
+"sample_id": "ocean50_003",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "clear_multi_step",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "The highest rates were measured in August at Doggersbank, both for the water column and for the seafloor... the highest number was recorded in February at station DB (Figure 3C).",
+"notes": "Genuine multi-step: the solver must first infer that the station with August pelagic and benthic N2 fixation peaks is DB (Doggersbank), then use that intermediate station identity to retrieve the month of highest sediment nifH expression (February). Both facts are in the same document; answer is supported and unique."
+},
+{
+"sample_id": "ocean50_004",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "clear_multi_step",
+"question_ambiguity": "minor",
+"scientific_error_risk": "medium",
+"source_excerpt": "considerable values were obtained of about USS15,500/ha... Nearly US$ 12.500 / ha amount each year from tourism and aquaculture income",
+"notes": "Two source values (US$15,500/ha vs US$12,500/ha) not supplied by the question are combined by subtraction to yield US$3,000/ha, qualifying as clear multi-step computation. Caveats: both source values are approximate ('about', 'Nearly'), and the comparison mixes a one-time replacement/implementation cost with an annual income figure, a units/temporal mismatch the question glosses over; this should temper interpretation of the difference."
+},
+{
+"sample_id": "ocean50_005",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "clear_multi_step",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "In 1997 these practices had already increased the destruction of 436.60 ha of mangrove forest of the existing total of 1488 ha across the Potengi estuary",
+"notes": "The result (1488 − 436.60 = 1051.4 ha) is computed from two source values not supplied by the question — a valid two-fact computation even though the operands are adjacent in the same paragraph. Arithmetic checks out (loss is ~29.3%, consistent with the 'about 30%' statement). Answer supported and unique."
+}
+]}

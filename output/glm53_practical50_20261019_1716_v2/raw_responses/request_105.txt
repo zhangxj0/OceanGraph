@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the Potengi estuary mangrove valuation study, how much larger was the per-hectare ecological service value (based on wastewater treatment replacement costs) than the annual per-hectare tourism and aquaculture income?",
+    "answer": "US$3,000 per hectare",
+    "short_answers": ["US$3,000 per hectare"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "coastal ecosystem valuation",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Ecological services valued at ~US$15,500/ha; tourism and aquaculture income ~US$12,500/ha/year; difference = US$3,000/ha."
+  },
+  {
+    "question": "By 1997, how many hectares of the Potengi estuary mangrove forest remained undestroyed, given the total forest area and the area lost to degradation practices by that year?",
+    "answer": "1051.4 ha",
+    "short_answers": ["1051.4 ha"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "mangrove forest degradation",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Total mangrove area 1488 ha minus 436.60 ha destroyed by 1997 = 1051.4 ha remaining."
+  },
+  {
+    "question": "Which mangrove tree species dominates the Potengi estuary close to the river mouth and margins, and what percentage of the forest does it comprise?",
+    "answer": "Rhizophora mangle, 62%",
+    "short_answers": ["Rhizophora mangle, 62%"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "mangrove forest ecology",
+    "relevance_score": 8,
+    "difficulty_score": 4,
+    "reasoning_path": "Species composition described by location within estuary; Rhizophora mangle predominates near the mouth and margins at 62%."
+  },
+  {
+    "question": "Given the raw domestic sewage phosphorus and nitrogen concentrations used for the Potengi estuary, what is the ratio of total nitrogen to total phosphorus concentration?",
+    "answer": "3.57",
+    "short_answers": ["3.57"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "estuarine biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Total N = 50 mg/L, total P = 14 mg/L; ratio 50/14 ≈ 3.57."
+  }
+]}

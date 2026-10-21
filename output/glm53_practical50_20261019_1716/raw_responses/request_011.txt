@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the OCEANIDS Celtic Sea ALR deployment, why were the Lab-On-Chip DIC sensor data flagged as unreliable, and which derived carbonate parameters were instead computed from the pH and TA sensor data?",
+    "answer": "Gas exchange unit failure and calibration error; DIC, pCO2, aragonite saturation state",
+    "short_answers": ["Gas exchange unit failure and calibration error; DIC, pCO2, aragonite saturation state"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine carbonate system autonomous observations",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "During the March 2022 Celtic Sea deployment, how did the agreement between ALR sensor and CTD co-sample measurements compare for pH versus TA, and what were the corresponding mean residuals for the derived pCO2 values?",
+    "answer": "pH within −0.011 to −0.015; TA within 1–2 μmol kg–1; pCO2 residuals 10–17 μatm",
+    "short_answers": ["pH within −0.011 to −0.015; TA within 1–2 μmol kg–1; pCO2 residuals 10–17 μatm"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "ocean carbon sensor validation",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why was closer ship–ALR agreement observed along the Deep Transect than the Shelf Transect in the Celtic Sea, and what mixed layer depths did the two platforms yield on the DT?",
+    "answer": "Vertical stratification present; ship 345 m, ALR 338 m",
+    "short_answers": ["Vertical stratification present; ship 345 m, ALR 338 m"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "physical-biogeochemical oceanography",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

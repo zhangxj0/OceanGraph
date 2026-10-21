@@ -1,0 +1,46 @@
+{"qa_pairs": [
+{
+"question": "In the southern North Sea study, how many times higher was the average nifH transcript number at station DB than at station OG in the bottom sediments?",
+"answer": "13 times",
+"short_answers": ["13 times"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "marine microbial ecology / nitrogen cycle",
+"relevance_score": 9,
+"difficulty_score": 5,
+"reasoning_path": "Chunk 3 states nifH transcripts averaged 1.2e4 g-1 at DB and 8.7e2 g-1 at OG; ratio = 13."
+},
+{
+"question": "At the station where pelagic and benthic nitrogen fixation rates peaked in August, in which month was the highest nifH gene expression recorded in the sediment?",
+"answer": "February",
+"short_answers": ["February"],
+"question_type": "bridge",
+"answer_type": "date",
+"subdomain": "marine biogeochemistry",
+"relevance_score": 9,
+"difficulty_score": 6,
+"reasoning_path": "Chunks 1-2 identify Doggersbank (DB) as the station with highest N2 fixation in August; chunk 3 states highest nifH expression at DB was in February."
+},
+{
+"question": "At the southern North Sea station where denitrification was always highest across seasons, what was the average nirS gene copy number per gram of wet sediment?",
+"answer": "9.3 × 10^6 copies g−1",
+"short_answers": ["9.3 × 10^6 copies g−1"],
+"question_type": "comparison",
+"answer_type": "numeric",
+"subdomain": "benthic denitrification",
+"relevance_score": 9,
+"difficulty_score": 6,
+"reasoning_path": "Chunks 1 and 3 identify Oyster Grounds (OG) as the station with highest denitrification in all seasons; chunk 3 gives its average nirS abundance of 9.3e6 copies g-1."
+},
+{
+"question": "How much higher was the pore water ammonium concentration at station OG in August than at station DB in February, in μM?",
+"answer": "16.0 μM",
+"short_answers": ["16.0 μM"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "sediment biogeochemistry",
+"relevance_score": 8,
+"difficulty_score": 5,
+"reasoning_path": "Table 1: ammonium at OG in August = 23.5 μM; at DB in February = 7.5 μM; difference = 16.0 μM."
+}
+]}

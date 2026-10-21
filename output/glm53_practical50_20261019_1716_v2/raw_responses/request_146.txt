@@ -1,0 +1,1 @@
+{"verdict": "REJECT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": false, "reason": "The answer 'stirring by eddies' is stated verbatim in a single sentence of the abstract, making this a plain single-fact lookup with no linked reasoning steps."}

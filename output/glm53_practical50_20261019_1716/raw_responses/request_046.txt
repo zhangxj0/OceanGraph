@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Okinawa study of Pocillopora damicornis larvae, how did larval lipid content change at ~1,000 µatm pCO2 compared to ~400 µatm, and what mechanism was proposed to link this to altered vertical positioning?",
+    "answer": "Declined 23–25%; reduced buoyancy from lipid loss",
+    "short_answers": ["Declined 23–25%; reduced buoyancy from lipid loss"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "ocean acidification and coral larval ecology",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "How did the vertical distribution of Pocillopora damicornis larvae in shallow tubes at ~400 µatm pCO2 differ from that at ~1,000 µatm pCO2 during the 12-h incubation on the Okinawa fringing reef?",
+    "answer": "Top at 400 µatm; bottom at 1,000 µatm",
+    "short_answers": ["Top at 400 µatm; bottom at 1,000 µatm"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "ocean acidification and coral larval behavior",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Given that Pocillopora damicornis larvae in deep tubes at ~400 µatm pCO2 aggregated at the bottom from 08:00 to 20:00 h, how did their distribution in deep tubes at ~1,000 µatm pCO2 compare over the same day?",
+    "answer": "Same: bottom throughout the day",
+    "short_answers": ["Same: bottom throughout the day"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "ocean acidification and coral larval behavior",
+    "relevance_score": 8,
+    "difficulty_score": 5
+  }
+]}

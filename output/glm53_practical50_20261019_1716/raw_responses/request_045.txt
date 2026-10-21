@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Kettle study, the 1-D NPZD model was tuned at three Atlantic sites using satellite chlorophyll and backscattering data. Why is chlorophyll alone not a robust proxy for phytoplankton carbon, making bb data useful as an additional constraint?",
+    "answer": "The carbon to chlorophyll ratio is highly variable",
+    "short_answers": ["The carbon to chlorophyll ratio is highly variable"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemical modeling and ocean color remote sensing",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "In the Kettle study, satellite bb(490) was simulated from the model's POC and compared to three IOP inversion algorithm datasets at the CIS, ESTOC, and PAP Atlantic sites. What did the study conclude about the effect of using different bb datasets on model behaviour?",
+    "answer": "Uncertainties in bb from different IOP algorithms are not significant",
+    "short_answers": ["Uncertainties in bb from different IOP algorithms are not significant"],
+    "question_type": "bridge",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemical modeling and inherent optical properties",
+    "relevance_score": 9,
+    "difficulty_score": 7
+  },
+  {
+    "question": "In the Kettle study, the HadOCC NPZD model was coupled to GOTM and tuned at three Atlantic sites including ESTOC and CIS. What was the overall effect of adding bb data to chlorophyll data on the tuned model parameters?",
+    "answer": "Did not consistently alter the same parameters; some became less constrained",
+    "short_answers": ["Did not consistently alter the same parameters; some became less constrained"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "ocean carbon cycle model parameter estimation",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

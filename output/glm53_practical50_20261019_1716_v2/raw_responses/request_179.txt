@@ -1,0 +1,46 @@
+{"qa_pairs": [
+{
+"question": "In St. Joseph Bay between 1990 and 2020, how much greater was the peak seagrass extent reached in 2004 compared to the low extent recorded in 2005?",
+"answer": "7 km2",
+"short_answers": ["7 km2"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "seagrass blue carbon and remote sensing",
+"relevance_score": 9,
+"difficulty_score": 5,
+"reasoning_path": "Chunk 4 gives 26 km2 in 2004 and 19 km2 in 2005; compute difference 26-19=7 km2."
+},
+{
+"question": "The DCNN classification of the Landsat image whose sensor's 12-bit quantization improved seagrass detection achieved what F-measure when validated against a WorldView-2 image?",
+"answer": "0.87",
+"short_answers": ["0.87"],
+"question_type": "bridge",
+"answer_type": "numeric",
+"subdomain": "satellite remote sensing of seagrass",
+"relevance_score": 9,
+"difficulty_score": 7,
+"reasoning_path": "Chunk 5 identifies the 2013 L8 image (12-bit OLI sensor); chunk 2 gives its F-measure of 0.87 against the 2013 WV2 image."
+},
+{
+"question": "After the brightness offset correction was applied to Landsat-derived LAI, how much did the mean belowground organic carbon from the L5 raster exceed the in situ-derived mean?",
+"answer": "7 g C m−2",
+"short_answers": ["7 g C m−2"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "seagrass biogeochemistry",
+"relevance_score": 9,
+"difficulty_score": 5,
+"reasoning_path": "Chunk 3: BGC from L5 raster = 179 g C m−2, in situ = 172 g C m−2; difference = 7 g C m−2."
+},
+{
+"question": "Since interannual variability in seagrass extent in St. Joseph Bay was unrelated to ENSO, NAO, sea surface temperature, or tropical cyclones, what localized pressures do the authors suggest may drive the observed dynamics?",
+"answer": "grazing or water quality",
+"short_answers": ["grazing or water quality"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "seagrass ecology",
+"relevance_score": 9,
+"difficulty_score": 6,
+"reasoning_path": "Chunk 4 states variability was unrelated to climate indices, SST and cyclones, and suggests localized pressures such as grazing or water quality."
+}
+]}

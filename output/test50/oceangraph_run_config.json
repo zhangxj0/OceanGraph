@@ -1,0 +1,122 @@
+{
+  "framework": "OceanGraph-R1",
+  "framework_version": "3.0.0",
+  "input_dir": "data/data1",
+  "output_dir": "output/test50",
+  "backend": "openai",
+  "model": null,
+  "num_qa_pairs": 50,
+  "max_workers": 4,
+  "embedding_model": "bge_m3",
+  "reranker_model": "text_embedding",
+  "max_depth": 2,
+  "qa_verification": {
+    "strict_multihop_verification": true,
+    "model_selection": false,
+    "verification_profile": "cost_efficient",
+    "max_answer_words": 12,
+    "max_answer_cjk_chars": 16,
+    "multihop_verification_mode": "balanced",
+    "max_verification_chunks": 4,
+    "max_unknown_verdicts": 1,
+    "counterfactual_verification": false
+  },
+  "agents": [
+    "corpus",
+    "evidence",
+    "qa",
+    "verifier"
+  ],
+  "agent_architecture": {
+    "version": "3.0.0",
+    "sequence": [
+      "corpus",
+      "evidence",
+      "qa",
+      "verifier"
+    ],
+    "manifest": [
+      {
+        "agent_id": "corpus",
+        "name": "Corpus Agent",
+        "model_stages": [
+          "corpus"
+        ],
+        "responsibilities": [
+          "domain_recognition",
+          "chunking_and_parsing",
+          "taxonomy_and_indexing"
+        ],
+        "input_artifacts": [
+          "source_documents"
+        ],
+        "output_artifacts": [
+          "chunks",
+          "domain_taxonomy",
+          "vector_index"
+        ]
+      },
+      {
+        "agent_id": "evidence",
+        "name": "Evidence Agent",
+        "model_stages": [
+          "retrieval"
+        ],
+        "responsibilities": [
+          "gap_detection",
+          "evidence_retrieval",
+          "context_completion"
+        ],
+        "input_artifacts": [
+          "seed_chunk",
+          "vector_index"
+        ],
+        "output_artifacts": [
+          "completed_context",
+          "search_history"
+        ]
+      },
+      {
+        "agent_id": "qa",
+        "name": "QA Agent",
+        "model_stages": [
+          "generation",
+          "selection",
+          "correction"
+        ],
+        "responsibilities": [
+          "qa_synthesis",
+          "subquestion_chaining",
+          "reasoning_path_assembly"
+        ],
+        "input_artifacts": [
+          "completed_context"
+        ],
+        "output_artifacts": [
+          "qa_candidates",
+          "reasoning_annotations"
+        ]
+      },
+      {
+        "agent_id": "verifier",
+        "name": "Verifier Agent",
+        "model_stages": [
+          "verification"
+        ],
+        "responsibilities": [
+          "atomicity_check",
+          "evidence_grounding",
+          "multihop_necessity"
+        ],
+        "input_artifacts": [
+          "qa_candidate",
+          "completed_context"
+        ],
+        "output_artifacts": [
+          "verification_decision",
+          "evidence_graph"
+        ]
+      }
+    ]
+  }
+}

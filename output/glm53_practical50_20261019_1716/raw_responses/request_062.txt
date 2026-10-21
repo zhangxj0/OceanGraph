@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the Moorea fore reef IBM study, coral cover after 7 years of recovery was 42.9% when ocean acidification affected only coral growth, but what cover percentage resulted when OA affected both growth and coral-coral competition?",
+    "answer": "28.9%",
+    "short_answers": ["28.9%"],
+    "question_type": "comparison",
+    "answer_type": "numeric",
+    "subdomain": "coral reef ecology and ocean acidification",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "In the Moorea fore reef model, which parameter produced the strongest change in projected coral cover when varied by ±20%, exceeding the effects of recruitment and competition?",
+    "answer": "coral linear growth rate",
+    "short_answers": ["coral linear growth rate"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "coral community modeling",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Among the four dominant coral genera modeled on the Moorea fore reef, which one required the largest adjustment (a six-fold increase) to its empirical recruitment rate for simulated and observed cover to converge at ~3.5% after 7 years?",
+    "answer": "Porites",
+    "short_answers": ["Porites"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "coral recruitment and community recovery",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

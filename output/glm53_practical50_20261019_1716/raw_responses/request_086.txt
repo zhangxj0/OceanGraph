@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In the 30-day mesocosm study with Pacific oysters, which physiological rate of Crassostrea gigas was NOT significantly affected by elevated pCO2 while its clearance rate and scope for growth were reduced?",
+    "answer": "food absorption efficiency",
+    "short_answers": ["food absorption efficiency"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "marine aquaculture and ocean acidification physiology",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "By how many pHNBS units did the presence of Saccharina japonica change daytime pH in the elevated pCO2 (900 µatm) mesocosm treatment, and through what process did the kelp achieve this CO2 uptake?",
+    "answer": "photosynthesis",
+    "short_answers": ["photosynthesis"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "marine biogeochemistry",
+    "relevance_score": 8,
+    "difficulty_score": 6
+  },
+  {
+    "question": "In Sanggou Bay, what was the annual dissolved inorganic carbon uptake (in tons) by the seaweeds Saccharina japonica and Gracilaria lemaneiformis that drove the bay to be a net DIC sink?",
+    "answer": "about 1.0 × 10^5 tons",
+    "short_answers": ["about 1.0 × 10^5 tons"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "coastal carbon biogeochemistry",
+    "relevance_score": 8,
+    "difficulty_score": 5
+  }
+]}

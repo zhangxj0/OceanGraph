@@ -1,0 +1,22 @@
+{"reviews": [
+{"sample_id": "ocean50_011", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "The time between ALR sensor measurements and bottle sample collection in the same proximity ranged between 1 min and 15 h (μ = 6 h) for the ST and between 5 min and 85 h (μ = 40 h) for the DT.",
+"notes": "Requires retrieving two mean lag values (6 h ST, 40 h DT) and computing the ratio 40/6 ≈ 6.7, which is not supplied in the text. Both values are in one sentence but the computed result is genuine multi-step arithmetic. Answer supported and unambiguous; deployment context (OCEANIDS, Celtic Sea, March 2022) is consistent with the source."},
+{"sample_id": "ocean50_012", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "During each cycle, about 90 kyr were glacial (cold), allowing continental ice sheets to build up, and 10 kyr were interglacial (warm), allowing the ice sheets to melt.",
+"notes": "Ratio 90/10 = 9 computed from two source values not supplied by the question. Adjacent operands do not make it a lookup per review criteria. Answer exact and unique; the ~100 kyr cycle framing matches the source. No causal overstatement."},
+{"sample_id": "ocean50_013", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "phosphate released to the pore waters upon the reductive dissolution of iron oxides by sulfide produced during anaerobic methane oxidation",
+"notes": "The question essentially restates the source sentence's mechanism (sulfide from anaerobic methane oxidation driving reductive dissolution) and asks for the phase named in that same sentence. The answer 'iron oxides' is directly stated; the relational framing is decorative rather than requiring linked reasoning. Answer is correct and unambiguous."},
+{"sample_id": "ocean50_014", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "the pCO2 product yields a determination coefficient of 0.92, a root-mean-square error of 12.70 µatm, and an accumulative uncertainty of 23.25 µatm.",
+"notes": "Difference 23.25 − 12.70 = 10.55 µatm computed from two values in the same abstract; per review criteria this is a valid two-fact computation, not a lookup. Conditions (ReCAD-NAACOM-pCO2, SOCAT comparison) match the source. Answer exact and unique."},
+{"sample_id": "ocean50_015", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "reported air–sea CO2 fluxes for the GoMe exhibit a wide range spanning from −0.50 to +2.50 mol C m−2 yr−1, with conflicting reports characterizing it as a CO2 source... CO2-neutral... or a CO2 sink",
+"notes": "The question quotes the distinguishing flux range verbatim and asks for the subregion named in the same sentence (GoMe = Gulf of Maine). The 'north of Cape Cod' clause is from the preceding sentence but does not add a reasoning step since the flux range alone uniquely identifies the region. Answer correct and unambiguous; no causal overstatement."}
+]}

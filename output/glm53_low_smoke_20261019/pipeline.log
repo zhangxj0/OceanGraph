@@ -1,0 +1,33 @@
+2026-10-19 11:48:24,668 - LLM Request stage=generation profile=generator model=GLM-5.3 prompt_sha=4b6ed6d77869 prompt_chars=26
+2026-10-19 11:48:27,544 - LLM Response stage=generation chars=2
+2026-10-19 11:48:27,554 - LLM Request stage=verification profile=verifier model=GLM-5.3 prompt_sha=c4831720233e prompt_chars=33
+2026-10-19 11:48:34,685 - LLM Response stage=verification chars=9
+2026-10-19 11:49:09,571 - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=a869667642b4 prompt_chars=11845
+2026-10-19 11:49:46,549 - LLM Response stage=corpus chars=4153
+2026-10-19 11:49:46,560 - Window 1: Query 3850 chars, Response 4153 chars
+2026-10-19 11:49:46,578 - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=04cc7a7e4426 prompt_chars=14195
+2026-10-19 11:50:04,889 - LLM Response stage=corpus chars=6497
+2026-10-19 11:50:04,896 - Window 1: Query 6200 chars, Response 6497 chars
+2026-10-19 11:50:04,908 - LLM Request stage=corpus profile=generator model=GLM-5.3 prompt_sha=bf8f594d1d28 prompt_chars=14616
+2026-10-19 11:50:28,088 - LLM Response stage=corpus chars=7125
+2026-10-19 11:50:28,093 - Window 1: Query 6621 chars, Response 7125 chars
+2026-10-19 11:50:40,962 - Load pretrained SentenceTransformer: BAAI/bge-m3
+2026-10-19 16:22:02,505 - LLM Request stage=generation profile=generator model=GLM-5.3 prompt_sha=4b6ed6d77869 prompt_chars=26
+2026-10-19 16:22:12,021 - LLM Response stage=generation chars=2
+2026-10-19 16:22:12,032 - LLM Request stage=verification profile=verifier model=GLM-5.3 prompt_sha=c4831720233e prompt_chars=33
+2026-10-19 16:22:14,307 - LLM Response stage=verification chars=9
+2026-10-19 16:22:57,752 - Load pretrained SentenceTransformer: BAAI/bge-m3
+2026-10-19 16:23:01,688 - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2026-10-19 16:27:20,139 - Load pretrained SentenceTransformer: BAAI/bge-m3
+2026-10-19 16:27:23,311 - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2026-10-19 16:27:23,998 - VLM Request stage=retrieval profile=generator model=GLM-5.3 prompt_sha=bb297dc30f8c chunks=1
+2026-10-19 16:27:27,030 - VLM Response stage=retrieval chunks=1 chars=425
+2026-10-19 16:27:31,814 - VLM Request stage=retrieval profile=generator model=GLM-5.3 prompt_sha=bb297dc30f8c chunks=2
+2026-10-19 16:27:35,455 - VLM Response stage=retrieval chunks=2 chars=472
+2026-10-19 16:27:35,462 - VLM Request stage=generation profile=generator model=GLM-5.3 prompt_sha=cb5aded8efe5 chunks=2
+2026-10-19 16:27:50,942 - VLM Response stage=generation chunks=2 chars=3720
+2026-10-19 16:27:50,966 - VLM Request stage=verification profile=verifier model=GLM-5.3 prompt_sha=abef603019b3 chunks=2
+2026-10-19 16:27:54,995 - VLM Response stage=verification chunks=2 chars=312
+2026-10-19 16:27:55,015 - VLM Request stage=retrieval profile=generator model=GLM-5.3 prompt_sha=bb297dc30f8c chunks=1
+2026-10-19 16:27:58,765 - VLM Response stage=retrieval chunks=1 chars=512
+2026-10-19 16:28:06,473 - VLM Request stage=retrieval profile=generator model=GLM-5.3 prompt_sha=bb297dc30f8c chunks=3

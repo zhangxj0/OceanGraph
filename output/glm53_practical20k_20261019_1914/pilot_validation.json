@@ -1,0 +1,11 @@
+{
+  "status": "pilot_validated",
+  "pilot_sources": 20,
+  "accepted_before_recheck": 20,
+  "removed": 3,
+  "accepted_after_recheck": 17,
+  "requests": 39,
+  "usage_complete": true,
+  "manifest_exported": 17,
+  "source_split_overlap": false
+}

@@ -1,0 +1,22 @@
+{"reviews": [
+{"sample_id": "ocean50_031", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "shallow_linkage", "question_ambiguity": "minor", "scientific_error_risk": "low",
+"source_excerpt": "Extended heatwave events caused an overall reduction of mussel consumption by 53% compared to starfish in the No heatwave treatment; Present-day and Extended heatwaves (intensity +5°C, maximum 23°C, duration of 9 and 13 days, respectively).",
+"notes": "The 53% reduction is correctly tied to the Extended treatment, and mapping +5°C/13-day parameters to the treatment name 'Extended' requires linking two paragraphs, so it is more than a pure lookup. However, the question is somewhat circular: the treatment is already fully specified by its intensity and duration, and the 'percentage' clause is largely decorative — the treatment name can be resolved from the parameters alone. Wording 'longer-term treatment outcome' vs the answer being a treatment name is mildly inconsistent; the percentage (53%) is never requested but is the true multi-hop element. Answer is supported and unique."},
+{"sample_id": "ocean50_032", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "minor", "scientific_error_risk": "low",
+"source_excerpt": "The coefficient of variation of the density distribution profiles within the ML ... ranged 1–2%, whereas for the plankton groups considered ranged from 10 to 100% (mean 46%).",
+"notes": "Both numbers (mean 46% for plankton, 1–2% for density) appear in a single sentence and the comparison the question asks for is directly stated. Answer using the mean 46% is supported but the source also gives a 10–100% range; the question's 'on average' phrasing resolves this to the mean, leaving only minor ambiguity. Effectively a direct lookup of an already-stated comparison."},
+{"sample_id": "ocean50_033", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "with diatoms and Synechococcus being the most variable and heterotrophic flagellates and bacteria the less variable.",
+"notes": "The source sentence directly names diatoms and Synechococcus as the most variable plankton groups within the mixed layer. The pre-bloom stratified-period condition is consistent with the study description. Pure direct lookup with an unambiguous, explicitly stated answer."},
+{"sample_id": "ocean50_034", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "Sedimentation rates were highest at site U1433 (20 cm/kya), moderate at site U1432 (12 cm/kya), and lowest at site U1431 (5 cm/kya).",
+"notes": "The ratio (20/5 = 4) is computed from two source values (highest U1433 and lowest U1431) that are not supplied by the question; per the review criteria, this is a legitimate numeric multi-step computation even though both values appear in the same sentence. Answer is correct, unique, and fully supported."},
+{"sample_id": "ocean50_035", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "As lipid content of the larvae declined 23–25% at ~1,000 vs. ~400 µatm pCO2, loss of lipid may be a cause of modified larval behavior at high pCO2. ... Lipids play a role in the buoyancy regulation ... modulation of lipid content ... could modify their vertical position in the water column by buoyancy effects.",
+"notes": "The answer requires linking two distinct text spans: the observed 23–25% lipid decline under high pCO2 (abstract/results) and the stated role of lipids in buoyancy regulation of planktonic organisms (introduction/methods rationale). Neither span alone yields the mechanism 'lipid loss reducing buoyancy', so this is genuine linked reasoning. The answer correctly reports this as a proposed mechanism (source uses hedged 'may be a cause'), avoiding overstated causality. Experimental conditions (Okinawa, ~1000 vs ~400 µatm, 12 h incubation) are appropriately contextualized in the question via 'given that lipids regulate buoyancy'."}
+]}

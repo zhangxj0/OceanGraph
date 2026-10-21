@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+  "question": "In the P. subcurvata glacial/interglacial simulation, glacial conditions corresponded to which combination of pCO2 and Fe treatment, and what production parameter did that combination favor compared to interglacial conditions?",
+  "answer": "190 μatm pCO2 with Fe addition; favored POC production",
+  "short_answers": ["190 μatm pCO2 with Fe addition; favored POC production"],
+  "question_type": "bridge",
+  "answer_type": "short_text",
+  "subdomain": "marine biogeochemistry / phytoplankton ecophysiology",
+  "relevance_score": 9,
+  "difficulty_score": 6
+},
+{
+  "question": "Given that increasing pCO2 caused a 20–30% decrease in cellular POC quotas in the P. subcurvata experiment, what does this imply about why POC production was reduced under interglacial conditions, and which other factor contributed to that reduction?",
+  "answer": "Higher pCO2 and low Fe availability caused the reduction",
+  "short_answers": ["Higher pCO2 and low Fe availability caused the reduction"],
+  "question_type": "causal",
+  "answer_type": "short_text",
+  "subdomain": "marine biogeochemistry",
+  "relevance_score": 9,
+  "difficulty_score": 6
+},
+{
+  "question": "In the P. subcurvata experiment, dFe concentrations in the abiotic culture medium ranged 2.92–3.10 nmol L-1 in the +Fe 190 treatment and 0.37–0.50 nmol L-1 in the Control 290 treatment; how much larger was the mean value of the former range than the latter, rounded to one decimal place?",
+  "answer": "About 2.6 nmol L-1",
+  "short_answers": ["About 2.6 nmol L-1"],
+  "question_type": "numeric_aggregation",
+  "answer_type": "numeric",
+  "subdomain": "marine biogeochemistry / trace metal chemistry",
+  "relevance_score": 8,
+  "difficulty_score": 5
+}
+]}

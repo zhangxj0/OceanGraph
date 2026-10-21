@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the central Red Sea study, how did the coefficient of variation of plankton group distributions within the mixed layer compare, on average, to that of the density profiles?",
+    "answer": "Mean 46% versus 1–2% for density",
+    "short_answers": ["Mean 46% versus 1–2% for density"],
+    "question_type": "comparison",
+    "answer_type": "numeric",
+    "subdomain": "Marine Plankton Ecology",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Fact 1: CV of density profiles within ML was 1–2%. Fact 2: CV of plankton groups ranged 10–100% with mean 46%. Compare to show plankton heterogeneity despite quasi-uniform density."
+  },
+  {
+    "question": "In the central Red Sea during the pre-bloom stratified period, which plankton groups showed the highest variability in vertical distribution within the mixed layer?",
+    "answer": "Diatoms and Synechococcus",
+    "short_answers": ["Diatoms and Synechococcus"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "Marine Plankton Ecology",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Fact 1: The study period was pre-bloom, stratified, central Red Sea. Fact 2: Among plankton groups with CV 10–100%, diatoms and Synechococcus were most variable."
+  },
+  {
+    "question": "Given that the dilution grazing assays in the central Red Sea showed microzooplankton grazing maxima in the lower mixed layer while phytoplankton intrinsic growth rates were higher in the upper mixed layer, in which layer did phytoplankton experience the more favorable net growth balance?",
+    "answer": "Upper mixed layer",
+    "short_answers": ["Upper mixed layer"],
+    "question_type": "causal",
+    "answer_type": "entity",
+    "subdomain": "Plankton Trophic Dynamics",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Fact 1: Growth rates higher in upper ML. Fact 2: Grazing maxima in lower ML. Combine: net growth (growth minus grazing) most favorable in upper ML."
+  },
+  {
+    "question": "By how much did the peak abundance of autotrophic prokaryotes exceed that of mesozooplankton copepod nauplii in the central Red Sea mixed layer, in individuals per liter?",
+    "answer": "Not determinable from the study",
+    "short_answers": ["Not determinable from the study"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "short_text",
+    "subdomain": "Marine Plankton Ecology",
+    "relevance_score": 2,
+    "difficulty_score": 4,
+    "reasoning_path": "Abundances are given in different units (cells mL−1 vs ind L−1) and autotrophic prokaryote peak values are not quantified; comparison not grounded."
+  }
+]}

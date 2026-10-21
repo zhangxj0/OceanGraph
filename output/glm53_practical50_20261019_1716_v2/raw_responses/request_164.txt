@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the Carter et al. study of marine alkalinity, how many times greater is the riverine alkalinity input per unit area to the Arctic than to the Atlantic, and how does that Arctic value compare to the other oceans?",
+    "answer": "Twice the Atlantic, 8 times other oceans",
+    "short_answers": ["Twice the Atlantic, 8 times other oceans"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "Marine Biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 5,
+    "reasoning_path": "Chunk 1 states Arctic riverine alkalinity per unit area is ~2x the Atlantic and 8x other oceans; question asks the respondent to link and report both ratios, which is stated directly but requires combining two facts."
+  },
+  {
+    "question": "How much larger is the hydrothermal alkalinity contribution estimated by deVilliers (1998) compared with the Wolery and Sleep (1988) estimate for ocean alkalinity inputs?",
+    "answer": "23.4 T mol per year",
+    "short_answers": ["23.4 T mol per year"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "Marine Biogeochemistry",
+    "relevance_score": 8,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 2 gives hydrothermal vent alkalinity estimates of 6.6 T mol AT yr-1 (Wolery and Sleep) and up to 30 T mol AT yr-1 (deVilliers); difference = 30 - 6.6 = 23.4 T mol AT yr-1."
+  },
+  {
+    "question": "According to the Carter et al. analysis of surface calcite saturation state, which process is primarily responsible for regional differences, and which process plays a comparatively minor role?",
+    "answer": "Temperature effects on CO2 solubility; CaCO3 cycling minor",
+    "short_answers": ["Temperature effects on CO2 solubility; CaCO3 cycling minor"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "Carbonate Chemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 1 states regional differences in surface calcite saturation state are due primarily to temperature effects on CO2 solubility, while variations in net calcium carbonate cycling revealed by Alk* play a minor role; question combines both facts."
+  },
+  {
+    "question": "In the definition of Alk*, how much larger is the theoretical Kanamori and Ikegami ratio-derived potential alkalinity nitrate coefficient compared with the empirical North Pacific value?",
+    "answer": "0.10",
+    "short_answers": ["0.10"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "Marine Biogeochemistry",
+    "relevance_score": 8,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 3 gives AP = AT + 1.26 x [NO3-] (empirical North Pacific value) and the Wolf-Gladrow theoretical value of 1.36; difference = 1.36 - 1.26 = 0.10."
+  }
+]}

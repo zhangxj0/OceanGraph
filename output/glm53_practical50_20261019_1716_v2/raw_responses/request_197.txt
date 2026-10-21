@@ -1,0 +1,22 @@
+{"reviews": [
+{"sample_id": "ocean50_036", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "shallow_linkage", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "At ∼400 µatm, larvae moved toward the top (0.1-m) of shallow tubes throughout the day, but in the deep tubes they aggregated at the bottom of the tubes from 08:00 to 20:00 h.",
+"notes": "Answer is directly supported; 'daytime' matches the 08:00–20:00 h scoring window. Both facts appear in a single sentence of the abstract, so it is essentially a restatement of a stated contrast rather than linked reasoning — a two-condition juxtaposition, not a computation or entity linkage. Quality acceptable but shallow."},
+{"sample_id": "ocean50_037", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "Wolery and Sleep (1988) estimate that hydrothermal vents add an additional 6.6 T mol AT yr−1, though deVilliers (1998) argues the hydrothermal contribution may be as high as 30 T mol AT yr−1.",
+"notes": "Numeric result (30 − 6.6 = 23.4 T mol yr−1) computed from two source values not supplied by the question; both attributed to named intermediate sources (deVilliers vs. Wolery & Sleep). Clear multi-step despite adjacent operands. Answer correct and unique. Question could state 'T mol AT per year' units more fully but this is negligible."},
+{"sample_id": "ocean50_038", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "minor", "scientific_error_risk": "low",
+"source_excerpt": "While the empirical Kanamori and Ikegami (1982) ratio of 1.26 may be specific to the elemental ratios of the North Pacific, Wolf-Gladrow et al. (2007) provide a theoretical derivation from Redfield ratios and obtain a similar value of 1.36.",
+"notes": "Computed difference 1.36 − 1.26 = 0.10 from two source values, both anchored to named studies — clear multi-step. Minor framing issue: the question says 'in the definition of Alk*', but the 1.36 theoretical value is discussed as a comparison, not used in the Alk* definition (which uses 1.26); the preamble is slightly misleading though it does not affect the answer. Note the 1.36 value is attributed to Wolf-Gladrow et al., not to Kanamori and Ikegami; the question's phrasing 'Kanamori and Ikegami ratio-derived' could misattribute, a small scientific-accuracy concern."},
+{"sample_id": "ocean50_039", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "clear_multi_step", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "Table 3: Nitrosopuilus | 44.5 (ST1_July) | ... | 39.7 (ST1_Jan.)",
+"notes": "Difference of 44.5 − 39.7 = 4.8 percentage points computed from two table values not given in the question — clear multi-step. Answer supported and unique. Minor caveat: the table misspells the genus as 'Nitrosopuilus' while the text uses 'Nitrosopumilus'; a solver must handle the spelling variant, but the row is unambiguous. GeoChip-based relative abundance context (station/season) is fully specified."},
+{"sample_id": "ocean50_040", "answer_supported": true, "answer_unique": true, "domain_relevant": true,
+"multihop_quality": "likely_single_lookup", "question_ambiguity": "none", "scientific_error_risk": "low",
+"source_excerpt": "We conclude that AOB are responsible for the bulk of the ammonium oxidation in these coastal microbial mats.",
+"notes": "The question's conditional clause ('where amoA gene abundance did not correlate with potential nitrification rates but amoA transcripts did') is copied nearly verbatim from the abstract and functions as a decorative preamble identifying the study; the answer is the paper's explicitly stated conclusion, a single-fact lookup. No computation or entity linkage required. Answer is correct, unique, and well-scoped, but the sample does not exercise multi-hop reasoning."}
+]}

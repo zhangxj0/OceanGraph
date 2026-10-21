@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "Chunk 2 supplies the mean lags (ST μ = 6 h, DT μ = 40 h) not given in the question, and their ratio 40/6 ≈ 6.7 supports the proposed answer via a two-step retrieval-and-calculation chain."}

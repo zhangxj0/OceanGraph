@@ -1,0 +1,1 @@
+{"verdict": "REJECT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": false, "reason": "The answer (AAIW and SAMW) is a plain single-attribute lookup directly stated in one sentence of CHUNK 1, with the NADW detail serving only as decorative filtering context rather than a genuine multi-hop link."}

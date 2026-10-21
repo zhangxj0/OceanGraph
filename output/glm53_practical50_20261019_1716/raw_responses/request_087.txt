@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the Kodiak Laboratory ocean acidification experiment, which crab species maintained its calcium content under acidified conditions but showed a decreased condition index, and what does this suggest about its calcification?",
+"answer": "Red king crab; calcification maintained at high energetic cost",
+"short_answers": ["Red king crab; calcification maintained at high energetic cost"],
+"question_type": "bridge",
+"answer_type": "short_text",
+"subdomain": "marine biogeochemistry and organismal response to ocean acidification",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "After how many days in pH 7.5 seawater did 100% mortality occur for juvenile red king crabs reared at ambient temperatures in the Kodiak Laboratory experiment?",
+"answer": "95 days",
+"short_answers": ["95 days"],
+"question_type": "numeric_aggregation",
+"answer_type": "numeric",
+"subdomain": "ocean acidification effects on crustacean survival",
+"relevance_score": 9,
+"difficulty_score": 5
+},
+{
+"question": "Why are calcifying organisms such as corals, bivalves, and crustaceans considered particularly vulnerable to ocean acidification, which has decreased ocean pH by about 0.1 units since the Industrial Revolution?",
+"answer": "Lower pH increases calcium carbonate dissolution rates",
+"short_answers": ["Lower pH increases calcium carbonate dissolution rates"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "carbonate chemistry and marine calcification",
+"relevance_score": 9,
+"difficulty_score": 5
+}
+]}

@@ -1,0 +1,1 @@
+{"verdict": "ACCEPT", "question_standalone": true, "single_target": true, "answer_supported": true, "domain_relevant": true, "multihop_plausible": true, "reason": "Chunk 3 gives the 1940s-to-present Corg burial fold-increases (9.1 at Kapisillit, 3.5 at Kobbefjord), and the ratio 9.1/3.5 ≈ 2.6 supports the proposed answer via a two-step retrieval-and-calculation chain."}

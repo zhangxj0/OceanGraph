@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "In St. Joseph Bay between 1990 and 2020, what was the mean belowground organic carbon stock given that it was derived from the mean seagrass leaf area index of about 1.6?",
+    "answer": "165 g C m−2",
+    "short_answers": ["165 g C m−2"],
+    "question_type": "bridge",
+    "answer_type": "numeric",
+    "subdomain": "seagrass blue carbon biogeochemistry",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  },
+  {
+    "question": "Why did the DCNN algorithm detect seagrass presence better in the 2013 Landsat 8 image than in the 2010 Landsat 5 image?",
+    "answer": "Improved signal-to-noise ratio and 12-bit quantization of L8 OLI",
+    "short_answers": ["Improved signal-to-noise ratio and 12-bit quantization of L8 OLI"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "satellite remote sensing of seagrass",
+    "relevance_score": 9,
+    "difficulty_score": 7
+  },
+  {
+    "question": "After tropical cyclones caused six brief declines in seagrass extent in St. Joseph Bay between 2004 and 2019, what was the overall 30-year trend in seagrass extent from 1990 to 2020?",
+    "answer": "No significant temporal trend; stable extent",
+    "short_answers": ["No significant temporal trend; stable extent"],
+    "question_type": "temporal",
+    "answer_type": "short_text",
+    "subdomain": "seagrass dynamics and climate disturbance",
+    "relevance_score": 9,
+    "difficulty_score": 6
+  }
+]}

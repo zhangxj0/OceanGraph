@@ -1,0 +1,49 @@
+schema_version: 1
+backend:
+  active: OPENAI
+  openai:
+    url: https://llmapi.paratera.com/v1/chat/completions
+    llm_model: GLM-5.3
+    vlm_model: GLM-5.3
+    timeout: 300
+models:
+  profiles:
+    generator:
+      backend: OPENAI
+      url: https://llmapi.paratera.com/v1/chat/completions
+      api_key_env: OPENAI_API_KEY
+      model: GLM-5.3
+      supports_vision: false
+      temperature: 0.0
+      structured_output: true
+      max_output_tokens: 8192
+      extra_body:
+        thinking:
+          type: enabled
+        reasoning_effort: low
+      timeout: 180
+    verifier:
+      backend: OPENAI
+      url: https://llmapi.paratera.com/v1/chat/completions
+      api_key_env: OPENAI_API_KEY
+      model: GLM-5.3
+      supports_vision: false
+      temperature: 0.0
+      structured_output: true
+      max_output_tokens: 8192
+      extra_body:
+        thinking:
+          type: enabled
+        reasoning_effort: high
+      timeout: 180
+  stages:
+    default: generator
+    corpus: generator
+    retrieval: generator
+    generation: generator
+    selection: verifier
+    verification: verifier
+    correction: generator
+rate_limiting:
+  requests_per_minute: 60
+  burst_size: 15

@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the proposed glacial–interglacial phosphorus cycle scenario, what geochemical process mobilizes sedimentary phosphorus into pore waters when falling sea level destabilizes methane hydrates?",
+"answer": "Reductive dissolution of iron oxides by sulfide from anaerobic methane oxidation",
+"short_answers": ["Reductive dissolution of iron oxides by sulfide from anaerobic methane oxidation"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "Marine biogeochemistry / sediment diagenesis",
+"relevance_score": 9,
+"difficulty_score": 7
+},
+{
+"question": "According to the ice-core record described, how did the timescale of atmospheric pCO2 rise during deglacial termination compare with the decline of pCO2 during the glacial phase, and what maximum duration did the rapid rise last?",
+"answer": "Termination rise was remarkably rapid, lasting 10 kyr or less",
+"short_answers": ["Termination rise was remarkably rapid, lasting 10 kyr or less"],
+"question_type": "comparison",
+"answer_type": "short_text",
+"subdomain": "Paleoceanography / carbon cycle",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "Given that each Pleistocene glacial cycle lasted roughly 100 kyr with about 10 kyr interglacial, how long was the glacial phase, and what sea-level change did this glacial phase cause globally?",
+"answer": "About 90 kyr, causing sea level to fall more than 100 m",
+"short_answers": ["About 90 kyr, causing sea level to fall more than 100 m"],
+"question_type": "numeric_aggregation",
+"answer_type": "short_text",
+"subdomain": "Paleoceanography / glacial cycles",
+"relevance_score": 8,
+"difficulty_score": 5
+}
+]}

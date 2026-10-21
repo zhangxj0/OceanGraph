@@ -1,0 +1,32 @@
+{"qa_pairs": [
+{
+"question": "In the simulated upwelling cycle experiments comparing Chaetoceros decipiens and Emiliania huxleyi, which organism maintained its rapid shift-up of growth and nitrate assimilation when returned to light and nutrients under iron-limiting conditions, and what gene-expression strategy before upwelling enables this response?",
+"answer": "C. decipiens; frontloading nitrate assimilation genes",
+"short_answers": ["C. decipiens; frontloading nitrate assimilation genes"],
+"question_type": "causal",
+"answer_type": "short_text",
+"subdomain": "Marine Phytoplankton Physiology and Biogeochemistry",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "Under iron-replete conditions in the upwelling cycle simulations, how did the maximum cellular C:N ratios of C. decipiens at T3 and E. huxleyi at T2 compare with each other and with the Redfield ratio of 6.6:1?",
+"answer": "Both exceeded Redfield; E. huxleyi (29.96) higher than C. decipiens (20.2)",
+"short_answers": ["Both exceeded Redfield; E. huxleyi (29.96) higher than C. decipiens (20.2)"],
+"question_type": "comparison",
+"answer_type": "numeric",
+"subdomain": "Marine Phytoplankton Elemental Stoichiometry",
+"relevance_score": 9,
+"difficulty_score": 6
+},
+{
+"question": "During the upwelling cycle simulations with iron-replete conditions, how did chlorophyll a and photosynthetic efficiency (Fv:Fm) change from the initial exponential phase (T1) to the stationary phase (T2 and T3), and what happened to Fv:Fm after the dark period when cells returned to exponential growth?",
+"answer": "Both decreased at T2/T3, then Fv:Fm increased after dark period",
+"short_answers": ["Both decreased at T2/T3, then Fv:Fm increased after dark period"],
+"question_type": "temporal",
+"answer_type": "short_text",
+"subdomain": "Phytoplankton Photophysiology",
+"relevance_score": 9,
+"difficulty_score": 5
+}
+]}

@@ -1,0 +1,57 @@
+{"reviews": [
+{
+"sample_id": "ocean50_006",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "shallow_linkage",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "By invoking diagenesis (phosphate released to the pore waters upon the reductive dissolution of iron oxides by sulfide produced during anaerobic methane oxidation), we can show that methane-driven diagenesis may contribute to the redistribution of phosphate...",
+"notes": "Answer is directly and verbatim supported; the mechanism chain (sea-level fall -> hydrate destabilization -> AOM sulfide -> iron-oxide dissolution -> P release) is genuinely multi-step science, but the full answer appears in a single sentence, and the question supplies the sea-level/hydrate premise as given. So it functions as a decorated lookup of one stated mechanism. No missing conditions; the paper is explicit that this is a proposed scenario, which the question correctly frames. No overstatement of causality."
+},
+{
+"sample_id": "ocean50_007",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "shallow_linkage",
+"question_ambiguity": "minor",
+"scientific_error_risk": "low",
+"source_excerpt": "This data scarcity introduces substantial uncertainty into air–sea CO2 exchange quantification... particularly in areas north of Cape Cod where measurements are very sparse (Fig. 2). For example, reported air–sea CO2 fluxes for the GoMe exhibit a wide range spanning from −0.50 to +2.50 mol C m−2 yr−1...",
+"notes": "The flux range and its attribution to sparse pCO2 coverage appear in adjacent sentences, so the 'why' is a one-hop explanation lookup rather than genuine cross-document linking. Minor ambiguity: the more general cause is 'data scarcity/limited spatiotemporal coverage'; 'north of Cape Cod' is the specific illustration given, and the GoMe lies in that area, so the proposed answer is defensible but slightly narrower than the stated general cause. Region (GoMe, NAACOM) is stated; no time condition needed since the cited flux estimates span multiple studies. Low risk of scientific error."
+},
+{
+"sample_id": "ocean50_008",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "likely_single_lookup",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "It has been estimated that the acidity in surface ocean waters has increased by about 26% since 1860 resulting in a pH decline from 8.2 to 8.1 (Tanhua et al., 2015).",
+"notes": "The 'computation' framing (logarithmic pH scale) is decorative: the 26% figure is stated verbatim in the source, and it is also arithmetically consistent (10^0.1 ≈ 1.26). Answer supported and unique. Note this is a global surface-ocean fact embedded in a U.S. Southeast acidification paper; the question correctly attributes it to surface ocean waters since 1860, so no missing conditions. Effectively a single-fact retrieval despite the quantitative setup."
+},
+{
+"sample_id": "ocean50_009",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "likely_single_lookup",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "The Southeast Coastal Ocean Observing Regional Association (SECOORA) and the National Oceanic and Atmospheric Administration's (NOAA) Ocean Acidification Program facilitated the formation of the Southeast Coastal and Ocean Acidification Network (SOCAN)... SOCAN was formed in January 2015...",
+"notes": "Pure single-fact lookup. The question's lead-in clauses (formation date, goal of translating the global problem to regional scales) are decorations restated from the same paragraph and do not add a reasoning hop. Answer is explicitly and uniquely supported. Region (North Carolina to Florida) is correctly included in the question. No scientific risk."
+},
+{
+"sample_id": "ocean50_010",
+"answer_supported": true,
+"answer_unique": true,
+"domain_relevant": true,
+"multihop_quality": "likely_single_lookup",
+"question_ambiguity": "none",
+"scientific_error_risk": "low",
+"source_excerpt": "...dissolved inorganic nitrogen, phosphate, and silica concentrations were significantly higher (p < 0.05) during the spring tide than those during the neap tide, suggesting that these nutrients were flushed from the mangrove area by the inundation and tidal mixing of the spring tide.",
+"notes": "The observation and its explanation are given in the same sentence of the abstract, so the 'why' is a direct lookup, not linked reasoning. The discussion adds a consistent mechanistic detail (release of anoxic interstitial waters by tidal wash-out), which is the same mechanism, so the answer remains unambiguous. Note the causal wording in the source is hedged ('suggesting'), and the proposed answer appropriately reflects a mechanistic inference rather than a proven cause; no overstatement. Study conditions (Sundarbans/Pasur River estuary, 2019 sampling) are adequately specified in the question."
+}
+]}

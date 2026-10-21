@@ -1,0 +1,46 @@
+{
+  "schema_version": "oceangraph.training.v1",
+  "split": null,
+  "split_strategy": "source_document_components",
+  "split_seed": 20261019,
+  "split_ratios": {
+    "train": 0.8,
+    "dev": 0.1,
+    "test": 0.1
+  },
+  "split_counts": {
+    "train": 13,
+    "dev": 2,
+    "test": 2
+  },
+  "split_files": {
+    "train": "train.jsonl",
+    "dev": "dev.jsonl",
+    "test": "test.jsonl"
+  },
+  "source_documents_per_split": {
+    "train": 6,
+    "dev": 2,
+    "test": 2
+  },
+  "source_document_overlaps": {
+    "train:dev": [],
+    "train:test": [],
+    "dev:test": []
+  },
+  "source_leakage_detected": false,
+  "split_viable": true,
+  "empty_splits": [],
+  "source_component_count": 10,
+  "largest_component_records": 3,
+  "largest_component_fraction": 0.17647058823529413,
+  "unresolved_supporting_chunk_records": 0,
+  "unresolved_supporting_chunk_ids": [],
+  "input_records": 17,
+  "exported_records": 17,
+  "rejected_records": 0,
+  "rejection_reasons": {},
+  "corpus_records": 44,
+  "qa_file": null,
+  "corpus_file": "corpus.jsonl"
+}

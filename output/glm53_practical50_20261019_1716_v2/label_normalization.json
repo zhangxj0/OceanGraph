@@ -1,0 +1,42 @@
+[
+  {
+    "question": "By 1997, how many hectares of the Potengi estuary mangrove forest remained undestroyed, given the total forest area and the area lost to degradation practices by that year?",
+    "subdomain": "coastal_hazards_human"
+  },
+  {
+    "question": "The Picorna-like virus detected in Pseudocalanus newmani whose phylogenetic relation to Bacillarnavirus matches the copepod's diatom prey belongs to which viral family?",
+    "subdomain": "marine_ecology_fisheries"
+  },
+  {
+    "question": "During a Pleistocene glacial cycle lasting about 100 kyr, how many times longer was the glacial (cold) phase compared to the interglacial (warm) phase?",
+    "subdomain": "physical_ocean_climate"
+  },
+  {
+    "question": "In the two-reservoir phosphorus scenario, which solid sediment phase releases its bound phosphorus into pore water when sulfide produced during anaerobic methane oxidation drives reductive dissolution?",
+    "subdomain": "physical_ocean_climate"
+  },
+  {
+    "question": "In the ReCAD-NAACOM-pCO2 reconstruction evaluated against SOCAT observations, how much larger is the accumulative uncertainty than the root-mean-square error?",
+    "subdomain": "carbon_biogeochemistry"
+  },
+  {
+    "question": "In which NAACOM subregion, where measurements north of Cape Cod are very sparse, have reported air–sea CO2 fluxes ranged from −0.50 to +2.50 mol C m−2 yr−1 with conflicting source/sink characterizations?",
+    "subdomain": "carbon_biogeochemistry"
+  },
+  {
+    "question": "In the Pasur River estuary study, how much higher was the mean chlorophyll-a concentration in the tidal mangrove creeks than in the estuary during the wet season?",
+    "subdomain": "carbon_biogeochemistry"
+  },
+  {
+    "question": "For Lithophyllum cabiochae, the 3°C warming increased dark respiration in autumn, winter and spring, but in one season under elevated pCO2 respiration declined instead. What mechanism involving enzymes was proposed for that decline?",
+    "subdomain": "carbon_biogeochemistry"
+  },
+  {
+    "question": "Among the three IODP South China Sea sites (U1431, U1432, U1433), what is the ratio of the highest to the lowest sedimentation rate?",
+    "subdomain": "physical_ocean_climate"
+  },
+  {
+    "question": "In the North Sea microbial mats where amoA gene abundance did not correlate with potential nitrification rates but amoA transcripts did, which group was concluded to perform the bulk of ammonium oxidation?",
+    "subdomain": "carbon_biogeochemistry"
+  }
+]

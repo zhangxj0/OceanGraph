@@ -1,0 +1,60 @@
+---
+document_id: "epmc-pmc4047535"
+title: "Coral calcifying fluid pH dictates response to ocean acidification"
+authors: ["M. Holcomb", "A. A. Venn", "E. Tambutté", "S. Tambutté", "D. Allemand", "J. Trotter", "M. McCulloch"]
+publisher: "Nature Publishing Group"
+journal: "Scientific Reports"
+publication_year: 2014
+document_type: "peer_reviewed_article"
+domain: "carbon_biogeochemistry"
+subdomain: "ocean_acidification_carbonate"
+secondary_topics: []
+source_platform: "Europe PMC"
+source_url: "https://europepmc.org/articles/PMC4047535"
+download_url: "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC4047535/fullTextXML"
+doi_or_report_id: "10.1038/srep05207"
+doi: "10.1038/srep05207"
+pmcid: "PMC4047535"
+license_status: "CC-BY-NC-SA"
+license_url: "http://creativecommons.org/licenses/by-nc-sa/3.0/"
+accessed_at: "2026-07-29"
+language: "en"
+---
+
+## Abstract
+
+Ocean acidification driven by rising levels of CO2 impairs calcification, threatening coral reef growth. Predicting how corals respond to CO2 requires a better understanding of how calcification is controlled. Here we show how spatial variations in the pH of the internal calcifying fluid (pHcf) in coral (Stylophora pistillata) colonies correlates with differential sensitivity of calcification to acidification. Coral apexes had the highest pHcf and experienced the smallest changes in pHcf in response to acidification. Lateral growth was associated with lower pHcf and greater changes with acidification. Calcification showed a pattern similar to pHcf, with lateral growth being more strongly affected by acidification than apical. Regulation of pHcf is therefore spatially variable within a coral and critical to determining the sensitivity of calcification to ocean acidification.
+
+The seawater environment that marine organisms inhabit is changing due to rising atmospheric CO2, which is causing a decline in seawater pH or ‘ocean acidification'1. Declining seawater pH and the resultant decrease in the calcium carbonate saturation state are expected to lead to reduced calcification rates for a wide range of calcifying organisms23. This is because bio-calcification, which generally occurs in an internal semi-isolated environment created and controlled by the organism, is nevertheless influenced by the external environment45678.
+
+Among the organisms expected to be affected by ocean acidification are scleractinian corals. The effects of acidification on coral calcification have been extensively studied91011121314151617, with a wide range of responses being observed1819. Such variability likely reflects the degree to which corals are able to control the chemistry at the site of calcification. One of the mechanisms by which corals are thought to facilitate calcification is through up-regulation of the pH of the calcifying fluid (pHcf)192021. An increase in pH is generally linked to an increase in the aragonite saturation state due to HCO3− converting to CO32− at elevated pH, thus favoring the precipitation of skeletal aragonite (CaCO3). The aragonite saturation state, represented by ΩAragonite, is defined as: where KSP is the solubility of aragonite.
+
+The decline in calcification rate often observed with ocean acidification has been suggested to be linked to a decline in pH in the calcifying fluid induced by lower pH in the external seawater environment192223. Understanding how the pH at the site of calcification changes in response to changes in the external seawater environment, both in the modern ocean and over evolutionary timescales, represents a critical step in predicting how calcifying organisms will fare under future conditions of ocean acidification.
+
+In addition to the importance of pHcf for the calcification process itself, understanding how pHcf relates to seawater pH is also of critical importance for the development of seawater pH proxies. Boron is of particular interest in this regard as it exists in seawater in one of two forms – borate or boric acid. The relative proportion of borate versus boric acid is determined by pH. Further there is a large (~27‰) difference in the isotopic composition of borate relative to boric acid, so the isotopic composition of borate is a function of pH24. Boron in the coral skeleton is thought to be derived almost entirely from borate present in the calcifying fluid25 and boron in the calcifying fluid is thought to come directly from seawater, which has a known boron isotopic composition26. Thus measurements of the isotopic composition of boron in corals can be used to calculate pHcf627. Since pHcf is related to seawater pH28 and the boron isotopic composition of the coral skeleton629, boron isotopes can be used to calculate seawater pH, thus allowing the estimation of seawater pH for periods prior to instrumental records.
+
+Here we investigate the sensitivity of corals to ocean acidification at intra-colony spatial scales by measuring pHcf and calcification rates in different regions within coral colonies exposed to reduced seawater pH. Branch tips (apexes) from colonies of the tropical coral Stylophora pistillata were attached to glass cover-slips and allowed to grow out laterally across the cover-slip (basal-lateral growth), and to extend the original branch tip (apical growth) (Fig. 1a). Measurements of pHcf were made in different regions of coral colonies using analytical methods suited to each region. Confocal microscopy with the pH indicator SNARF-1 was used to measure pHcf during the early stages of basal-lateral growth at the growing edge of the colonies where skeletal material is limited, thus facilitating observations with confocal microscopy. Boron isotope measurements were made on skeletal calcium carbonate samples from two different regions: 1) the lateral region (Fig. 1a), which included the material from the growing edge where confocal microscopy was undertaken, as well as the more mature skeletal regions overlying the material initially formed at the growing edge; and 2) the upwardly growing tips of the apexes, or apical region (Fig. 1a). The apical region is the region in which most growth normally occurs.
+
+## Results
+
+Corals were maintained in seawater with varying degrees of acidification (Supplementary Table S1) ranging from near ambient, pHT = 7.94 (pCO2 = 550 μatm), to pHT = 7.17 (pCO2 = 4140 μatm, used to achieve undersaturation with respect to aragonite). Corals produced new skeleton under the full range of pH treatments. However lateral growth rates (measured as changes in skeletal area) declined progressively with decreasing seawater pH (Fig. 1b), and growth was significantly reduced at pHT = 7.16 relative to ambient conditions (F3,32 = 5.81, p<0.01)28. In contrast to lateral growth, the apical extension of branches showed no significant change (F3,52 = 1.1, p = 0.36) in response to acidification (Fig. 1b).
+
+Measurements of δ11B showed a consistent decline in δ11B values associated with a decline in seawater pHT (Fig. 2a). For all regions, although pHcf was invariably elevated relative to seawater pHT (Fig. 2b), pHcf decreased with a decline in seawater pHT (Fig. 2b). The decline in pHcf was smaller than the corresponding pHT change in the seawater, thus the difference between seawater pHT and pHcf (ΔpH6) increased as seawater pHT declined (Fig. 2b and Supplementary Fig. S1). Although measurements of both apical and lateral growth showed the same general pattern, lateral growth generally had lower pHcf values than apical growth, and the difference between lateral and apical regions increased as pHT declined (Fig. 2b). Apexes thus had smaller changes in pHcf in response to acidification than adjacent lateral skeletal growth. For the growing edge, pHcf estimates were even lower and showed the largest declines in pHcf in response to acidification.
+
+## Discussion
+
+Our estimates of the effects of ocean acidification on the extension of branch tips (apical growth) are similar to those of other studies on S. pistillata colonies93031, being fairly stable over a wide range of pHT conditions (Fig. 1b). In contrast, extension of the lateral part of the colonies (lateral growth) was more strongly affected by ocean acidification, similar to other studies that have examined lateral growth in S. pistillata30. Boron isotope-based estimates of pHcf exhibited patterns similar to calcification data. Lateral growth, which showed the greatest decline in calcification in response to acidification also showed a greater decline in pHcf in response to acidification than adjacent apical growth. Thus spatial differences in the regulation of pHcf may account for changes in calcification, consistent with the IpHRAC19 model in which internal pHcf regulation controls abiotic calcification rates.
+
+Variation in the ability of the overlying tissue layer to control the pH at the site of calcification, as suggested by pHcf estimates (Fig. 2), may be linked to a number of differences existing between the apically and basal laterally growing regions3233. The growth of these two regions is fundamentally different: apical growth occurs in a largely unrestricted environment whereas basal lateral growth occurs at an interface between the coral and a substrate. Thus the growing edge (initial basal lateral growth) faces a number of potential challenges not generally encountered by the rest of the coral tissue, including competing with other organisms for substrate, and isolating new substrates from the surrounding environment to allow crystal growth to occur. The devotion of resources to compete for substrate could limit the energy available for calcification and in-turn reduce the ability of the tissue to up-regulate pH when faced with a more acidified environment. Or the isolation of new substrates from the surrounding environment may not be as complete as the isolation of existing skeletal regions, thus allowing higher rates of seawater ingress resulting in a more pronounced effect of acidification. Regardless of the underlying mechanism(s), pHcf and thus calcification, was more strongly affected by acidification in the basal, laterally growing regions than the apical growth. Thus stages of coral growth that involve extension over new substrates are likely to be more strongly affected by ocean acidification. This may be particularly relevant to the larval-stage of coral growth when all calcification is occurring on a new substrate, to coral fragments that must cement themselves to a new substrate, as well as to damaged corals attempting to re-grow over exposed skeleton; all represent growth stages in which lateral growth over a substrate plays an important role. These stages are therefore least likely to be able to maintain pHcf under acidified conditions and thus are likely to be more adversely affected by ocean acidification.
+
+Since calcification within a coral differs spatially in its sensitivity to ocean acidification, and that variations in pHcf appear to correspond to these differences in calcification, pHcf may help to predict how calcification will respond to ocean acidification. Measurements of pHcf thus represent an important tool for identifying stages of coral growth (e.g. colonization of new substrates) and particular species that will most likely be adversely affected by ocean acidification. Measurements of pHcf using boron isotopes can allow pHcf to be estimated over long time scales and allow variations in biologically controlled pH up-regulation to be linked to events (e.g. bleaching, storms, etc) in the natural environment which may further impact the ability of corals to regulate pHcf. Collectively such data can help to better predict how corals will respond to the range of conditions they face.
+
+## Methods
+
+See the supplemental material.
+
+## Author Contributions
+
+M.H., A.A.V., E.T., S.T., D.A., J.T. and M.M. designed the experiments. M.H., A.A.V. and E.T. performed research. M.H., A.A.V., E.T., S.T., D.A., J.T. and M.M. were involved in the preparation of the manuscript.
+
+## Supplementary Material

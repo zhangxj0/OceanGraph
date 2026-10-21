@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "Among the three Atlantic sites where the NPZD model was tuned with SeaWiFS chlorophyll and bb(490) data, which site is located at coordinates 49°N, 16°W, and which ocean abyssal province does it represent?",
+    "answer": "Porcupine Abyssal Plain (PAP)",
+    "short_answers": ["Porcupine Abyssal Plain (PAP)"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "marine biogeochemical modeling",
+    "reasoning_path": "Identify site at 49N 16W among CIS, ESTOC, PAP; resolve its name and province from the site descriptions.",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "If chlorophyll alone is used to validate an ocean carbon cycle model, what property of phytoplankton makes chlorophyll an unreliable proxy for carbon, and what does POC-derived bb data relate to instead?",
+    "answer": "highly dynamic carbon to chlorophyll ratio; particulate organic carbon",
+    "short_answers": ["highly dynamic carbon to chlorophyll ratio; particulate organic carbon"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemistry",
+    "reasoning_path": "Combine the stated reason chlorophyll is not a robust proxy (variable C:Chl) with the fact that bb empirically relates to POC.",
+    "relevance_score": 8,
+    "difficulty_score": 6
+  },
+  {
+    "question": "At the ESTOC site, the study location is the Estacion Europea de Series Temporales del Oceano near Islas Canarias; what latitude is it located at?",
+    "answer": "29 degrees North",
+    "short_answers": ["29 degrees North"],
+    "question_type": "bridge",
+    "answer_type": "numeric",
+    "subdomain": "ocean observation sites",
+    "reasoning_path": "Match ESTOC site name to its coordinates given in the site list.",
+    "relevance_score": 8,
+    "difficulty_score": 4
+  },
+  {
+    "question": "Of the three Atlantic study sites (Central Irminger Sea, ESTOC, Porcupine Abyssal Plain), which is the northernmost, and what is its longitude?",
+    "answer": "Central Irminger Sea, 40 degrees West",
+    "short_answers": ["Central Irminger Sea, 40 degrees West"],
+    "question_type": "comparison",
+    "answer_type": "entity",
+    "subdomain": "ocean observation sites",
+    "reasoning_path": "Compare latitudes 60N, 29N, 49N to identify the northernmost site, then retrieve its stated longitude 40W.",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  }
+]}

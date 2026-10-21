@@ -1,0 +1,32 @@
+{"qa_pairs": [
+  {
+    "question": "According to the Alk* analysis by Carter and colleagues, the Arctic receives riverine alkalinity per unit area at 8 times the rate of which ocean regions, and at what multiple relative to the Atlantic?",
+    "answer": "Twice the Atlantic, 8 times other oceans",
+    "short_answers": ["Twice the Atlantic, 8 times other oceans"],
+    "question_type": "comparison",
+    "answer_type": "short_text",
+    "subdomain": "Marine alkalinity and carbonate cycling",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "Upwelling of dissolved CaCO3-rich deep water elevates Alk* in which two ocean regions where subtropical gyres instead show low Alk* from net carbonate precipitation?",
+    "answer": "North Pacific and Southern Ocean",
+    "short_answers": ["North Pacific and Southern Ocean"],
+    "question_type": "spatial",
+    "answer_type": "entity",
+    "subdomain": "Marine carbonate cycling",
+    "relevance_score": 9,
+    "difficulty_score": 5
+  },
+  {
+    "question": "Given that rivers add 33 T mol AT per year of dissolved bicarbonate while Wolery and Sleep estimate hydrothermal vents add 6.6 T mol AT per year, how many times larger is the riverine than the estimated hydrothermal alkalinity input?",
+    "answer": "5",
+    "short_answers": ["5"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "Marine alkalinity sources",
+    "relevance_score": 8,
+    "difficulty_score": 6
+  }
+]}

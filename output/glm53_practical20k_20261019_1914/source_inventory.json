@@ -1,0 +1,25 @@
+{
+  "counts": {
+    "scanned": 20000,
+    "eligible": 13727,
+    "insufficient_marine_body": 2037,
+    "no_scientific_topic": 439,
+    "previous_sample_sources_excluded": 29,
+    "off_topic_title": 100,
+    "duplicate_document": 3655,
+    "short_context": 13
+  },
+  "topics": {
+    "carbon_pump_flux": 680,
+    "acidification_carbonate": 1592,
+    "nutrients_microbes": 4729,
+    "coastal_blue_carbon": 771,
+    "physical_climate": 516,
+    "ecology_plankton": 3125,
+    "observing_models": 408,
+    "sediment_paleo": 1906
+  },
+  "maximum_acceptance_at_4_per_document": 54908,
+  "seed": 20261019,
+  "previous_50_not_counted": true
+}

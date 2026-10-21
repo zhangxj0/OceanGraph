@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "In the Asterias rubens heatwave experiment, how much greater was the mortality at day 21 in the Amplified heatwave treatment compared to the Future heatwave treatment when temperature exceeded 25.8°C for 3 days?",
+    "answer": "8 percentage points",
+    "short_answers": ["8 percentage points"],
+    "question_type": "numeric_aggregation",
+    "answer_type": "numeric",
+    "subdomain": "marine heatwave impacts on benthic predators",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 1 states 83% mortality in Amplified vs 75% in Future by day 21; compute difference 83-75=8 percentage points."
+  },
+  {
+    "question": "In the Asterias rubens experiment, the heatwave treatment with intensity +5°C and 13-day duration reduced overall mussel consumption relative to the No heatwave control by a certain percentage; which longer-term treatment outcome does this percentage correspond to?",
+    "answer": "Extended heatwave treatment",
+    "short_answers": ["Extended heatwave treatment"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "marine heatwave impacts on predator feeding",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Chunk 1 defines Extended heatwave as +5°C, 13 days; Chunk 2 states the Extended heatwave caused a 53% reduction in mussel consumption. Bridge treatment definition to its outcome label."
+  },
+  {
+    "question": "The treatment in which all Asterias rubens died after 24 days was excluded from the feeding-rate plots; what peak temperature characterized that treatment?",
+    "answer": "26°C",
+    "short_answers": ["26°C"],
+    "question_type": "bridge",
+    "answer_type": "numeric",
+    "subdomain": "thermal tolerance of marine invertebrates",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Figure captions state Amplified treatments (all died after 24 days) were excluded; Chunk 1/4 state Amplified treatments had maximum 26.0°C."
+  },
+  {
+    "question": "Starfish feeding rates peak around 14°C and cease above 22°C; given this and the Kiel Fjord 2018 summer record, how far above the historical Baltic record were the experimental temperatures that caused 100% mortality?",
+    "answer": "1°C",
+    "short_answers": ["1°C"],
+    "question_type": "causal",
+    "answer_type": "numeric",
+    "subdomain": "thermal tolerance limits of marine predators",
+    "relevance_score": 9,
+    "difficulty_score": 7,
+    "reasoning_path": "Chunk 4 records 25°C peak in Kiel Fjord summer 2018 and states experimental temperatures only 1°C above this record were 100% lethal; combine lethal treatment temperature (26°C) with historical record."
+  }
+]}

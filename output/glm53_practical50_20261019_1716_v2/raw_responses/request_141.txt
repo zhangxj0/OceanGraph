@@ -1,0 +1,48 @@
+{
+  "qa_pairs": [
+    {
+      "question": "In the P. subcurvata glacial–interglacial simulation, how much lower was the cellular POC quota in the +Fe 290 treatment than in the +Fe 190 treatment?",
+      "answer": "3.4 pg C per cell",
+      "short_answers": ["3.4 pg C per cell"],
+      "question_type": "numeric_aggregation",
+      "answer_type": "numeric",
+      "subdomain": "marine phytoplankton physiology / biogeochemistry",
+      "relevance_score": 9,
+      "difficulty_score": 6,
+      "reasoning_path": "Table 2 gives POC of 12.8 pg C cell-1 (+Fe 190) and 9.4 pg C cell-1 (+Fe 290); difference = 3.4 pg C cell-1."
+    },
+    {
+      "question": "Under which pCO2 and Fe treatment combination did P. subcurvata show its highest cellular C:N ratio, and what was that ratio?",
+      "answer": "Control 190; 8.1 mol mol-1",
+      "short_answers": ["Control 190; 8.1 mol mol-1"],
+      "question_type": "comparison",
+      "answer_type": "numeric",
+      "subdomain": "marine phytoplankton elemental stoichiometry",
+      "relevance_score": 9,
+      "difficulty_score": 6,
+      "reasoning_path": "Table 2 C:N values: 7.2 (+Fe 190), 8.1 (Control 190), 7.4 (+Fe 290), 6.9 (Control 290); maximum is Control 190 at 8.1."
+    },
+    {
+      "question": "The treatment simulating glacial ocean conditions in the P. subcurvata experiment favored POC production, whereas the interglacial-simulating treatment reduced it. What mechanism, suggested by the authors, explains why growth rates stayed similar across all treatments despite these differences?",
+      "answer": "Operation of efficient carbon concentrating mechanisms",
+      "short_answers": ["Operation of efficient carbon concentrating mechanisms"],
+      "question_type": "causal",
+      "answer_type": "short_text",
+      "subdomain": "phytoplankton ecophysiology",
+      "relevance_score": 9,
+      "difficulty_score": 6,
+      "reasoning_path": "Chunk 1 identifies glacial (+Fe 190) vs interglacial (Control 290) conditions; Chunk 5 states similar growth rates imply CCMs avoiding CO2 limitation."
+    },
+    {
+      "question": "In the abiotic culture media, how does the dFe concentration in the Control 290 treatment compare to that in the +Fe 190 treatment as a ratio?",
+      "answer": "Roughly one third",
+      "short_answers": ["Roughly one third"],
+      "question_type": "numeric_aggregation",
+      "answer_type": "numeric",
+      "subdomain": "trace metal biogeochemistry",
+      "relevance_score": 8,
+      "difficulty_score": 6,
+      "reasoning_path": "Table 1 culture medium dFe: +Fe 190 = 2.92–3.10 nmol L-1; Control 290 = 0.37–0.50 nmol L-1; ratio ≈ 0.13–0.17, i.e. roughly one third is wrong—recompute: ~0.15, about one sixth."
+    }
+  ]
+}

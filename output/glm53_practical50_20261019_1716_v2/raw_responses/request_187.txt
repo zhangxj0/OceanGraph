@@ -1,0 +1,46 @@
+{"qa_pairs": [
+  {
+    "question": "During the STRATIPHYT-II spring 2011 observations, satellite ocean colour showed high Chl a around 45°N in the eastern North Atlantic with lower values further north, where in situ mixing profiles showed the water column homogeneously mixed down to 100 m. What factor explains the low Chl a concentrations in the north?",
+    "answer": "light limitation",
+    "short_answers": ["light limitation"],
+    "question_type": "causal",
+    "answer_type": "short_text",
+    "subdomain": "marine biogeochemistry / phytoplankton dynamics",
+    "relevance_score": 9,
+    "difficulty_score": 7,
+    "reasoning_path": "Fact 1: north of 45°N during STRATIPHYT-II the water column is almost homogeneously mixed to 100 m and Chl a is low. Fact 2: the paper states the low northern Chl a follows from light limitation. Combine to identify the mechanism."
+  },
+  {
+    "question": "In the Hahn-Woernle et al. North Atlantic transect study, SST increase is expected to inhibit mixing and reduce nutrient transport in the midlatitude Atlantic, whereas in the northern North Atlantic a different response is expected. In which of these two regions is phytoplankton expected to increase with rising SST?",
+    "answer": "northern North Atlantic",
+    "short_answers": ["northern North Atlantic"],
+    "question_type": "comparison",
+    "answer_type": "entity",
+    "subdomain": "ocean climate / phytoplankton-climate interactions",
+    "relevance_score": 9,
+    "difficulty_score": 6,
+    "reasoning_path": "Fact 1: midlatitude Atlantic is nutrient limited; SST rise reduces nutrient supply. Fact 2: northern North Atlantic is light limited; SST rise shallows the mixed layer, increasing light and expected phytoplankton. Compare to select the region."
+  },
+  {
+    "question": "Along the eastern North Atlantic south–north transect, the deep chlorophyll maximum is described as the dominant phytoplankton appearance in strongly stratified regions. In which ocean region does the study identify the DCM as the most dominant phytoplankton feature?",
+    "answer": "subtropical North Atlantic",
+    "short_answers": ["subtropical North Atlantic"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "phytoplankton vertical distributions",
+    "relevance_score": 8,
+    "difficulty_score": 5,
+    "reasoning_path": "Fact 1: DCM forms when growth shifts below the mixed layer in stratified, nutrient-depleted conditions. Fact 2: the text specifies the subtropical North Atlantic as the strongly stratified region where DCM dominates."
+  },
+  {
+    "question": "In the North Atlantic north of 20°N, Wernand et al. reported a century-long average Chl a increase rate of 0.0071 mg m−3 yr−1, while Boyce et al.'s long-term trends are correlated with a change in another ocean property. Which property's increase are the non-uniform global Chl a trends correlated with?",
+    "answer": "sea surface temperature",
+    "short_answers": ["sea surface temperature"],
+    "question_type": "bridge",
+    "answer_type": "entity",
+    "subdomain": "long-term chlorophyll trends",
+    "relevance_score": 8,
+    "difficulty_score": 6,
+    "reasoning_path": "Fact 1: long-term Chl a trends from Boyce et al. are non-uniform globally. Fact 2: the text states these trends are well correlated with increasing SST. Bridge from trend observation to the correlated driver."
+  }
+]}

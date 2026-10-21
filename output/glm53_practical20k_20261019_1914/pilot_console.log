@@ -1,0 +1,21 @@
+{"source": "ocean_corpus_09589", "accepted": 1, "total": 1}
+{"source": "ocean_corpus_08892", "accepted": 1, "total": 2}
+{"source": "ocean_corpus_06060", "accepted": 1, "total": 3}
+{"source": "ocean_corpus_00182", "accepted": 2, "total": 5}
+{"source": "ocean_corpus_10576", "accepted": 2, "total": 7}
+{"source": "ocean_corpus_08743", "accepted": 2, "total": 9}
+{"source": "ocean_corpus_11011", "accepted": 1, "total": 10}
+{"source": "ocean_corpus_11608", "accepted": 0, "total": 10}
+{"source": "ocean_corpus_14425", "accepted": 1, "total": 11}
+{"source": "ocean_corpus_06124", "accepted": 0, "total": 11}
+{"source": "ocean_corpus_12337", "accepted": 0, "total": 11}
+{"source": "ocean_corpus_02632", "accepted": 0, "total": 11}
+{"source": "ocean_corpus_01790", "accepted": 0, "total": 11}
+{"source": "ocean_corpus_00908", "accepted": 2, "total": 13}
+{"source": "ocean_corpus_02583", "accepted": 1, "total": 14}
+{"source": "ocean_corpus_18160", "accepted": 0, "total": 14}
+{"source": "ocean_corpus_11428", "accepted": 3, "total": 17}
+{"source": "ocean_corpus_00641", "accepted": 1, "total": 18}
+{"source": "ocean_corpus_14412", "accepted": 0, "total": 18}
+{"source": "ocean_corpus_02529", "accepted": 2, "total": 20}
+RUN_SUMMARY {"accepted": 20, "target": 20000, "source_documents": 13, "topics": {"nutrients_microbes": 4, "coastal_blue_carbon": 1, "carbon_pump_flux": 1, "physical_climate": 2, "ecology_plankton": 5, "acidification_carbonate": 3, "observing_models": 1, "sediment_paleo": 3}, "question_types": {"numeric_aggregation": 7, "bridge": 10, "causal": 1, "comparison": 2}, "quality_labels": {"clear_multi_step": 8, "shallow_linkage": 12}, "api_usage": {"requests": 39, "input_accounted": 114928, "output_accounted": 33552, "input_reported": 114928, "output_reported": 33552, "accepted": 20, "numeric": 7}, "completed": false, "verification_scope": "GLM-5.3 qualitative review, source-backed arithmetic, exact deduplication and within-source near-duplicate check; no proof of per-hop necessity."}

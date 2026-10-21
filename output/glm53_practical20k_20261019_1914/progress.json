@@ -1,0 +1,23 @@
+{
+  "status": "stopped",
+  "target": 20000,
+  "accepted": 16171,
+  "sources": {
+    "done": 4987,
+    "failed": 12,
+    "pending": 8728
+  },
+  "usage": {
+    "requests": 27168,
+    "input_accounted": 83249560,
+    "output_accounted": 25383723,
+    "input_reported": 83035904,
+    "output_reported": 25252651,
+    "accepted": 16171,
+    "numeric": 4941
+  },
+  "pid": 1701077,
+  "active_seconds": 56219.47,
+  "stop_reason": "Model endpoint returned HTTP 403",
+  "updated_utc": "2026-10-20T17:11:05Z"
+}
