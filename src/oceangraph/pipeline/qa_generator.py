@@ -191,7 +191,8 @@ def check_chunk_relevance(chunk_content: str, expert_persona: str, domain: str) 
     
     return is_relevant
 
-def generate_qa(chunks: List[Dict], expert_persona: str, domain: str) -> tuple:
+def generate_qa(chunks: List[Dict], expert_persona: str, domain: str,
+                *, verification_profile: str = "cost_efficient") -> tuple:
     """Generate one or more Q&A pairs from multihop context chunks using consolidated prompt.
     
     Returns:
@@ -210,7 +211,11 @@ def generate_qa(chunks: List[Dict], expert_persona: str, domain: str) -> tuple:
         domain_context = ""
         domain_relevance = ""
     
-    prompt = PROMPTS["question_answer_generation"].format(
+    template = PROMPTS["question_answer_generation"]
+    if verification_profile == "practical_multihop":
+        from oceangraph.pipeline.practical import GENERATION_PROMPT
+        template = GENERATION_PROMPT
+    prompt = template.format(
         content="[Refer to the chunks provided below]",
         expert_persona=expert_persona,
         domain_context=domain_context,
@@ -625,6 +630,8 @@ def verify_qa_cost_efficient(
     max_verification_chunks: int = 4,
 ) -> Dict[str, Any]:
     """Validate grounding, standalone form, and multi-hop support in one call."""
+    from oceangraph.text import is_metadata_only_chunk
+
     usable_chunks: List[Dict] = []
     chunk_labels: List[str] = []
     seen_labels = set()
@@ -649,6 +656,23 @@ def verify_qa_cost_efficient(
             "verification_api_calls": 0,
             "raw_response": "",
             "reason": "Fewer than the required distinct evidence chunks.",
+        }
+
+    metadata_labels = {
+        label for label, chunk in zip(chunk_labels, usable_chunks)
+        if is_metadata_only_chunk(chunk.get("content", ""))
+    }
+    if len(set(chunk_labels) - metadata_labels) < min_supporting_chunks:
+        return {
+            "status": "INSUFFICIENT_SCIENTIFIC_EVIDENCE",
+            "passes": False,
+            "basic_checks_passed": False,
+            "supporting_chunks": [],
+            "checked_chunks": chunk_labels,
+            "verification_profile": "cost_efficient",
+            "verification_api_calls": 0,
+            "raw_response": "",
+            "reason": "Bibliographic metadata cannot count as scientific multi-hop evidence.",
         }
 
     selected_indices = prioritize_verification_chunks(
@@ -682,7 +706,7 @@ def verify_qa_cost_efficient(
             "verification_profile": "cost_efficient",
             "verification_api_calls": 1,
             "raw_response": response,
-            "reason": "DeepSeek returned no parseable JSON object.",
+            "reason": "Verifier returned no parseable JSON object.",
         }
 
     verdict_accept = str(payload.get("verdict", "")).strip().upper() == "ACCEPT"
@@ -701,6 +725,10 @@ def verify_qa_cost_efficient(
     supporting_chunks = _resolve_supporting_positions(
         payload.get("supporting_chunks", []), selected_labels
     )
+    metadata_support = set(supporting_chunks) & metadata_labels
+    if metadata_support:
+        requires_content = False
+        supporting_chunks = [label for label in supporting_chunks if label not in metadata_labels]
     basic_checks_passed = all(
         (standalone, single_target, answer_supported, requires_content)
     )
@@ -737,9 +765,12 @@ def verify_qa_cost_efficient(
         "verification_profile": "cost_efficient",
         "verification_mode": "single_pass",
         "verification_api_calls": 1,
-        "method": "single_deepseek_grounding_pass",
+        "method": "single_model_grounding_pass",
         "raw_response": response,
-        "reason": str(payload.get("reason", "")).strip(),
+        "reason": (
+            "Bibliographic metadata was cited as scientific evidence."
+            if metadata_support else str(payload.get("reason", "")).strip()
+        ),
     }
 
 

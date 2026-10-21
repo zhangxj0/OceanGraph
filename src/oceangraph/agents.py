@@ -293,9 +293,14 @@ class QAAgent:
         chunks: List[Dict[str, Any]],
         expert_persona: str,
         domain: str,
+        *,
+        verification_profile: str = "cost_efficient",
     ) -> tuple:
         from oceangraph.pipeline.qa_generator import generate_qa
 
+        if verification_profile == "practical_multihop":
+            return generate_qa(chunks, expert_persona, domain,
+                               verification_profile=verification_profile)
         return generate_qa(chunks, expert_persona, domain)
 
     def select(
@@ -308,6 +313,7 @@ class QAAgent:
         use_model_review: bool,
         max_answer_words: int = 12,
         max_answer_cjk_chars: int = 16,
+        verification_profile: str = "cost_efficient",
     ) -> tuple:
         from oceangraph.pipeline.qa_generator import select_qa_pairs
 
@@ -316,7 +322,7 @@ class QAAgent:
             chunks,
             expert_persona,
             domain,
-            use_model_review=use_model_review,
+            use_model_review=use_model_review and verification_profile != "practical_multihop",
             max_answer_words=max_answer_words,
             max_answer_cjk_chars=max_answer_cjk_chars,
         )
@@ -372,7 +378,7 @@ class VerificationDecision:
         return self.verification_passed and self.multihop_passed
 
     def trace_event(self) -> Dict[str, Any]:
-        return make_agent_event(
+        event = make_agent_event(
             "verifier",
             status="accepted" if self.accepted else "rejected",
             outputs={
@@ -386,6 +392,13 @@ class VerificationDecision:
                 ),
             },
         )
+        if self.multihop_necessity_result.get("verification_profile") == "practical_multihop":
+            event["outputs"]["necessary"] = False
+            event["outputs"]["multihop_plausible"] = (
+                self.multihop_necessity_result.get("multihop_plausible") is True
+            )
+            event["actions"] = ["atomicity_check", "evidence_grounding", "multihop_plausibility"]
+        return event
 
 
 @dataclass(frozen=True)
@@ -608,7 +621,17 @@ class VerifierAgent:
                 verifier_uncertain=False,
             )
 
-        if self.verification_profile == "cost_efficient":
+        if self.verification_profile == "practical_multihop":
+            from oceangraph.pipeline.practical import verify_qa_practical
+            multihop_necessity = verify_qa_practical(
+                chunks, qa_pair, domain,
+            )
+            verification = str(multihop_necessity.get("raw_response")
+                               or multihop_necessity.get("reason", ""))
+            verification_passed = multihop_necessity.get("basic_checks_passed") is True
+            # Disabling exhaustive necessity checks does not allow plain lookups.
+            multihop_passed = multihop_necessity.get("passes") is True
+        elif self.verification_profile == "cost_efficient":
             multihop_necessity = verify_qa_cost_efficient(
                 chunks,
                 qa_pair,

@@ -96,7 +96,7 @@ def test_verification_and_correction_apply_deterministic_gate():
     assert "source_failure.get('original_qa', {})" in engine
     assert "optional model selection disabled" in generator
     assert '"method": "consolidated_single_pass"' in generator
-    assert '"method": "single_deepseek_grounding_pass"' in generator
+    assert '"method": "single_model_grounding_pass"' in generator
     assert "verification_api_calls" in generator
     assert "use_model_review=QA_MODEL_SELECTION" in engine
     assert "for source_failure in current_failures:" in engine

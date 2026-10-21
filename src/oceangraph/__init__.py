@@ -16,7 +16,7 @@ from .agents import (
 )
 
 FRAMEWORK_NAME = "OceanGraph-R1"
-FRAMEWORK_VERSION = "3.0.0"
+FRAMEWORK_VERSION = "4.0.0"
 __version__ = FRAMEWORK_VERSION
 
 __all__ = [

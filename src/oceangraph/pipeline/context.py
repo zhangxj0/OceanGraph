@@ -794,6 +794,7 @@ def build_complete_context(
             'artifact': artifact_paths,  # List of image paths (zero, one, or more)
             'image_path': image_path,  # First image path for backward compatibility
             'chunk_id': initial_chunk.get('chunk_id', 'initial'),
+            'global_chunk_id': initial_chunk.get('global_chunk_id'),
             'file_name': file_name  # Track source document
         }]
 

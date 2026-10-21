@@ -580,11 +580,15 @@ class TextEmbeddingReranker(ChunkReranker):
     
     def __init__(self, model_name: str = "BAAI/bge-large-en-v1.5"):
         from sentence_transformers import SentenceTransformer
+        from oceangraph.core.config import get_embedding_config
         
         print(f"Loading text embedding model: {model_name}")
         self.device = get_device()
         
-        self.model = SentenceTransformer(model_name, device=self.device)
+        self.model = SentenceTransformer(
+            model_name, device=self.device,
+            local_files_only=bool(get_embedding_config().get("local_files_only", False)),
+        )
         print(f"[OK] Text embedding model loaded on {self.device}")
         
         # For generating image descriptions (reuse VLM)

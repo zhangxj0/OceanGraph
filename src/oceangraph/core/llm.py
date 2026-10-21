@@ -227,13 +227,18 @@ def _is_usable_model_text(value: Any) -> bool:
     )
 
 
+class OutputTokenLimitError(ValueError):
+    """The request needs a different output budget, not an identical retry."""
+
+
 def _extract_openai_response_text(payload: Dict[str, Any]) -> str:
     """Extract non-empty assistant text from an OpenAI-compatible response.
 
     Some reasoning-model deployments return HTTP 200 with an empty ``content``
     field after consuming the output budget in ``reasoning_content``. Treating
     that as success used to cache an unusable response and reject downstream
-    candidates. Raise a retryable error instead, with non-secret diagnostics.
+    candidates. Length termination is non-retryable, including partial content.
+    Other empty responses remain retryable. Diagnostics never include content.
     """
 
     choices = payload.get("choices")
@@ -254,12 +259,20 @@ def _extract_openai_response_text(payload: Dict[str, Any]) -> str:
                 text_parts.append(part["text"])
         content = "".join(text_parts)
 
-    if _is_usable_model_text(content):
-        return content.strip()
-
     reasoning = message.get("reasoning_content")
     reasoning_chars = len(reasoning) if isinstance(reasoning, str) else 0
     finish_reason = choice.get("finish_reason", "unknown")
+    if finish_reason == "length":
+        state = "is empty" if not _is_usable_model_text(content) else "is truncated"
+        raise OutputTokenLimitError(
+            f"OpenAI-compatible response content {state} "
+            f"(finish_reason=length, reasoning_chars={reasoning_chars}). "
+            "Increase max_output_tokens or lower the model's supported reasoning effort. "
+            "The unchanged request will not be retried."
+        )
+    if _is_usable_model_text(content):
+        return content.strip()
+
     raise ValueError(
         "OpenAI-compatible response content is empty "
         f"(finish_reason={finish_reason}, reasoning_chars={reasoning_chars}). "
@@ -555,13 +568,13 @@ def call_llm_simple(
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = _extract_openai_response_text(resp_json)
-                    # Track token usage
+                    # Rejected HTTP-200 responses still consume provider tokens.
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0)
                     )
+                    result = _extract_openai_response_text(resp_json)
                 else:
                     raise Exception(f"HTTP {response.status_code}: {response.text[:200]}")
                     
@@ -578,6 +591,11 @@ def call_llm_simple(
                 )
                 if response.status_code == 200:
                     response_data = response.json()
+                    usage = response_data.get("usage", {})
+                    _update_token_stats(
+                        usage.get("prompt_tokens", 0),
+                        usage.get("completion_tokens", 0),
+                    )
                     result = _extract_openai_response_text(response_data)
                 else:
                     raise Exception(f"HTTP {response.status_code}")
@@ -599,6 +617,8 @@ def call_llm_simple(
             
             return result
                 
+        except OutputTokenLimitError:
+            raise
         except Exception as e:
             print(f"[WARN] LLM call error (attempt {attempt}/{max_retries}): {e}")
             
@@ -1154,12 +1174,12 @@ def call_vlm_interweaved(
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0),
                     )
+                    result = _extract_openai_response_text(resp_json)
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
                     # Note: Do NOT decrement attempt - rate limits count against max retries
                     raise Exception(f"Server error {response.status_code}")
@@ -1200,12 +1220,12 @@ def call_vlm_interweaved(
                 )
                 if response.status_code == 200:
                     resp_json = response.json()
-                    result = _extract_openai_response_text(resp_json)
                     usage = resp_json.get("usage", {})
                     _update_token_stats(
                         usage.get("prompt_tokens", 0),
                         usage.get("completion_tokens", 0),
                     )
+                    result = _extract_openai_response_text(resp_json)
                 elif 500 <= response.status_code < 600 or response.status_code == 429:
                     # Note: Do NOT decrement attempt - rate limits count against max retries
                     raise Exception(f"Server error {response.status_code}")
@@ -1229,6 +1249,8 @@ def call_vlm_interweaved(
             
             return result
                 
+        except OutputTokenLimitError:
+            raise
         except Exception as e:
             print(f"[WARN] VLM call error (attempt {attempt}): {e}")
         
@@ -1917,6 +1939,9 @@ async def _batch_llm_calls_async(
                 )
                 results[idx] = result
                 return
+            except OutputTokenLimitError as e:
+                results[idx] = f"ERROR: {e}"
+                return
             except Exception as e:
                 if attempt == max_retries - 1:
                     logging.error(f"Batch LLM call {idx} failed after {max_retries} attempts: {e}")
@@ -1963,6 +1988,9 @@ async def _batch_vlm_calls_async(
                     response_format=response_format,
                 )
                 results[idx] = result
+                return
+            except OutputTokenLimitError as e:
+                results[idx] = f"ERROR: {e}"
                 return
             except Exception as e:
                 if attempt == max_retries - 1:

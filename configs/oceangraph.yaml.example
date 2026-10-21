@@ -13,7 +13,7 @@
 
 framework:
   name: OceanGraph-R1
-  version: 3.0.0
+  version: 4.0.0
   agent_architecture: four_agent
   agents: [corpus, evidence, qa, verifier]
 

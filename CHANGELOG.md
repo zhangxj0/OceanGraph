@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0] - 2026-10-21
+
+- Share `configs/llm.yaml` between the normal pipeline and the packaged durable batch runner.
+- Accept OpenAI-compatible profile `base_url` while retaining legacy full `url`; reject ambiguous endpoint fields.
+- Add `oceangraph.batch.prepare` and `oceangraph.batch.run`, offline configuration checking, per-role credentials and provider parameters, run configuration history and per-call/sample route provenance.
+- Preserve SQLite resume, cumulative request/token/time bounds, local arithmetic and compound-question checks, topic selection and source-grouped training/Search-R1 exports.
+- Include previously validated GLM truncation, checkpoint recovery, token accounting, text reranking and practical-multihop improvements.
+- Remove batch machine-specific paths and credential extraction from local notes; provide a GLM/DeepSeek example and a Chinese configuration/migration README.
+- Software version is 4.0.0; taxonomy and four-agent architecture schema remain 3.0.0. Existing samples are not silently reverified after a model switch.
+
+
 All notable changes to OceanGraph-R1 are documented here.
 
 ## [3.0.0] - 2026-07-22

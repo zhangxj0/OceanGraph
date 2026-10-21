@@ -149,3 +149,11 @@ config.yaml.*backup*
 /rerankers_multimodal.py
 /rerankers_text_qa_llm.py
 /run_ablation_study.py
+
+# Local trial state and credential-bearing notes
+/tmp/
+GLM_TRIAL_NOTES.md
+GLM_PROFILE.md
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

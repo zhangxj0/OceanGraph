@@ -370,6 +370,9 @@ class CheckpointManager:
         elif operation == "file_chunks":
             file_stem = str(event["file_stem"])
             state["chunks_by_file"][file_stem] = list(event.get("chunks", []))
+            # New/repaired document chunks require a fresh combined-corpus write.
+            # This also invalidates a stale final marker during journal replay.
+            state["final_chunks_saved"] = False
             if file_stem not in state["completed_files"]:
                 state["completed_files"].append(file_stem)
         elif operation == "final_chunks_saved":
@@ -460,14 +463,23 @@ class CheckpointManager:
     
     def get_completed_chunk_files(self) -> Set[str]:
         """Get set of already chunked files (by stem name)."""
-        return set(self._chunks_state.get('completed_files', []))
+        return set(self._chunks_state.get('completed_files', [])) & set(
+            self.get_all_file_chunks()
+        )
     
     def is_final_chunks_saved(self) -> bool:
         """Check if final renumbered chunks have been saved."""
-        return self._chunks_state.get('final_chunks_saved', False)
+        completed = set(self._chunks_state.get('completed_files', []))
+        return bool(
+            self._chunks_state.get('final_chunks_saved', False)
+            and completed
+            and completed == self.get_completed_chunk_files()
+        )
     
     def save_file_chunks(self, file_stem: str, chunks: List[Dict]):
         """Save chunks for a single file (before renumbering)."""
+        if not chunks or any(not chunk.get("content", "").strip() for chunk in chunks):
+            raise ValueError(f"Cannot checkpoint empty chunks for {file_stem}")
         self._append_event(
             self.chunks_checkpoint,
             self._chunks_state,
@@ -477,7 +489,12 @@ class CheckpointManager:
     
     def get_all_file_chunks(self) -> Dict[str, List[Dict]]:
         """Get all chunks organized by file."""
-        return self._chunks_state.get('chunks_by_file', {})
+        # Older runs could journal zero chunks as a completed document.
+        return {
+            name: chunks
+            for name, chunks in self._chunks_state.get('chunks_by_file', {}).items()
+            if chunks and all(chunk.get("content", "").strip() for chunk in chunks)
+        }
     
     def mark_final_chunks_saved(self):
         """Mark that final renumbered chunks have been saved."""

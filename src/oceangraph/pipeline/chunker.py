@@ -31,25 +31,32 @@ OVERLAP_SIZE = 800   # Ten percent overlap for boundary continuity
 # Parallel processing
 NUM_FILE_WORKERS = 4  # Number of files to process in parallel
 
-def parse_chunks_from_response(response: str) -> List[Dict]:
+def parse_chunks_from_response(response: str, *, strict: bool = False) -> List[Dict]:
     """Parse structured chunks from LLM response
     
     Expected format per prompt:
     <chunk_id>VALUE<|#|><chunk_type>VALUE<|#|><content>VALUE<|#|><artifact>VALUE<|#|><status>VALUE<|#|><chunk_end>
+
+    Strict runtime parsing rejects malformed blocks instead of silently losing
+    part of a document. The default retains legacy inspection-tool behavior.
     """
     chunks = []
     
     # Split by <chunk_end> marker
     chunk_blocks = response.split('<chunk_end>')
     
-    for block in chunk_blocks:
+    for block_index, block in enumerate(chunk_blocks):
         block = block.strip()
         if not block:
             continue
+        if strict and block_index == len(chunk_blocks) - 1:
+            raise ValueError("Semantic chunk block is missing <chunk_end>")
         
         # Parse fields separated by <|#|>
         # Format: <field_name>VALUE<|#|>
         parts = block.split('<|#|>')
+        if strict and (len(parts) != 6 or parts[-1].strip()):
+            raise ValueError("Semantic chunk must contain exactly five terminated fields")
         
         if len(parts) >= 5:
             # Extract field values by removing the field name prefix
@@ -64,6 +71,11 @@ def parse_chunks_from_response(response: str) -> List[Dict]:
             content = re.sub(r'^<content>', '', parts[2]).strip()
             artifact = re.sub(r'^<artifact>', '', parts[3]).strip()
             status = re.sub(r'^<status>', '', parts[4]).strip()
+            if strict and (
+                not chunk_id or not chunk_type or not content
+                or status.upper() not in {"COMPLETE", "INCOMPLETE"}
+            ):
+                raise ValueError("Semantic chunk block has empty fields or invalid status")
             
             # Fix: If artifact is empty/None but content has image references, extract them
             if (not artifact or artifact == 'None') and content and '![' in content and '](' in content:
@@ -80,6 +92,8 @@ def parse_chunks_from_response(response: str) -> List[Dict]:
                 'status': status
             })
         else:
+            if strict:
+                raise ValueError(f"Malformed semantic chunk block: {len(parts)} fields")
             logging.warning(f"Skipping malformed chunk block with {len(parts)} parts (expected 5+). Block preview: {block[:200]}")
             print(f"[WARN] Skipping malformed chunk block with {len(parts)} parts")
     
@@ -223,17 +237,14 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
             
             # Check for empty response
             if not response or not response.strip():
-                logging.warning(f"Empty response from LLM for window {window_num}")
-                print(f"[WARN] Empty response from LLM for window {window_num}, skipping...")
-                incomplete_chunk = None
-                # Move to next window
-                if window_end >= len(markdown_text):
-                    break
-                position = window_end - overlap_size
-                continue
+                raise ValueError("Empty semantic chunking response")
             
             # Parse chunks from response
-            window_chunks = parse_chunks_from_response(response)
+            window_chunks = parse_chunks_from_response(response, strict=True)
+            if not window_chunks or any(
+                not chunk.get("content", "").strip() for chunk in window_chunks
+            ):
+                raise ValueError("Semantic chunking returned no usable chunks")
             print(f"[OK] Parsed {len(window_chunks)} chunks from window {window_num}")
             
             # Print character and word count for each chunk
@@ -252,8 +263,8 @@ def chunk_with_windows(markdown_text: str) -> Tuple[List[Dict], Dict[int, Dict[s
             all_chunks.extend(window_chunks)
             
         except Exception as e:
-            print(f"[ERROR] Error processing window {window_num}: {e}")
-            incomplete_chunk = None  # Reset on error
+            # Never promote partial documents to a completed corpus checkpoint.
+            raise RuntimeError(f"Semantic chunking failed at window {window_num}: {e}") from e
         
         # Move to next window with overlap
         if window_end >= len(markdown_text):

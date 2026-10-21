@@ -6,6 +6,24 @@ import json
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional
+from urllib.parse import urlsplit
+
+
+def profile_url(raw: Mapping[str, Any], backend: str, fallback: str) -> str:
+    """Accept a full legacy URL or an OpenAI-compatible API base, never both."""
+    if raw.get("url") and raw.get("base_url"):
+        raise ValueError("Set either url or base_url, not both")
+    if not raw.get("base_url"):
+        return str(raw.get("url") or fallback)
+    if backend != "OPENAI":
+        raise ValueError("Profile base_url currently requires backend OPENAI; use url otherwise")
+    base = str(raw["base_url"]).strip().rstrip("/")
+    parsed = urlsplit(base)
+    if parsed.scheme not in {"https", "http"} or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("base_url must be an HTTP(S) URL without credentials, query or fragment")
+    if base.endswith("/chat/completions"):
+        raise ValueError("base_url must omit /chat/completions; use url for a full endpoint")
+    return base + "/chat/completions"
 
 
 _DEFAULT_STAGE_ROUTES = {
@@ -159,7 +177,7 @@ class StageModelRouter:
                 backend=profile_backend,
                 model=str(raw.get("model") or fallback_llm_model),
                 vision_model=raw.get("vision_model"),
-                url=str(raw.get("url") or fallback_url),
+                url=profile_url(raw, profile_backend, fallback_url),
                 api_key_env=str(api_key_env) if api_key_env else None,
                 temperature=raw.get("temperature", 0.0),
                 timeout=int(raw.get("timeout", 300)),

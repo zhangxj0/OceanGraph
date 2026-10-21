@@ -146,7 +146,9 @@ def load_config(config_path: str = None) -> Dict[str, Any]:
             path = workspace_config
         else:
             # Return default configuration - allows import without config file
-            return _apply_runtime_environment(_get_default_config())
+            return _apply_runtime_environment(
+                _resolve_external_llm_config(_get_default_config(), primary_config_path=path)
+            )
     
     with open(path, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f) or {}

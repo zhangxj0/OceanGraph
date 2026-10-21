@@ -14,7 +14,9 @@ import faiss
 from pathlib import Path
 from typing import Optional, List, Dict, Tuple
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import (
+    ThreadPoolExecutor, ProcessPoolExecutor, as_completed, wait, FIRST_COMPLETED,
+)
 from functools import partial
 import multiprocessing as mp
 
@@ -274,7 +276,7 @@ if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
         QA_MULTIHOP_VERIFICATION_MODE,
     )
     QA_MULTIHOP_VERIFICATION_MODE = "balanced"
-if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
+if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy", "practical_multihop"}:
     logging.warning(
         "Unknown verification profile %r; using cost_efficient",
         QA_VERIFICATION_PROFILE,
@@ -381,9 +383,9 @@ def apply_runtime_config(runtime_config=None) -> dict:
         qa_generation.get("verification_profile", "cost_efficient")
         or "cost_efficient"
     ).strip().lower()
-    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
+    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy", "practical_multihop"}:
         raise ValueError(
-            "qa_generation.verification_profile must be cost_efficient or legacy"
+            "qa_generation.verification_profile must be cost_efficient, legacy or practical_multihop"
         )
     QA_MAX_ANSWER_WORDS = max(
         1, int(qa_generation.get("max_answer_words", 12) or 12)
@@ -485,8 +487,8 @@ def apply_runtime_config(runtime_config=None) -> dict:
 
     if QA_MULTIHOP_VERIFICATION_MODE not in {"balanced", "strict"}:
         raise ValueError("multihop verification mode must be balanced or strict")
-    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy"}:
-        raise ValueError("verification profile must be cost_efficient or legacy")
+    if QA_VERIFICATION_PROFILE not in {"cost_efficient", "legacy", "practical_multihop"}:
+        raise ValueError("verification profile must be cost_efficient, legacy or practical_multihop")
     if QA_MULTIHOP_VERIFICATION_MODE != "strict":
         QA_COUNTERFACTUAL_VERIFICATION = False
     QA_MAX_VERIFICATION_CHUNKS = max(
@@ -560,6 +562,7 @@ def _effective_runtime_settings() -> dict:
             "min_supporting_chunks": QA_MIN_SUPPORTING_CHUNKS,
             "model_selection": QA_MODEL_SELECTION,
             "verification_profile": QA_VERIFICATION_PROFILE,
+            "evidence_policy": "scientific_body_v1",
             "max_answer_words": QA_MAX_ANSWER_WORDS,
             "max_answer_cjk_chars": QA_MAX_ANSWER_CJK_CHARS,
             "multihop_verification_mode": QA_MULTIHOP_VERIFICATION_MODE,
@@ -728,18 +731,23 @@ def _load_sentence_transformer(model_name: str):
     from oceangraph.utils.device import get_device
     
     device = get_device()
+    local_files_only = bool(get_embedding_config().get("local_files_only", False))
     
     # Load to CPU first to avoid meta tensor issues, then move to GPU
     # Some models use device_map internally which creates meta tensors
     try:
-        model = SentenceTransformer(model_name, device='cpu')
+        model = SentenceTransformer(
+            model_name, device='cpu', local_files_only=local_files_only,
+        )
         if device.startswith('cuda'):
             model = model.to(device)
         return model
     except Exception as e:
         # Fallback: try direct loading with device
         print(f"CPU-first loading failed ({e}), trying direct load...")
-        return SentenceTransformer(model_name, device=device)
+        return SentenceTransformer(
+            model_name, device=device, local_files_only=local_files_only,
+        )
 
 def get_embedder(model_name: Optional[str] = None, use_multimodal: bool = False):
     """Get or create embedding model (cached if CACHE_EMBEDDINGS=True)
@@ -970,6 +978,8 @@ def _chunk_single_markdown(args: Tuple[str, str]) -> Tuple[str, List[dict], str]
         md_file = Path(md_file_path)
         markdown_text = md_file.read_text(encoding='utf-8')
         chunks, _ = chunk_with_windows(markdown_text)
+        if not chunks:
+            raise ValueError("Semantic chunking produced no chunks")
         chunks = renumber_chunks(chunks, file_stem)
         
         return (file_stem, chunks, None)
@@ -1153,23 +1163,44 @@ def convert_documents_to_chunks_parallel(doc_dir: str, output_chunks_file: str,
     
     # Process pending files
     if pending_md_files:
+        failures = {}
+        pending = iter(pending_md_files)
         with ThreadPoolExecutor(max_workers=NUM_WORKERS) as executor:
-            futures = {executor.submit(_chunk_single_markdown, args): args[1] for args in pending_md_files}
-            
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Chunking"):
-                file_stem = futures[future]
-                try:
-                    name, chunks, error = future.result()
-                    if error:
-                        print(f"  [ERROR] {name}: {error}")
-                    else:
-                        saved_chunks[file_stem] = chunks
-                        print(f"  [OK] {name}: {len(chunks)} chunks")
-                        # Checkpoint after each file is chunked
-                        if checkpoint_mgr:
-                            checkpoint_mgr.save_file_chunks(file_stem, chunks)
-                except Exception as e:
-                    print(f"  [ERROR] {file_stem}: {e}")
+            futures = {}
+            def submit_next():
+                args = next(pending, None)
+                if args is not None:
+                    futures[executor.submit(_chunk_single_markdown, args)] = args[1]
+
+            for _ in range(min(NUM_WORKERS, len(pending_md_files))):
+                submit_next()
+            with tqdm(total=len(pending_md_files), desc="Chunking") as progress:
+                while futures:
+                    done, _ = wait(futures, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        file_stem = futures.pop(future)
+                        try:
+                            name, chunks, error = future.result()
+                            if error or not chunks:
+                                raise RuntimeError(error or "Semantic chunking produced no chunks")
+                            if checkpoint_mgr:
+                                checkpoint_mgr.save_file_chunks(file_stem, chunks)
+                            saved_chunks[file_stem] = chunks
+                            print(f"  [OK] {name}: {len(chunks)} chunks")
+                        except Exception as e:
+                            failures[file_stem] = str(e)
+                            print(f"  [ERROR] {file_stem}: {e}")
+                        progress.update(1)
+                    # Drain only already-running documents after the first failure.
+                    if not failures:
+                        for _ in done:
+                            submit_next()
+        if failures:
+            raise RuntimeError(
+                f"Semantic chunking failed for {len(failures)} document(s); "
+                "successful document checkpoints were retained. "
+                f"No partial corpus was finalized. First failure: {next(iter(failures.values()))}"
+            )
     
     # =========================================================================
     # PHASE 3: Combine and renumber all chunks
@@ -1572,6 +1603,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         initial_chunk_dict = {
             'content': chunk_content,
             'chunk_id': chunk.get('chunk_id', str(i)) if isinstance(chunk, dict) else str(i),
+            'global_chunk_id': chunk.get('global_chunk_id') if isinstance(chunk, dict) else None,
             'file_name': chunk.get('file_name', 'unknown') if isinstance(chunk, dict) else 'unknown',
             'artifact': chunk.get('artifact', 'None') if isinstance(chunk, dict) else 'None'
         }
@@ -1621,7 +1653,8 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
         
         # 4.2 QA Agent: synthesize candidate QA pairs and reasoning annotations
         qa_pairs, qa_metadata = qa_agent.generate(
-            context_chunks, expert_persona, domain
+            context_chunks, expert_persona, domain,
+            verification_profile=QA_VERIFICATION_PROFILE,
         )
         search_trajectory = build_search_trajectory(context_result)
         
@@ -1632,6 +1665,7 @@ def process_single_chunk_for_qa(chunk_data: tuple, domain: str, expert_persona: 
             expert_persona,
             domain,
             use_model_review=QA_MODEL_SELECTION,
+            verification_profile=QA_VERIFICATION_PROFILE,
             max_answer_words=QA_MAX_ANSWER_WORDS,
             max_answer_cjk_chars=QA_MAX_ANSWER_CJK_CHARS,
         )
@@ -2048,6 +2082,9 @@ def filter_chunks_by_qa_type(chunks: list, qa_type: str) -> list:
         from oceangraph.text import sanitize_text_chunks
 
         chunks = sanitize_text_chunks(chunks)
+
+    from oceangraph.text import is_metadata_only_chunk
+    chunks = [chunk for chunk in chunks if not is_metadata_only_chunk(chunk.get("content", ""))]
 
     if qa_type == 'mix':
         # Mix mode: use all chunks

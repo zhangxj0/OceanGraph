@@ -17,6 +17,12 @@ TRAINING_SCHEMA_VERSION = "oceangraph.training.v1"
 REQUIRED_AGENTS = {"corpus", "evidence", "qa", "verifier"}
 
 
+def _is_practical_record(item: Mapping[str, Any]) -> bool:
+    return (item.get("multihop_necessity_result") or {}).get(
+        "verification_profile"
+    ) == "practical_multihop"
+
+
 def _unique_strings(values: Iterable[Any]) -> List[str]:
     if isinstance(values, (str, bytes)):
         values = [values]
@@ -52,6 +58,16 @@ def validate_training_record(item: Mapping[str, Any]) -> List[str]:
     necessity = item.get("multihop_necessity_result") or {}
     if necessity.get("passes") is not True:
         reasons.append("multihop_not_verified")
+
+    if _is_practical_record(item):
+        # Qualitative verification remains mandatory; chain annotations do not.
+        for check in ("question_standalone", "single_target", "answer_supported",
+                      "domain_relevant", "multihop_plausible"):
+            if necessity.get(check) is not True:
+                reasons.append(f"verification_failed:{check}")
+        if necessity.get("verdict") != "ACCEPT":
+            reasons.append("verifier_not_accepted")
+        return reasons
 
     graph = item.get("evidence_graph") or {}
     supporting_ids = _unique_strings(graph.get("supporting_chunk_ids", []) or [])
@@ -107,11 +123,12 @@ def to_training_record(
     split_group_id: str = "",
 ) -> Dict[str, Any]:
     """Normalize one accepted QA item without duplicating full context text."""
-    graph = dict(item.get("evidence_graph") or {})
+    practical = _is_practical_record(item)
+    graph = {} if practical else dict(item.get("evidence_graph") or {})
     necessity = dict(item.get("multihop_necessity_result") or {})
     question = " ".join(str(item.get("question", "")).split())
     answer = " ".join(str(item.get("answer", "")).split())
-    return {
+    record = {
         "schema_version": TRAINING_SCHEMA_VERSION,
         "qa_id": str(item.get("qa_id") or stable_qa_id(item)),
         "split": split,
@@ -127,27 +144,6 @@ def to_training_record(
         "taxonomy_version": item.get("taxonomy_version", "3.0.0"),
         "question_type": item.get("question_type", ""),
         "answer_type": normalize_answer_type(item.get("answer_type", "")),
-        "hop_count": int(item.get("hop_count", 0) or 0),
-        "reasoning": {
-            "sub_questions": list(item.get("sub_questions", []) or []),
-            "reasoning_path": item.get("reasoning_path", ""),
-        },
-        "evidence": {
-            "supporting_chunk_ids": list(graph.get("supporting_chunk_ids", []) or []),
-            "supporting_facts": list(item.get("supporting_facts", []) or []),
-            "evidence_spans": list(item.get("evidence_spans", []) or []),
-            "graph": graph,
-        },
-        "retrieval": {
-            "search_history": list(item.get("search_history", []) or []),
-            "search_trajectory": list(item.get("search_trajectory", []) or []),
-            "retrieval_hop_count": int(item.get("retrieval_hop_count", 0) or 0),
-        },
-        "multi_agent": {
-            "architecture_version": "3.0.0",
-            "agent_trace": list(item.get("agent_trace", []) or []),
-            "coordination_trace": dict(item.get("coordination_trace") or {}),
-        },
         "verification": {
             "passes": necessity.get("passes") is True,
             "status": necessity.get("status", ""),
@@ -164,6 +160,39 @@ def to_training_record(
             "selection_status": item.get("selection_status", ""),
         },
     }
+    if practical:
+        record["verification"].update({
+            "answer_supported": necessity.get("answer_supported") is True,
+            "multihop_plausible": necessity.get("multihop_plausible") is True,
+            "necessity_verified": False,
+        })
+    else:
+        record.update({
+            "hop_count": int(item.get("hop_count", 0) or 0),
+            "reasoning": {
+                "sub_questions": list(item.get("sub_questions", []) or []),
+                "reasoning_path": item.get("reasoning_path", ""),
+            },
+            "evidence": {
+                "supporting_chunk_ids": list(graph.get("supporting_chunk_ids", []) or []),
+                "supporting_facts": list(item.get("supporting_facts", []) or []),
+                "evidence_spans": list(item.get("evidence_spans", []) or []),
+                "graph": graph,
+            },
+            "retrieval": {
+                "search_history": list(item.get("search_history", []) or []),
+                "search_trajectory": list(item.get("search_trajectory", []) or []),
+                "retrieval_hop_count": int(item.get("retrieval_hop_count", 0) or 0),
+            },
+            "multi_agent": {
+                "architecture_version": "3.0.0",
+                "agent_trace": list(item.get("agent_trace", []) or []),
+                "coordination_trace": dict(item.get("coordination_trace") or {}),
+            },
+        })
+    if item.get("model_provenance"):
+        record["metadata"]["model_provenance"] = dict(item["model_provenance"])
+    return record
 
 
 def to_corpus_records(chunks: Iterable[Mapping[str, Any]]) -> List[Dict[str, Any]]:
@@ -216,11 +245,17 @@ def _resolve_supporting_source_documents(
     item: Mapping[str, Any],
     chunk_sources: Mapping[str, str],
 ) -> tuple[List[str], List[str]]:
-    """Resolve every supporting chunk against the exported retrieval corpus."""
+    """Resolve provenance against the corpus, even when proof graphs are absent."""
     graph = item.get("evidence_graph") or {}
+    if _is_practical_record(item):
+        chunk_ids = [stable_chunk_id(dict(chunk), index)
+                     for index, chunk in enumerate(item.get("context_chunks", []) or [], 1)
+                     if isinstance(chunk, Mapping)]
+    else:
+        chunk_ids = graph.get("supporting_chunk_ids", []) or []
     sources = []
     unresolved = []
-    for chunk_id in _unique_strings(graph.get("supporting_chunk_ids", []) or []):
+    for chunk_id in _unique_strings(chunk_ids):
         source = chunk_sources.get(chunk_id)
         if source:
             sources.append(source)
@@ -342,6 +377,9 @@ def export_training_dataset(
             unresolved_record_count += 1
             unresolved_supporting_ids.extend(unresolved)
             rejected_reasons.update(["unresolved_supporting_chunks"])
+            continue
+        if _is_practical_record(item) and not sources:
+            rejected_reasons.update(["missing_source_context"])
             continue
         resolved_items.append(item)
         source_sets.append(sources)

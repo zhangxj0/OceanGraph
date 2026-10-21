@@ -5,7 +5,7 @@ import yaml
 from oceangraph.core.config import load_config
 
 
-def test_recommended_config_routes_qwen_and_deepseek():
+def test_recommended_config_routes_glm_with_stage_reasoning():
     config_path = Path(__file__).parents[1] / "configs" / "oceangraph.yaml.example"
     raw_config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     config = load_config(str(config_path))
@@ -13,7 +13,7 @@ def test_recommended_config_routes_qwen_and_deepseek():
 
     assert raw_config["llm_config_file"] == "configs/llm.yaml"
     assert "models" not in raw_config
-    assert config["framework"]["version"] == "3.0.0"
+    assert config["framework"]["version"] == "4.0.0"
     assert config["framework"]["agents"] == [
         "corpus",
         "evidence",
@@ -24,17 +24,24 @@ def test_recommended_config_routes_qwen_and_deepseek():
         "https://llmapi.paratera.com/v1/chat/completions"
     )
     assert profiles["generator"]["api_key_env"] == "OPENAI_API_KEY"
-    assert profiles["generator"]["model"] == "Qwen3.7-Plus"
-    assert profiles["generator"]["max_output_tokens"] == 4096
+    assert profiles["generator"]["model"] == "GLM-5.3"
+    assert profiles["generator"]["max_output_tokens"] == 32768
+    assert profiles["generator"].get("thinking") is None
+    assert profiles["generator"]["extra_body"] == {
+        "thinking": {"type": "enabled"}, "reasoning_effort": "low",
+    }
     assert config["pipeline"]["modality"] == "text"
     assert profiles["generator"]["supports_vision"] is False
     assert profiles["verifier"]["url"] == (
         "https://llmapi.paratera.com/v1/chat/completions"
     )
     assert profiles["verifier"]["api_key_env"] == "OPENAI_API_KEY"
-    assert profiles["verifier"]["model"] == "DeepSeek-V4-Pro"
-    assert profiles["verifier"]["thinking"] is False
-    assert profiles["verifier"]["max_output_tokens"] == 4096
+    assert profiles["verifier"]["model"] == "GLM-5.3"
+    assert profiles["verifier"].get("thinking") is None
+    assert profiles["verifier"]["extra_body"] == {
+        "thinking": {"type": "enabled"}, "reasoning_effort": "high",
+    }
+    assert profiles["verifier"]["max_output_tokens"] == 32768
     assert config["processing"]["max_pdfs"] is None
     assert config["chunking"] == {"window_size": 8000, "overlap_size": 800}
     assert config["evaluation"]["run_evaluation"] is False
@@ -92,5 +99,5 @@ def test_normalized_corpus_profile_matches_server_safe_defaults():
     assert profile["chunking"] == {"window_size": 8000, "overlap_size": 800}
     assert profile["embedding"]["local_files_only"] is True
     assert profile["faiss"]["use_gpu"] is False
-    assert resolved["models"]["profiles"]["generator"]["model"] == "Qwen3.7-Plus"
-    assert resolved["models"]["profiles"]["verifier"]["model"] == "DeepSeek-V4-Pro"
+    assert resolved["models"]["profiles"]["generator"]["model"] == "GLM-5.3"
+    assert resolved["models"]["profiles"]["verifier"]["model"] == "GLM-5.3"

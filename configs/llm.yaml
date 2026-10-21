@@ -1,3 +1,6 @@
+# v4: shared by the normal pipeline and python -m oceangraph.batch.run.
+# Profiles accept either full url OR base_url (OpenAI-compatible API prefix).
+# Reload happens at the next process start. See README for two-provider examples.
 # OceanGraph model routing (safe to edit and commit: no API keys live here).
 #
 # Edit only this file when the generation or verification endpoint changes.
@@ -11,38 +14,45 @@ backend:
   active: OPENAI
   openai:
     url: https://llmapi.paratera.com/v1/chat/completions
-    llm_model: Qwen3.7-Plus
-    vlm_model: Qwen3.7-Plus
+    llm_model: GLM-5.3
+    vlm_model: GLM-5.3
     timeout: 300
 
 models:
   profiles:
-    # Qwen generates retrieval queries, multi-hop questions, short answers,
-    # reasoning annotations, and optional corrections.
+    # GLM-5.3 always reasons. Low effort is used for corpus/retrieval/generation.
+    # Documented GLM fields are passed through extra_body; enable_thinking is
+    # a different provider's flag and is intentionally omitted.
     generator:
       backend: OPENAI
       url: https://llmapi.paratera.com/v1/chat/completions
       api_key_env: OPENAI_API_KEY
-      model: Qwen3.7-Plus
+      model: GLM-5.3
       supports_vision: false
       temperature: 0.0
-      thinking: false
       structured_output: true
-      max_output_tokens: 4096
+      max_output_tokens: 32768
+      extra_body:
+        thinking:
+          type: enabled
+        reasoning_effort: low
       timeout: 300
 
-    # DeepSeek is used only for validation. Both profiles use the same
-    # Paratera OpenAI-compatible endpoint while retaining model separation.
+    # Separate verifier calls use the same GLM model with a higher effort.
+    # This is role separation, not independent-model verification.
     verifier:
       backend: OPENAI
       url: https://llmapi.paratera.com/v1/chat/completions
       api_key_env: OPENAI_API_KEY
-      model: DeepSeek-V4-Pro
+      model: GLM-5.3
       supports_vision: false
       temperature: 0.0
-      thinking: false
       structured_output: true
-      max_output_tokens: 4096
+      max_output_tokens: 32768
+      extra_body:
+        thinking:
+          type: enabled
+        reasoning_effort: high
       timeout: 300
 
   stages:

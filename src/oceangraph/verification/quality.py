@@ -92,7 +92,10 @@ def atomic_qa_violations(
         violations.append("multi_clause_answer")
 
     answer_without_terminal = normalized_answer.rstrip(".!。！")
-    if re.search(r"[.!。！]\s*\S", answer_without_terminal):
+    # Decimal points and abbreviated scientific genera are not sentence ends.
+    sentence_text = re.sub(r"(?<=\d)\.(?=\d)", "", answer_without_terminal)
+    sentence_text = re.sub(r"\b[A-Z]\.(?=\s+[a-z])", "", sentence_text)
+    if re.search(r"[.!。！]\s*\S", sentence_text):
         violations.append("multi_sentence_answer")
 
     latin_words = re.findall(r"\b[\w$%+./-]+\b", normalized_answer, re.UNICODE)

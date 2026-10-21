@@ -105,3 +105,59 @@ def test_local_standalone_gate_rejects_before_deepseek(monkeypatch):
     assert decision.accepted is False
     assert decision.quality_violations == ["question_not_standalone"]
     assert decision.multihop_necessity_result["verification_api_calls"] == 0
+
+
+def _bibliographic_chunk():
+    return {"file_name": "deposit", "chunk_id": "meta", "content": (
+        '---\ndocument_id: "deposit-123"\ntitle: "CSIRO Mk3L COAL"\n'
+        'publication_year: 2019\nsource: Zenodo\n---'
+    )}
+
+
+def test_metadata_year_shortcut_is_rejected_before_paid_verification(monkeypatch):
+    qa_generator = _load_qa_generator(monkeypatch)
+    calls = []
+    def accepted(*args, **kwargs):
+        calls.append(1)
+        return json.dumps({"verdict": "ACCEPT", "question_standalone": True,
+            "single_target": True, "answer_supported": True,
+            "requires_content": True, "supporting_chunks": [1, 2]})
+    monkeypatch.setattr(qa_generator, "call_ai_service", accepted)
+    result = qa_generator.verify_qa_cost_efficient(
+        [_chunks()[0], _bibliographic_chunk()],
+        {"question": "In what year was the Zenodo deposit for CSIRO Mk3L COAL published?",
+         "answer": "2019"}, "Ocean scientist", "Marine biogeochemistry")
+    assert result["passes"] is False
+    assert result["verification_api_calls"] == 0
+    assert calls == []
+
+
+def test_metadata_cannot_be_promoted_to_support_even_if_model_accepts(monkeypatch):
+    qa_generator = _load_qa_generator(monkeypatch)
+    monkeypatch.setattr(qa_generator, "call_ai_service", lambda *a, **kw:
+        json.dumps({"verdict": "ACCEPT", "question_standalone": True,
+            "single_target": True, "answer_supported": True,
+            "requires_content": True, "supporting_chunks": [1, 3]}))
+    result = qa_generator.verify_qa_cost_efficient(
+        [_chunks()[0], _chunks()[1], _bibliographic_chunk()],
+        {"question": "When was the model deposit published?", "answer": "2019"},
+        "Ocean scientist", "Marine biogeochemistry")
+    assert result["passes"] is False
+    assert result["basic_checks_passed"] is False
+    assert "deposit:meta" not in result["supporting_chunks"]
+
+
+def test_mixed_metadata_and_science_body_remains_scientific_evidence():
+    from oceangraph.text import is_metadata_only_chunk
+    metadata = _bibliographic_chunk()["content"]
+    assert is_metadata_only_chunk(metadata) is True
+    assert is_metadata_only_chunk(metadata + "\n\nOcean acidification lowers pH.") is False
+    assert is_metadata_only_chunk("Ocean acidification lowers pH.") is False
+
+
+def test_metadata_is_not_scheduled_as_a_qa_seed(monkeypatch):
+    from oceangraph import engine
+    monkeypatch.setattr(engine, "TEXT_ONLY_MODE", True)
+    candidates = engine.filter_chunks_by_qa_type([_bibliographic_chunk(), _chunks()[0]], "multihop")
+    assert len(candidates) == 1
+    assert candidates[0]["file_name"] == "argo"

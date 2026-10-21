@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from oceangraph.core import config, llm
 from oceangraph.pipeline import chunker
 from oceangraph.utils import preflight
@@ -87,9 +89,9 @@ def test_semantic_chunking_uses_corpus_route(monkeypatch):
 
     monkeypatch.setattr(chunker, "call_llm_simple", fail_after_recording)
 
-    chunks, _ = chunker.chunk_with_windows("A short ocean-science test document.")
+    with pytest.raises(RuntimeError, match="stop after route capture"):
+        chunker.chunk_with_windows("A short ocean-science test document.")
 
-    assert chunks == []
     assert stages == ["corpus"]
 
 

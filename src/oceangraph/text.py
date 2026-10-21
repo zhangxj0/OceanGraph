@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
+import re
+
+
+def is_metadata_only_chunk(text: str) -> bool:
+    """Recognize a complete bibliographic YAML block without any science body."""
+    match = re.fullmatch(r"---[ \t]*\r?\n(.*?)\r?\n---[ \t]*", str(text).strip(), re.DOTALL)
+    if not match:
+        return False
+    keys = set(re.findall(r"(?m)^([a-z_]+)\s*:", match.group(1)))
+    return bool(
+        keys & {"document_id", "source", "doi", "url"}
+        and len(keys & {"document_id", "title", "authors", "publication_year",
+                        "source", "doi", "url", "license", "domain", "subdomain"}) >= 2
+    )
 
 
 def sanitize_text_chunks(chunks: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
